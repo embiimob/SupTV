@@ -101,7 +101,9 @@
       color: #00131f;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       font-weight: 700;
+      font-size: 1.05rem;
       cursor: pointer;
+      min-width: 2.6rem;
     }
 
     .controls .skip-inline {
@@ -109,7 +111,6 @@
       color: #dbe7ff;
       border: 1px solid rgba(132, 157, 217, .36);
       font-weight: 700;
-      min-width: 4.6rem;
     }
 
     .side-feed {
@@ -215,32 +216,6 @@
       cursor: pointer;
     }
 
-    .skip-floating-btn {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      min-width: 4.5rem;
-      height: 2.35rem;
-      padding: 0 .85rem;
-      border-radius: .8rem;
-      border: 1px solid rgba(140, 164, 222, .3);
-      background: rgba(9, 15, 32, .72);
-      color: #e9f1ff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: .86rem;
-      letter-spacing: .03em;
-      font-weight: 700;
-      cursor: pointer;
-      z-index: 5;
-      transition: opacity .2s ease, transform .2s ease;
-    }
-
-    .skip-floating-btn:hover {
-      transform: scale(1.04);
-      background: rgba(22, 31, 54, .78);
-    }
 
     .waiting-overlay {
       position: absolute;
@@ -349,7 +324,7 @@
     }
 
     .hidden-ui .topbar,
-    .hidden-ui .skip-floating-btn {
+    .hidden-ui .ticker-wrap {
       opacity: 0;
       pointer-events: none;
     }
@@ -387,6 +362,7 @@
       background: rgba(4, 8, 20, .85);
       overflow: hidden;
       pointer-events: none;
+      transition: opacity .25s ease;
     }
 
     #ticker {
@@ -396,7 +372,7 @@
       line-height: 2.7rem;
       color: #dbebff;
       font-weight: 600;
-      animation: crawl 26s linear infinite;
+      animation: crawl 50s linear infinite;
     }
 
     @keyframes crawl {
@@ -420,12 +396,10 @@
       <div class="brand"><b>SupTV</b><span>Always-on stream</span></div>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
-        <button type="submit">Play</button>
-        <button type="button" id="fullscreenBtn" aria-keyshortcuts="f">Full Screen</button>
-        <button type="button" class="skip-inline" id="skipInlineBtn">Skip</button>
+        <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
+        <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
     </header>
-    <button class="skip-floating-btn" id="trashBtn" type="button" aria-label="Skip current video" title="Skip this video">Skip</button>
 
     <section class="side-feed" aria-live="polite">
       <ul id="messages"></ul>
@@ -459,7 +433,6 @@
       searchForm: document.getElementById('searchForm'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
-      trashBtn: document.getElementById('trashBtn'),
       app: document.getElementById('app'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
@@ -690,7 +663,7 @@
       });
       const summary = `found:${searchResultTotal} • active:${items.length} • keyword:${keyword}`;
       dom.ticker.textContent = statusCards.length
-        ? `${tickerLabel(keyword)}${summary} • ${statusCards.join('  ✦  ')}`
+        ? `${tickerLabel(keyword)}${summary}          ${statusCards.join('          ✦          ')}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
     }
 
@@ -1047,7 +1020,6 @@
         }
       });
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
-      dom.trashBtn.addEventListener('click', trashCurrentVideo);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       dom.video.addEventListener('touchstart', (event) => {
         if (!event.changedTouches?.length) return;
