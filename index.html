@@ -554,6 +554,8 @@
     let lastTouchPointer = null;
     let lastMousePointer = null;
     let currentKeyword = DEFAULT_KEYWORD;
+    const keywordByAddressCache = new Map();
+    const profileByAddressCache = new Map();
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -618,6 +620,31 @@
       if (!value) return Number.NaN;
       const time = new Date(value).getTime();
       return Number.isNaN(time) ? Number.NaN : time;
+    };
+    const unwrapQuotedText = (value) => normalize(value).replace(/^"|"$/g, '');
+    const formatLinkLabel = (value, max = 42) => {
+      const text = cleanDisplayText(value || '');
+      if (!text) return '';
+      let display = text;
+      try {
+        const parsed = new URL(text);
+        display = `${parsed.hostname.replace(/^www\./i, '')}${parsed.pathname === '/' ? '' : parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch {
+        display = text.replace(/^https?:\/\//i, '');
+      }
+      return display.length > max ? `${display.slice(0, max - 1)}…` : display;
+    };
+    const profileDisplayName = (profile) => {
+      if (!profile || typeof profile !== 'object') return '';
+      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || '');
+      if (urn) return urn;
+      const displayName = cleanDisplayText(profile.dnm || profile.DNM || profile.displayName || profile.DisplayName || '');
+      if (displayName) return displayName;
+      const fullName = [profile.fnm, profile.FNM, profile.firstName, profile.FirstName, profile.mnm, profile.MNM, profile.middleName, profile.MiddleName, profile.lnm, profile.LNM, profile.lastName, profile.LastName, profile.sfx, profile.SFX, profile.suffix, profile.Suffix]
+        .map((part) => cleanDisplayText(part || ''))
+        .filter(Boolean)
+        .join(' ');
+      return cleanDisplayText(fullName);
     };
     const createSocialCard = ({ title, meta, body, imageUrl = '', links = [], keywords = [], createdAt = '', timestamp = Number.NaN, key = '' }) => ({
       title,
@@ -688,7 +715,7 @@
       if (trailing) fragment.appendChild(document.createTextNode(trailing));
     }
 
-    function buildInteractiveContent(text) {
+    function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
       const content = document.createDocumentFragment();
       const source = normalize(text);
       const urlRegex = new RegExp(URL_REGEX.source, 'gi');
@@ -704,7 +731,8 @@
         anchor.href = cleanUrl;
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.textContent = cleanUrl;
+        anchor.title = cleanUrl;
+        anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
         content.appendChild(anchor);
         if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         lastIndex = start + matchedUrl.length;
@@ -716,7 +744,7 @@
     function setStatus(text) {
       const statusText = normalize(text).replace(/\s*[\u2013\u2014-]\s*tap\/click to play\s*$/i, '');
       dom.status.setAttribute('aria-label', statusText);
-      dom.status.replaceChildren(buildInteractiveContent(statusText));
+      dom.status.replaceChildren(buildInteractiveContent(statusText, { urlMaxLength: 34 }));
     }
 
     function asArray(payload) {
@@ -744,6 +772,11 @@
       return cleanDisplayText(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '');
     }
 
+    function displayFromAddress(root, addressLabels = new Map()) {
+      const address = rootFromAddress(root);
+      return addressLabels.get(address) || address;
+    }
+
     function messageBlockDate(payload) {
       const root = unwrapRootPayload(payload);
       return root?.BlockDate || root?.blockDate || root?.['Block Date'] || '';
@@ -756,6 +789,57 @@
 
     function messageTimestamp(payload) {
       return toTimestamp(messageBlockDate(payload));
+    }
+
+    async function getKeywordByPublicAddress(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return '';
+      if (keywordByAddressCache.has(cleanAddress)) return keywordByAddressCache.get(cleanAddress);
+      const lookup = (async () => {
+        try {
+          const endpoint = `${P2FK_BASE_URL}/GetKeywordByPublicAddress/${encodeURIComponent(cleanAddress)}?mainnet=${USE_P2FK_MAINNET}`;
+          const response = await fetch(endpoint);
+          if (!response.ok) return '';
+          return cleanDisplayText(unwrapQuotedText(await response.text()));
+        } catch {
+          return '';
+        }
+      })();
+      keywordByAddressCache.set(cleanAddress, lookup);
+      return lookup;
+    }
+
+    async function getProfileByAddress(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return null;
+      if (profileByAddressCache.has(cleanAddress)) return profileByAddressCache.get(cleanAddress);
+      const lookup = (async () => {
+        try {
+          const endpoint = `${P2FK_BASE_URL}/GetProfileByAddress/${encodeURIComponent(cleanAddress)}?mainnet=${USE_P2FK_MAINNET}`;
+          const response = await fetch(endpoint);
+          if (!response.ok) return null;
+          return await response.json();
+        } catch {
+          return null;
+        }
+      })();
+      profileByAddressCache.set(cleanAddress, lookup);
+      return lookup;
+    }
+
+    async function resolveAddressDisplay(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return '';
+      const keyword = await getKeywordByPublicAddress(cleanAddress);
+      if (keyword) return keyword;
+      const profile = await getProfileByAddress(cleanAddress);
+      return profileDisplayName(profile) || cleanAddress;
+    }
+
+    async function resolveAddressLabels(messages) {
+      const addresses = [...new Set(messages.map((message) => rootFromAddress(unwrapRootPayload(message) || {})).filter(Boolean))];
+      const entries = await Promise.all(addresses.map(async (address) => [address, await resolveAddressDisplay(address)]));
+      return new Map(entries);
     }
 
     function sortByNewestTimestamp(a, b) {
@@ -804,7 +888,7 @@
       });
     }
 
-    function parseItems(messages) {
+    function parseItems(messages, addressLabels = new Map()) {
       const seen = new Set();
       const isValidIpfsVideoMessage = (messageText) => {
         const ipfsMatch = messageText.match(IPFS_REGEX);
@@ -830,7 +914,7 @@
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, title),
-              from: rootFromAddress(root),
+              from: displayFromAddress(root, addressLabels),
               createdAt: messageBlockDate(root),
               hash: '',
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
@@ -856,7 +940,7 @@
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
-              from: rootFromAddress(root),
+              from: displayFromAddress(root, addressLabels),
               createdAt: messageBlockDate(root),
               hash,
               path: '',
@@ -871,20 +955,20 @@
         .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp));
     }
 
-    function parseSocialCards(messages) {
+    function parseSocialCards(messages, addressLabels = new Map()) {
       return messages
         .map((msg) => {
           const root = unwrapRootPayload(msg) || {};
           const messageText = normalizeRootMsg(root);
           if (!messageText) return null;
           const subject = cleanDisplayText(normalize(root?.Subject || root?.subject || ''));
-          const from = rootFromAddress(root);
+          const from = displayFromAddress(root, addressLabels);
           const createdAt = messageBlockDate(root);
           const timestamp = messageTimestamp(root);
           const txid = messageTxid(root);
           return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
-            meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
+            meta: `${from ? shortTitle(from, 18) : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
             body: cleanDisplayText(messageText),
             imageUrl: extractImageUrl(messageText),
             links: extractLinks(messageText),
@@ -954,7 +1038,7 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body)));
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: 42 }));
         li.appendChild(body);
       }
 
@@ -966,7 +1050,8 @@
           anchor.href = url;
           anchor.target = '_blank';
           anchor.rel = 'noopener noreferrer';
-          anchor.textContent = shortTitle(url, 44);
+          anchor.title = url;
+          anchor.textContent = formatLinkLabel(url, 44);
           linksWrap.appendChild(anchor);
         }
         li.appendChild(linksWrap);
@@ -1182,8 +1267,8 @@
       updateTicker();
     }
 
-    function prepareSocialFeed(messages, keyword) {
-      streamCardPool = parseSocialCards(messages);
+    function prepareSocialFeed(messages, keyword, addressLabels = new Map()) {
+      streamCardPool = parseSocialCards(messages, addressLabels);
       shownSocialCardKeys = new Set();
       if (!streamCardPool.length) {
         streamCardPool = [createSocialCard({ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, links: [], keywords: [keyword], key: `none:${keyword}` })];
@@ -1193,7 +1278,7 @@
 
     function scheduleTimelineForCurrent(entry, nextEntry) {
       clearScheduledMessages();
-      const creator = entry.from ? `${entry.from.slice(0, 12)}…` : 'p2fk';
+      const creator = entry.from ? shortTitle(entry.from, 18) : 'p2fk';
       addMessage({
         title: `Now Playing: ${entry.title}`,
         meta: `${creator}${entry.createdAt ? ` · ${formatUtcDate(entry.createdAt)}` : ''}${entry.hash ? ` · ${entry.hash.slice(0, 12)}…` : ''}`,
@@ -1262,11 +1347,12 @@
       const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
       const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
       const messages = mergeUniqueMessagesByTxid(keywordMessages, mainSearchMessages);
-      const items = dedupeItemsByTxid(parseItems(messages));
+      const addressLabels = await resolveAddressLabels(messages);
+      const items = dedupeItemsByTxid(parseItems(messages, addressLabels));
       if (!items.length) {
         throw new Error('no playable videos in keyword or search results');
       }
-      return { items, messages };
+      return { items, messages, addressLabels };
     }
 
     function playCurrent() {
@@ -1364,12 +1450,12 @@
       setStatus(`Searching p2fk.io for "${cleaned}"…`);
 
       try {
-        const { items, messages } = await queryP2FK(cleaned);
+        const { items, messages, addressLabels } = await queryP2FK(cleaned);
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
         updateTicker(playQueue, cleaned);
-        prepareSocialFeed(messages, cleaned);
+        prepareSocialFeed(messages, cleaned, addressLabels);
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
