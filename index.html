@@ -31,6 +31,8 @@
       position: fixed;
       inset: 0;
       background: radial-gradient(circle at top right, #16233d, #050811 40%, #02020a 80%);
+      border: 1px solid rgba(137, 166, 232, .16);
+      box-shadow: inset 0 0 0 2px rgba(130, 167, 255, .06), inset 0 0 120px rgba(41, 95, 205, .15);
     }
 
     #player {
@@ -100,6 +102,14 @@
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       font-weight: 700;
       cursor: pointer;
+    }
+
+    .controls .skip-inline {
+      background: rgba(13, 21, 41, .78);
+      color: #dbe7ff;
+      border: 1px solid rgba(132, 157, 217, .36);
+      font-weight: 700;
+      min-width: 4.6rem;
     }
 
     .side-feed {
@@ -173,40 +183,195 @@
       opacity: .95;
     }
 
-    .trash-btn {
+    .skip-floating-btn {
       position: absolute;
       top: 1rem;
       right: 1rem;
-      width: 2.35rem;
+      min-width: 4.5rem;
       height: 2.35rem;
+      padding: 0 .85rem;
       border-radius: .8rem;
       border: 1px solid rgba(140, 164, 222, .3);
       background: rgba(9, 15, 32, .72);
       color: #e9f1ff;
-      display: grid;
-      place-items: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .86rem;
+      letter-spacing: .03em;
+      font-weight: 700;
       cursor: pointer;
       z-index: 5;
       transition: opacity .2s ease, transform .2s ease;
     }
 
-    .trash-btn:hover {
+    .skip-floating-btn:hover {
       transform: scale(1.04);
       background: rgba(22, 31, 54, .78);
     }
 
-    .trash-btn svg {
-      width: 1.2rem;
-      height: 1.2rem;
+    .queue-panel {
+      position: absolute;
+      left: 1rem;
+      bottom: 4.45rem;
+      width: min(34vw, 430px);
+      border-radius: .95rem;
+      border: 1px solid rgba(126, 158, 226, .25);
+      background: linear-gradient(160deg, rgba(9, 16, 32, .72), rgba(11, 21, 43, .56));
+      backdrop-filter: blur(8px);
+      padding: .65rem .75rem;
+      pointer-events: none;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+    }
+
+    .queue-panel-title {
+      font-size: .72rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #b1c6f7;
+      margin-bottom: .4rem;
+    }
+
+    #queueStatus {
+      font-size: .73rem;
+      color: #d8e8ff;
+      margin-bottom: .45rem;
+    }
+
+    #queueList {
+      display: grid;
+      gap: .28rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: .75rem;
+      color: #d7e4ff;
+    }
+
+    #queueList li {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: .9;
+    }
+
+    .waiting-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, rgba(7, 12, 25, .82), rgba(0, 0, 0, .72));
+      color: #f1f7ff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+      z-index: 4;
+    }
+
+    .waiting-overlay.visible {
+      opacity: 1;
+    }
+
+    .waiting-box {
+      text-align: center;
+      background: rgba(8, 14, 28, .65);
+      border: 1px solid rgba(142, 167, 228, .34);
+      border-radius: .9rem;
+      padding: .85rem 1rem;
+      min-width: min(74vw, 350px);
+      box-shadow: 0 10px 35px rgba(0, 0, 0, .32);
+    }
+
+    .waiting-spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      margin: 0 auto .55rem;
+      border: 2px solid rgba(208, 224, 255, .22);
+      border-top-color: #9bc7ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .off-air-screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #2f2f33, #15161b 58%, #09090b 100%);
+      z-index: 3;
+      overflow: hidden;
+    }
+
+    .off-air-screen.visible {
+      display: flex;
+    }
+
+    .off-air-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,.04), rgba(255,255,255,.04) 2px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px);
+      mix-blend-mode: soft-light;
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    .off-air-card {
+      width: min(84vw, 640px);
+      aspect-ratio: 4 / 3;
+      border-radius: .9rem;
+      border: 2px solid rgba(240, 246, 255, .38);
+      background: linear-gradient(180deg, #f0f0f0 0%, #dedede 38%, #999 60%, #272727 100%);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 15px 44px rgba(0, 0, 0, .48);
+    }
+
+    .off-air-bars {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(to right,
+          #f7f7f7 0 15%,
+          #f8da3d 15% 30%,
+          #38d9e8 30% 45%,
+          #65e264 45% 60%,
+          #e45757 60% 75%,
+          #6c69e8 75% 100%);
+      opacity: .68;
+    }
+
+    .off-air-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #f7fbff;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, .58);
+      font-weight: 800;
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      background: radial-gradient(circle at center, rgba(0,0,0,.15), rgba(0,0,0,.6));
     }
 
     .hidden-ui .topbar,
-    .hidden-ui .trash-btn {
+    .hidden-ui .skip-floating-btn {
       opacity: 0;
       pointer-events: none;
     }
 
     .fullscreen-mode .ticker-wrap {
+      display: none;
+    }
+
+    .fullscreen-mode .queue-panel {
       display: none;
     }
 
@@ -264,6 +429,7 @@
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 6.9rem; }
       .controls { width: min(72vw, 560px); }
       .brand span { display: none; }
+      .queue-panel { width: calc(100vw - 2rem); bottom: 3.55rem; }
     }
   </style>
 </head>
@@ -278,16 +444,33 @@
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="submit">Play</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f">Full Screen</button>
+        <button type="button" class="skip-inline" id="skipInlineBtn">Skip</button>
       </form>
     </header>
-    <button class="trash-btn" id="trashBtn" type="button" aria-label="Trash current video" title="Skip this video">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 7h16M9 7V5.8c0-.99.81-1.8 1.8-1.8h2.4c.99 0 1.8.81 1.8 1.8V7m-8.7 0 .85 11.3c.06.93.84 1.65 1.77 1.65h5.56c.93 0 1.71-.72 1.77-1.65L17.9 7M10 10.2v6.2M14 10.2v6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-      </svg>
-    </button>
+    <button class="skip-floating-btn" id="trashBtn" type="button" aria-label="Skip current video" title="Skip this video">Skip</button>
 
     <section class="side-feed" aria-live="polite">
       <ul id="messages"></ul>
+    </section>
+
+    <aside class="queue-panel" aria-live="polite">
+      <div class="queue-panel-title">Queue Monitor</div>
+      <div id="queueStatus">Preparing queue…</div>
+      <ol id="queueList"></ol>
+    </aside>
+
+    <section class="off-air-screen" id="offAirScreen" aria-live="polite">
+      <div class="off-air-card" role="img" aria-label="Station off air signal">
+        <div class="off-air-bars"></div>
+        <div class="off-air-center">SUPTV · OFF AIR</div>
+      </div>
+    </section>
+
+    <section class="waiting-overlay" id="waitingOverlay" aria-live="polite">
+      <div class="waiting-box">
+        <div class="waiting-spinner" aria-hidden="true"></div>
+        <div id="waitingText">Buffering next stream…</div>
+      </div>
     </section>
 
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
@@ -303,11 +486,19 @@
       query: document.getElementById('query'),
       searchForm: document.getElementById('searchForm'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
+      skipInlineBtn: document.getElementById('skipInlineBtn'),
       trashBtn: document.getElementById('trashBtn'),
-      app: document.getElementById('app')
+      app: document.getElementById('app'),
+      queueStatus: document.getElementById('queueStatus'),
+      queueList: document.getElementById('queueList'),
+      offAirScreen: document.getElementById('offAirScreen'),
+      waitingOverlay: document.getElementById('waitingOverlay'),
+      waitingText: document.getElementById('waitingText')
     };
 
     const DEFAULT_KEYWORD = 'game';
+    const MAX_PLAYLIST_ITEMS = 50;
+    const PRELOAD_COUNT = 3;
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
@@ -319,15 +510,17 @@
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
-    let streamTimer = null;
+    let scheduledMessageTimeouts = [];
     let hudTimer = null;
-    let streamQueue = [];
-    let playlist = [];
-    let pointer = 0;
+    let playQueue = [];
+    let currentEntry = null;
     let streamCardPool = [];
+    let socialTimeline = [];
+    let preloadElements = new Map();
     let trashedVideoUrls = new Set();
     let lastTouchPointer = null;
     let lastMousePointer = null;
+    let currentKeyword = DEFAULT_KEYWORD;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -349,6 +542,18 @@
         .join('/');
       return `${IPFS_GATEWAY_URL}${hash}/${encoded}`;
     };
+    const extractImageUrl = (messageText) => {
+      const direct = messageText.match(IMAGE_URL_REGEX);
+      if (direct) return direct[1];
+      const ipfsImage = messageText.match(IPFS_IMAGE_REGEX);
+      if (!ipfsImage || !ipfsImage[1]) return '';
+      return buildIpfsPathUrl(ipfsImage[1], ipfsImage[2] || '');
+    };
+    const toTimestamp = (value) => {
+      if (!value) return Number.NaN;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? Number.NaN : time;
+    };
 
     function setStatus(text) {
       dom.status.textContent = text;
@@ -366,13 +571,6 @@
 
     function parseItems(messages) {
       const seen = new Set();
-      const extractImageUrl = (messageText) => {
-        const direct = messageText.match(IMAGE_URL_REGEX);
-        if (direct) return direct[1];
-        const ipfsImage = messageText.match(IPFS_IMAGE_REGEX);
-        if (!ipfsImage || !ipfsImage[1]) return '';
-        return buildIpfsPathUrl(ipfsImage[1], ipfsImage[2] || '');
-      };
       const isValidIpfsVideoMessage = (messageText) => {
         const ipfsMatch = messageText.match(IPFS_REGEX);
         const fileMatch = messageText.match(VIDEO_FILE_REGEX);
@@ -399,7 +597,8 @@
               hash: '',
               subject: cleanDisplayText(normalize(msg?.Subject || msg?.subject || '')),
               imageUrl: extractImageUrl(messageText),
-              txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || ''))
+              txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || '')),
+              timestamp: toTimestamp(msg?.BlockDate || msg?.blockDate || '')
             };
           }
 
@@ -422,14 +621,43 @@
             hash,
             subject: cleanDisplayText(normalize(msg?.Subject || msg?.subject || '')),
             imageUrl: extractImageUrl(messageText),
-            txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || ''))
+            txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || '')),
+            timestamp: toTimestamp(msg?.BlockDate || msg?.blockDate || '')
           };
         })
         .filter(Boolean);
     }
 
+    function parseSocialCards(messages) {
+      return messages
+        .map((msg) => {
+          const messageText = normalize(msg?.Message || msg?.message || msg?.text);
+          if (!messageText) return null;
+          const subject = cleanDisplayText(normalize(msg?.Subject || msg?.subject || ''));
+          const from = cleanDisplayText(msg?.FromAddress || msg?.fromAddress || '');
+          const createdAt = msg?.BlockDate || msg?.blockDate || '';
+          const timestamp = toTimestamp(createdAt);
+          const txid = cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || ''));
+          return {
+            title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
+            meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
+            body: cleanDisplayText(messageText),
+            imageUrl: extractImageUrl(messageText),
+            createdAt,
+            timestamp
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (Number.isNaN(a.timestamp) && Number.isNaN(b.timestamp)) return 0;
+          if (Number.isNaN(a.timestamp)) return 1;
+          if (Number.isNaN(b.timestamp)) return -1;
+          return a.timestamp - b.timestamp;
+        });
+    }
+
     function updateTicker(items, keyword) {
-      const headlines = items.slice(0, 10).map((v, idx) => `${idx + 1}. ${v.title}`);
+      const headlines = items.slice(0, MAX_PLAYLIST_ITEMS).map((v, idx) => `${idx + 1}. ${v.title}`);
       dom.ticker.textContent = headlines.length
         ? `${tickerLabel(keyword)}${headlines.join('  ✦  ')}`
         : `${tickerLabel(keyword)}No matching videos`;
@@ -474,43 +702,101 @@
       }, MESSAGE_ROTATION_INTERVAL_MS);
     }
 
-    function resetStreamMessages(items, keyword) {
-      streamCardPool = [];
-      for (const item of items.slice(0, 30)) {
-        const creator = item.from ? `${item.from.slice(0, 12)}…` : 'p2fk';
-        const postedAt = formatUtcDate(item.createdAt);
-        const hashTag = item.hash ? ` · ${item.hash.slice(0, 12)}…` : '';
-        const subject = item.subject ? ` · ${item.subject}` : '';
-        const txid = item.txid ? ` · tx:${item.txid.slice(0, 10)}…` : '';
-        streamCardPool.push({
-          title: item.title || 'Post',
-          meta: `${creator}${postedAt ? ` · ${postedAt}` : ''}${hashTag}${txid}${subject}`.slice(0, 180),
-          body: item.description,
-          imageUrl: item.imageUrl || ''
-        });
-      }
-      if (!streamCardPool.length) {
-        streamCardPool.push({ title: 'No live updates', meta: keyword, body: `No live updates for "${keyword}"`, imageUrl: '' });
-      }
+    function clearScheduledMessages() {
+      for (const timeoutId of scheduledMessageTimeouts) clearTimeout(timeoutId);
+      scheduledMessageTimeouts = [];
+    }
 
-      dom.messages.innerHTML = '';
-      addMessage({ title: `Keyword: ${keyword}`, meta: 'p2fk social feed', body: 'Showing recent thread cards', imageUrl: '' });
-      streamQueue = streamCardPool
-        .map((card) => ({ card, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map((entry) => entry.card);
+    function showWaiting(message) {
+      dom.waitingText.textContent = message || 'Buffering next stream…';
+      dom.waitingOverlay.classList.add('visible');
+    }
 
-      if (streamTimer) clearInterval(streamTimer);
-      streamTimer = setInterval(() => {
-        if (!streamQueue.length) {
-          streamQueue = streamCardPool
-            .map((card) => ({ card, sort: Math.random() }))
-            .sort((a, b) => a.sort - b.sort)
-            .map((entry) => entry.card);
+    function hideWaiting() {
+      dom.waitingOverlay.classList.remove('visible');
+    }
+
+    function showOffAir(message) {
+      dom.offAirScreen.classList.add('visible');
+      hideWaiting();
+      dom.video.removeAttribute('src');
+      dom.video.load();
+      dom.ticker.textContent = `LIVE • ${currentKeyword.toUpperCase()} • OFF AIR`;
+      setStatus(message || 'OFF AIR • No more queued search results');
+      addMessage({ title: 'Station Notice', meta: currentKeyword, body: message || 'No more search results. SupTV is now off air.', imageUrl: '' });
+      renderQueueMonitor();
+    }
+
+    function hideOffAir() {
+      dom.offAirScreen.classList.remove('visible');
+    }
+
+    function renderQueueMonitor() {
+      const queueCount = playQueue.length;
+      const preloadCount = Math.min(PRELOAD_COUNT, queueCount);
+      dom.queueStatus.textContent = queueCount
+        ? `${queueCount} queued • preloading ${preloadCount} • keyword "${currentKeyword}"`
+        : `Queue empty • keyword "${currentKeyword}"`;
+      dom.queueList.innerHTML = '';
+      for (const [index, item] of playQueue.slice(0, 8).entries()) {
+        const li = document.createElement('li');
+        li.textContent = `${index === 0 ? '▶' : `${index + 1}.`} ${cleanDisplayText(item.title)}`;
+        dom.queueList.appendChild(li);
+      }
+    }
+
+    function primePreloadCandidates() {
+      for (const [url, media] of preloadElements.entries()) {
+        if (!playQueue.some((item) => item.url === url)) {
+          media.removeAttribute('src');
+          media.load();
+          preloadElements.delete(url);
         }
-        const next = streamQueue.shift() || null;
-        addMessage(next);
-      }, MESSAGE_ROTATION_INTERVAL_MS);
+      }
+      for (const candidate of playQueue.slice(0, PRELOAD_COUNT)) {
+        if (preloadElements.has(candidate.url)) continue;
+        const probe = document.createElement('video');
+        probe.preload = 'metadata';
+        probe.muted = true;
+        probe.src = candidate.url;
+        probe.load();
+        preloadElements.set(candidate.url, probe);
+      }
+    }
+
+    function prepareSocialFeed(messages, keyword) {
+      streamCardPool = parseSocialCards(messages);
+      if (!streamCardPool.length) {
+        streamCardPool = [{ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, imageUrl: '', createdAt: '', timestamp: Number.NaN }];
+      }
+      socialTimeline = streamCardPool;
+    }
+
+    function scheduleTimelineForCurrent(entry, nextEntry) {
+      clearScheduledMessages();
+      const creator = entry.from ? `${entry.from.slice(0, 12)}…` : 'p2fk';
+      addMessage({
+        title: `Now Playing: ${entry.title}`,
+        meta: `${creator}${entry.createdAt ? ` · ${formatUtcDate(entry.createdAt)}` : ''}${entry.hash ? ` · ${entry.hash.slice(0, 12)}…` : ''}`,
+        body: entry.description,
+        imageUrl: entry.imageUrl || ''
+      });
+
+      const currentTs = entry.timestamp;
+      const nextTs = nextEntry?.timestamp;
+      let cards = socialTimeline.filter((card) => {
+        if (Number.isNaN(currentTs)) return true;
+        if (Number.isNaN(card.timestamp)) return false;
+        if (Number.isNaN(nextTs)) return card.timestamp >= currentTs;
+        return card.timestamp >= currentTs && card.timestamp < nextTs;
+      });
+      if (!cards.length) cards = socialTimeline.slice(0, 8);
+      const durationSeconds = Number.isFinite(dom.video.duration) && dom.video.duration > 0 ? dom.video.duration : 90;
+      const spacing = Math.max(2200, Math.floor((durationSeconds * 1000) / (cards.length + 1)));
+      for (const [index, card] of cards.slice(0, 25).entries()) {
+        const timeoutId = window.setTimeout(() => addMessage(card), spacing * (index + 1));
+        scheduledMessageTimeouts.push(timeoutId);
+      }
     }
 
     async function getPublicAddressByKeyword(keyword) {
@@ -537,44 +823,52 @@
       if (!items.length) {
         throw new Error('no playable videos in keyword channel');
       }
-      return items;
+      return { items, messages };
     }
 
     function playCurrent() {
-      const entry = playlist[pointer];
-      if (!entry) return;
+      const entry = playQueue[0];
+      if (!entry) {
+        showOffAir('OFF AIR • Playlist reached the end of search results');
+        return;
+      }
+      currentEntry = entry;
+      hideOffAir();
+      renderQueueMonitor();
+      updateTicker(playQueue, currentKeyword);
+      primePreloadCandidates();
+      scheduleTimelineForCurrent(entry, playQueue[1] || null);
+      showWaiting(`Loading "${entry.title}"…`);
       dom.video.src = entry.url;
+      dom.video.load();
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
         setStatus(`Loaded "${entry.title}" — tap/click to play`);
       });
-      setStatus(`Now Playing: ${entry.title}`);
+      setStatus(`Now Playing: ${entry.title} (${playQueue.length} left)`);
     }
 
     function nextVideo() {
-      if (!playlist.length) return;
-      pointer = (pointer + 1) % playlist.length;
+      if (!playQueue.length) {
+        showOffAir('OFF AIR • Playlist reached the end of search results');
+        return;
+      }
+      playQueue.shift();
       playCurrent();
     }
 
     function trashCurrentVideo() {
-      const current = playlist[pointer];
+      const current = playQueue[0];
       if (!current) return;
       trashedVideoUrls.add(current.url);
-      playlist = playlist.filter((item) => !trashedVideoUrls.has(item.url));
-      pointer = 0;
+      playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
       addMessage({
-        title: 'Video trashed',
+        title: 'Video skipped',
         meta: 'skip',
         body: `Skipped "${current.title}" for this session`,
         imageUrl: ''
       });
-      if (!playlist.length) {
-        setStatus('All queued videos were trashed. Search to load more.');
-        dom.video.removeAttribute('src');
-        dom.video.load();
-        return;
-      }
+      if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
       playCurrent();
     }
 
@@ -601,6 +895,8 @@
 
     async function loadSearch(keyword) {
       const cleaned = normalize(keyword) || DEFAULT_KEYWORD;
+      currentKeyword = cleaned;
+      clearScheduledMessages();
 
       const url = new URL(window.location.href);
       url.searchParams.set('q', cleaned);
@@ -609,18 +905,17 @@
       setStatus(`Searching p2fk.io for "${cleaned}"…`);
 
       try {
-        const items = await queryP2FK(cleaned);
-        playlist = items.filter((item) => !trashedVideoUrls.has(item.url));
-        pointer = 0;
-        updateTicker(items, cleaned);
-        resetStreamMessages(items, cleaned);
-        if (!playlist.length) throw new Error('all videos were trashed in this session');
+        const { items, messages } = await queryP2FK(cleaned);
+        playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
+        updateTicker(playQueue, cleaned);
+        prepareSocialFeed(messages, cleaned);
+        if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
-        playlist = [];
+        playQueue = [];
         updateTicker([], cleaned);
-        resetStreamMessages([], cleaned);
-        setStatus(`Unable to load playable results for "${cleaned}" (${error?.message || 'request failed'})`);
+        prepareSocialFeed([], cleaned);
+        showOffAir(`Unable to load playable results for "${cleaned}" (${error?.message || 'request failed'})`);
       }
     }
 
@@ -650,6 +945,16 @@
         addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
         nextVideo();
       });
+      dom.video.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
+      dom.video.addEventListener('stalled', () => showWaiting('Network is slow, waiting for stream data…'));
+      dom.video.addEventListener('playing', hideWaiting);
+      dom.video.addEventListener('canplay', hideWaiting);
+      dom.video.addEventListener('loadedmetadata', () => {
+        if (!currentEntry) return;
+        if (dom.video.currentSrc && dom.video.currentSrc.includes(currentEntry.url)) {
+          scheduleTimelineForCurrent(currentEntry, playQueue[1] || null);
+        }
+      });
       dom.video.addEventListener('click', () => dom.video.play().catch(() => {}));
       dom.video.addEventListener('click', showHudTemporarily);
       dom.video.addEventListener('keydown', (event) => {
@@ -660,6 +965,7 @@
       });
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.trashBtn.addEventListener('click', trashCurrentVideo);
+      dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       dom.video.addEventListener('touchstart', (event) => {
         if (!event.changedTouches?.length) return;
         const touch = event.changedTouches[0];
