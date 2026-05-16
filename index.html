@@ -202,6 +202,23 @@
       overflow-wrap: anywhere;
     }
 
+    .message-card-body a {
+      color: #97ccff;
+      text-decoration: underline;
+      word-break: break-word;
+    }
+
+    .message-card-body button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .08rem .45rem;
+      font-size: .72rem;
+      cursor: pointer;
+      margin: 0 .12rem;
+    }
+
     .message-card-image {
       display: block;
       width: 100%;
@@ -518,6 +535,7 @@
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
     const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
+    const URL_TRAILING_PUNCTUATION_REGEX = /[),.;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
     let scheduledMessageTimeouts = [];
     let queuedMessages = [];
@@ -644,10 +662,15 @@
       return keywords.slice(0, 5);
     };
 
-    function appendStatusTokenText(fragment, text) {
+    function triggerKeywordSearch(keyword) {
+      dom.query.value = keyword;
+      loadSearch(keyword);
+    }
+
+    function appendInteractiveTokenText(fragment, text) {
       const source = normalize(text);
       if (!source) return;
-      const hashtagRegex = /#([a-zA-Z0-9_-]{2,32})/g;
+      const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
       let lastIndex = 0;
       let match;
       while ((match = hashtagRegex.exec(source)) !== null) {
@@ -657,10 +680,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = `#${keyword}`;
-        button.addEventListener('click', () => {
-          dom.query.value = keyword;
-          loadSearch(keyword);
-        });
+        button.addEventListener('click', () => triggerKeywordSearch(keyword));
         fragment.appendChild(button);
         lastIndex = hashtagRegex.lastIndex;
       }
@@ -668,17 +688,17 @@
       if (trailing) fragment.appendChild(document.createTextNode(trailing));
     }
 
-    function buildStatusContent(text) {
+    function buildInteractiveContent(text) {
       const content = document.createDocumentFragment();
       const source = normalize(text);
-      const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
+      const urlRegex = new RegExp(URL_REGEX.source, 'gi');
       let lastIndex = 0;
       let match;
       while ((match = urlRegex.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendStatusTokenText(content, source.slice(lastIndex, start));
+        appendInteractiveTokenText(content, source.slice(lastIndex, start));
         const matchedUrl = match[0];
-        const cleanUrl = matchedUrl.replace(/[),.;]+$/, '');
+        const cleanUrl = matchedUrl.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
         const trailingPunctuation = matchedUrl.slice(cleanUrl.length);
         const anchor = document.createElement('a');
         anchor.href = cleanUrl;
@@ -686,17 +706,17 @@
         anchor.rel = 'noopener noreferrer';
         anchor.textContent = cleanUrl;
         content.appendChild(anchor);
-        appendStatusTokenText(content, trailingPunctuation);
+        appendInteractiveTokenText(content, trailingPunctuation);
         lastIndex = start + matchedUrl.length;
       }
-      appendStatusTokenText(content, source.slice(lastIndex));
+      appendInteractiveTokenText(content, source.slice(lastIndex));
       return content;
     }
 
     function setStatus(text) {
       const statusText = normalize(text);
       dom.status.setAttribute('aria-label', statusText);
-      dom.status.replaceChildren(buildStatusContent(statusText));
+      dom.status.replaceChildren(buildInteractiveContent(statusText));
     }
 
     function asArray(payload) {
@@ -930,7 +950,7 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.textContent = cleanDisplayText(card.body);
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body)));
         li.appendChild(body);
       }
 
@@ -955,10 +975,7 @@
           const button = document.createElement('button');
           button.type = 'button';
           button.textContent = `#${keyword}`;
-          button.addEventListener('click', () => {
-            dom.query.value = keyword;
-            loadSearch(keyword);
-          });
+          button.addEventListener('click', () => triggerKeywordSearch(keyword));
           keywordWrap.appendChild(button);
         }
         li.appendChild(keywordWrap);
