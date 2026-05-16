@@ -9,8 +9,9 @@ Play the most recent Sup!? video by search string.
 ## Standalone player
 
 Open `index.html` from the repository root in a browser to launch the fullscreen-capable SupTV player.
-It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=100` (where `100` matches the configured trending quantity in `index.html`).
-It selects up to the top 5 search strings, pulls up to 100 records for each search, then builds the queue in round-robin batches of 5 videos per search string (first pass up to 25 videos total, then the next 5 per string, and so on until exhausted).
+It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=20` (where `20` matches `TRENDING_KEYWORD_LIMIT` in `index.html`).
+It selects up to the top 20 search strings, pulls up to 200 records for each search in a single request, then builds the queue in round-robin batches of 5 videos per search string (cycling through all keywords until all results are exhausted, up to 500 total).
+Results are cached for the session so clicking the SupTV logo to return to trending replays instantly without re-fetching.
 Playback then starts immediately.
 Standard keyword searches now page through up to the first 100 search records so videos deeper in the results can still be discovered.
 If the trending API is empty/unavailable, it falls back to `mp4` as the default.
@@ -24,7 +25,7 @@ You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp
 Edit `index.html` and update these constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`) → set this to your local API base URL
-- `TRENDING_SEARCH_QTY` (default: `100`) → change this only if you want a different trending fetch size
+- `TRENDING_SEARCH_QTY` (default: `200`) → change this only if you want a different per-keyword trending fetch size
 
 Example local values:
 
