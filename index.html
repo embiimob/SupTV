@@ -514,7 +514,7 @@
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
     const STREAM_RETRY_LIMIT = 1;
-    const MAX_IPFS_GATEWAY_FALLBACKS = 1;
+    const IPFS_GATEWAY_RETRY_LIMIT = 1;
     const ACTIVE_STREAM_TIMEOUT_MS = 12000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
@@ -608,7 +608,7 @@
     const tryNextIpfsGateway = (item) => {
       if (!item?.hash) return null;
       const currentIndex = Number.isInteger(item.gatewayIndex) ? item.gatewayIndex : 0;
-      if (currentIndex >= MAX_IPFS_GATEWAY_FALLBACKS) return null;
+      if (currentIndex >= IPFS_GATEWAY_RETRY_LIMIT) return null;
       const nextIndex = currentIndex + 1;
       if (nextIndex >= IPFS_GATEWAY_URLS.length) return null;
       const oldUrl = item.url;
