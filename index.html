@@ -469,8 +469,6 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
-    const MIN_READY_BUFFER_SECONDS = 28;
-    const STREAM_READY_BUFFER_SECONDS = 18;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
@@ -929,29 +927,26 @@
       dom.offAirScreen.classList.remove('visible');
     }
 
-    function bufferedSecondsFromStart(videoEl) {
+    function isBufferedFromStartThroughEnd(videoEl) {
+      const duration = Number(videoEl?.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return false;
       const ranges = videoEl?.buffered;
-      if (!ranges || !ranges.length) return 0;
+      if (!ranges || !ranges.length) return false;
       for (let i = 0; i < ranges.length; i += 1) {
         const start = Number(ranges.start(i));
         const end = Number(ranges.end(i));
         if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-        if (start <= READY_RANGE_START_ALLOWANCE_SECONDS) return Math.max(0, end - Math.max(0, start));
+        if (start <= READY_RANGE_START_ALLOWANCE_SECONDS && end >= (duration - FULLY_BUFFERED_EPSILON_SECONDS)) {
+          return true;
+        }
       }
-      return 0;
+      return false;
     }
 
     function isProbeReady(videoEl) {
       const readyState = Number(videoEl?.readyState || 0);
-      if (readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
-      const bufferedFromStart = bufferedSecondsFromStart(videoEl);
-      if (bufferedFromStart <= 0) return false;
-      const duration = Number(videoEl?.duration);
-      if (Number.isFinite(duration) && duration > 0) {
-        if (bufferedFromStart >= (duration - FULLY_BUFFERED_EPSILON_SECONDS)) return true;
-        return bufferedFromStart >= Math.min(duration, MIN_READY_BUFFER_SECONDS) && readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
-      }
-      return bufferedFromStart >= STREAM_READY_BUFFER_SECONDS && readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+      if (readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return false;
+      return isBufferedFromStartThroughEnd(videoEl);
     }
 
     function clearPreloadProbe(url, media) {
