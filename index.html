@@ -1555,8 +1555,7 @@
           unique.push(candidate);
         }
         if (!unique.length) return [DEFAULT_KEYWORD];
-        if (unique.length > 1) return unique.slice(0, limit);
-        return [unique[0]];
+        return unique.slice(0, limit);
       } catch {
         return [DEFAULT_KEYWORD];
       }

@@ -18,7 +18,7 @@ You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp
 
 ## Pointing `index.html` at a local p2fk-compatible API
 
-Edit `/home/runner/work/SupTV/SupTV/index.html` and update these constants near the top of the script:
+Edit `index.html` and update these constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`) → set this to your local API base URL
 - `TRENDING_SEARCHES_ENDPOINT` (default: `https://bitfossil.org/GetTrendingRootSearches?qty=100`) → set this to your local trending endpoint if needed
