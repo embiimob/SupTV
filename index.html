@@ -1532,7 +1532,7 @@
       return { items, messages, addressLabels };
     }
 
-    function trendingSearchString(entry) {
+    function extractSearchString(entry) {
       return normalize(
         entry?.searchString
         || entry?.SearchString
@@ -1550,7 +1550,7 @@
         const rows = asArray(payload);
         const unique = [];
         for (const row of rows) {
-          const candidate = trendingSearchString(row);
+          const candidate = extractSearchString(row);
           if (!candidate || unique.includes(candidate)) continue;
           unique.push(candidate);
         }
@@ -1576,13 +1576,13 @@
         throw new Error('no playable videos in trending results');
       }
       const usedFallbackKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase();
-      const fallbackDisplayKeyword = usedFallbackKeyword ? DEFAULT_KEYWORD : 'trending';
+      const displayKeyword = usedFallbackKeyword ? DEFAULT_KEYWORD : 'trending';
       return {
         items,
         messages,
         addressLabels,
         keywords,
-        displayKeyword: fallbackDisplayKeyword,
+        displayKeyword,
         usedFallbackKeyword
       };
     }
