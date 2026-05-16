@@ -695,9 +695,8 @@
 
     function setStatus(text) {
       const statusText = normalize(text);
-      dom.status.textContent = '';
       dom.status.setAttribute('aria-label', statusText);
-      dom.status.appendChild(buildStatusContent(statusText));
+      dom.status.replaceChildren(buildStatusContent(statusText));
     }
 
     function asArray(payload) {
@@ -990,7 +989,7 @@
       if (activeMessageTimeoutId || !queuedMessages.length) return;
       const card = queuedMessages.shift();
       const li = renderMessageCard(card);
-      dom.messages.innerHTML = '';
+      dom.messages.replaceChildren();
       dom.messages.prepend(li);
       activeMessageTimeoutId = window.setTimeout(() => {
         if (li.parentElement === dom.messages) dom.messages.removeChild(li);
@@ -1013,7 +1012,7 @@
         clearTimeout(activeMessageTimeoutId);
         activeMessageTimeoutId = null;
       }
-      dom.messages.innerHTML = '';
+      dom.messages.replaceChildren();
     }
 
     function showWaiting(message) {
