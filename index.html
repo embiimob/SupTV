@@ -828,6 +828,8 @@
               title,
               description: cleanDisplayText(messageText),
               tags: [],
+              links: extractLinks(messageText),
+              keywords: extractKeywords(messageText, title),
               from: rootFromAddress(root),
               createdAt: messageBlockDate(root),
               hash: '',
@@ -847,14 +849,16 @@
           if (seen.has(url)) return null;
           seen.add(url);
 
-          return {
-            url,
-            title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
-            description: cleanDisplayText(messageText),
-            tags: [],
-            from: rootFromAddress(root),
-              createdAt: messageBlockDate(root),
-              hash,
+            return {
+              url,
+              title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
+              description: cleanDisplayText(messageText),
+              tags: [],
+              links: extractLinks(messageText),
+              keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
+              from: rootFromAddress(root),
+                createdAt: messageBlockDate(root),
+                hash,
               path: '',
               gatewayIndex: 0,
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
@@ -1195,7 +1199,9 @@
         title: `Now Playing: ${entry.title}`,
         meta: `${creator}${entry.createdAt ? ` · ${formatUtcDate(entry.createdAt)}` : ''}${entry.hash ? ` · ${entry.hash.slice(0, 12)}…` : ''}`,
         body: entry.description,
-        imageUrl: entry.imageUrl || ''
+        imageUrl: entry.imageUrl || '',
+        links: Array.isArray(entry.links) ? entry.links : [],
+        keywords: Array.isArray(entry.keywords) ? entry.keywords : []
       });
 
       const currentTs = entry.timestamp;
