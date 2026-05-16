@@ -1919,7 +1919,7 @@
     function bootstrap() {
       const urlQuery = new URLSearchParams(window.location.search).get('q');
       const initial = normalize(urlQuery);
-      // Keep the input blank so the UI starts clean while still using DEFAULT_KEYWORD fallback.
+      // Keep the input blank so the UI starts clean while using trending defaults when no ?q is provided.
       dom.query.value = '';
       syncAudioUi();
 

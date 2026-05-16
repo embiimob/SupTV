@@ -9,7 +9,9 @@ Play the most recent Sup!? video by search string.
 ## Standalone player
 
 Open `index.html` from the repository root in a browser to launch the fullscreen-capable SupTV player.
-It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=100` (where `100` matches the configured trending quantity in `index.html`), selects up to the top 5 search strings, pulls up to 100 records for each search, combines them, sorts by newest `BlockDate`, and starts playback immediately.
+It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=100` (where `100` matches the configured trending quantity in `index.html`).
+It selects up to the top 5 search strings, pulls up to 100 records for each search, combines them, and sorts by newest `BlockDate`.
+Playback then starts immediately.
 If the trending API is empty/unavailable, it falls back to `mp4` as the default.
 The search field starts empty; submitting your own query still runs a normal keyword search, while submitting empty keeps the trending-default behavior.
 Playback uses a larger queue for trending mode (up to 500 combined results) and advances until exhausted, then shows an off-air screen.
