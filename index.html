@@ -1820,7 +1820,7 @@
       videoEl.addEventListener('timeupdate', () => {
         if (!dom.waitingOverlay.classList.contains('visible')) return;
         if (videoEl.paused || videoEl.seeking) return;
-        if (!Number.isFinite(videoEl.currentTime) || videoEl.currentTime <= 0) return;
+        if (!Number.isFinite(videoEl.currentTime)) return;
         hideWaiting();
       });
       videoEl.addEventListener('loadedmetadata', () => {
