@@ -1315,6 +1315,9 @@
         if (window.location.protocol === 'file:') {
           htmlText = `<!DOCTYPE html>\n${document.documentElement.outerHTML}`;
         } else {
+          if (sourceUrl.origin !== window.location.origin) {
+            throw new Error('download source must stay on the current origin');
+          }
           const response = await fetch(sourceUrl.toString(), {
             cache: 'no-store',
             credentials: 'same-origin'
