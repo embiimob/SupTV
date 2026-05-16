@@ -748,7 +748,7 @@
       let text = normalize(value);
       if (!text) return '';
       text = text.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
-      text = text.replace(/(?:&(?:gt|lt);?)+$/gi, '');
+      text = text.replace(/(?:&(?:gt|lt);)+$/gi, '');
       while (text.endsWith(')')) {
         const openCount = (text.match(/\(/g) || []).length;
         const closeCount = (text.match(/\)/g) || []).length;
