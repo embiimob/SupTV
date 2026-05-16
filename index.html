@@ -1817,6 +1817,12 @@
       videoEl.addEventListener('stalled', () => showWaiting('Network is slow, waiting for stream data…'));
       videoEl.addEventListener('playing', hideWaiting);
       videoEl.addEventListener('canplay', hideWaiting);
+      videoEl.addEventListener('timeupdate', () => {
+        if (!dom.waitingOverlay.classList.contains('visible')) return;
+        if (videoEl.paused || videoEl.seeking) return;
+        if (!Number.isFinite(videoEl.currentTime)) return;
+        hideWaiting();
+      });
       videoEl.addEventListener('loadedmetadata', () => {
         if (!currentEntry) return;
         if (videoEl.currentSrc && videoEl.currentSrc.includes(currentEntry.url)) {
