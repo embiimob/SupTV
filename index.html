@@ -1575,7 +1575,15 @@
       if (!items.length) {
         throw new Error('no playable videos in trending results');
       }
-      return { items, messages, addressLabels, keywords };
+      const usedFallbackKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase();
+      return {
+        items,
+        messages,
+        addressLabels,
+        keywords,
+        displayKeyword: usedFallbackKeyword ? DEFAULT_KEYWORD : 'trending',
+        usedFallbackKeyword
+      };
     }
 
     function playCurrent() {
@@ -1705,7 +1713,7 @@
     async function loadSearch(keyword) {
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
-      const displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
+      let displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
       currentKeyword = displayKeyword;
       clearScheduledMessages();
       clearAllPreloadProbes();
@@ -1722,6 +1730,10 @@
         const result = isTrendingDefault
           ? await queryTrendingP2FK()
           : await queryP2FK(cleanedInput);
+        if (isTrendingDefault && result?.displayKeyword) {
+          displayKeyword = result.displayKeyword;
+          currentKeyword = displayKeyword;
+        }
         const { items, messages, addressLabels } = result;
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
