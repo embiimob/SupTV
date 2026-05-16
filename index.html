@@ -514,6 +514,8 @@
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
     const STREAM_RETRY_LIMIT = 1;
+    const MAX_IPFS_GATEWAY_FALLBACKS = 1;
+    const ACTIVE_STREAM_TIMEOUT_MS = 12000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 13500;
@@ -560,6 +562,7 @@
     const keywordByAddressCache = new Map();
     const profileByAddressCache = new Map();
     let streamRetryCountByUrl = new Map();
+    let activeStreamTimeoutId = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -605,6 +608,7 @@
     const tryNextIpfsGateway = (item) => {
       if (!item?.hash) return null;
       const currentIndex = Number.isInteger(item.gatewayIndex) ? item.gatewayIndex : 0;
+      if (currentIndex >= MAX_IPFS_GATEWAY_FALLBACKS) return null;
       const nextIndex = currentIndex + 1;
       if (nextIndex >= IPFS_GATEWAY_URLS.length) return null;
       const oldUrl = item.url;
@@ -1119,6 +1123,19 @@
       dom.waitingOverlay.setAttribute('aria-label', message || 'Buffering stream');
       dom.waitingA11yText.textContent = message || 'Buffering stream';
       dom.waitingOverlay.classList.add('visible');
+      clearTimeout(activeStreamTimeoutId);
+      activeStreamTimeoutId = window.setTimeout(() => {
+        const activeItem = playQueue[0];
+        if (!activeItem?.url || activeItem.url !== currentEntry?.url) return;
+        activeStreamTimeoutId = null;
+        addMessage({
+          title: 'Playback timeout',
+          meta: 'player',
+          body: `Timed out waiting for "${activeItem.title || 'current video'}"; retrying once before skip`
+        });
+        videoStatusByUrl.set(activeItem.url, 'error');
+        playCurrent();
+      }, ACTIVE_STREAM_TIMEOUT_MS);
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'downloading');
         updateTicker();
@@ -1127,6 +1144,10 @@
 
     function hideWaiting() {
       dom.waitingOverlay.classList.remove('visible');
+      if (activeStreamTimeoutId) {
+        clearTimeout(activeStreamTimeoutId);
+        activeStreamTimeoutId = null;
+      }
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'playing');
         updateTicker();
@@ -1134,6 +1155,10 @@
     }
 
     function showOffAir(message) {
+      if (activeStreamTimeoutId) {
+        clearTimeout(activeStreamTimeoutId);
+        activeStreamTimeoutId = null;
+      }
       dom.offAirScreen.classList.add('visible');
       hideWaiting();
       dom.video.removeAttribute('src');
@@ -1225,19 +1250,6 @@
         probe.addEventListener('durationchange', refreshProbeStatus);
         probe.addEventListener('suspend', refreshProbeStatus);
         probe.addEventListener('error', () => {
-          const gatewayFallback = tryNextIpfsGateway(candidate);
-          if (gatewayFallback) {
-            clearPreloadProbe(gatewayFallback.oldUrl, probe);
-            moveStatusToNewUrl(gatewayFallback.oldUrl, gatewayFallback.nextUrl, 'downloading');
-            addMessage({
-              title: 'Gateway fallback',
-              meta: 'preload',
-              body: `Switching preload to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
-            });
-            updateTicker();
-            queueMicrotask(primePreloadCandidates);
-            return;
-          }
           videoStatusByUrl.set(candidate.url, 'error');
           clearPreloadProbe(candidate.url, probe);
           updateTicker();
@@ -1375,6 +1387,10 @@
       }
       const entry = playQueue[0];
       if (!entry) {
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         showOffAir('OFF AIR • Playlist reached the end of search results');
         updateTicker(playQueue, currentKeyword);
         return;
@@ -1411,6 +1427,10 @@
 
     function nextVideo() {
       if (!playQueue.length) {
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         showOffAir('OFF AIR • Playlist reached the end of search results');
         return;
       }
@@ -1477,6 +1497,10 @@
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
         streamRetryCountByUrl = new Map();
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
         updateTicker(playQueue, cleaned);
         prepareSocialFeed(messages, cleaned, addressLabels);
@@ -1486,6 +1510,10 @@
         searchResultTotal = 0;
         videoStatusByUrl = new Map();
         streamRetryCountByUrl = new Map();
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         playQueue = [];
         updateTicker([], cleaned);
         prepareSocialFeed([], cleaned);
