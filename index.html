@@ -13,6 +13,7 @@
       --accent-2: #b18fff;
       --text: #f4f7ff;
       --muted: #a4b1d8;
+      --swipe-tug-transition-ms: 180ms;
     }
 
     * { box-sizing: border-box; }
@@ -47,11 +48,11 @@
       box-shadow: inset 0 0 0 2px rgba(130, 167, 255, .06), inset 0 0 120px rgba(41, 95, 205, .15);
       --swipe-tug-x: 0px;
       transform: translate3d(var(--swipe-tug-x), 0, 0);
-      transition: transform .2s ease;
+      transition: transform var(--swipe-tug-transition-ms) ease;
     }
 
     #app.swipe-tugging { transition: none; }
-    #app.swipe-tug-release { transition: transform .18s ease-out; }
+    #app.swipe-tug-release { transition: transform var(--swipe-tug-transition-ms) ease-out; }
 
     #player {
       width: 100%;
@@ -569,6 +570,8 @@
     const SWIPE_SKIP_MAX_Y_PX = 80;
     const SWIPE_TUG_MAX_X_PX = 44;
     const SWIPE_TUG_START_X_PX = 12;
+    const SWIPE_TUG_DAMPING_FACTOR = 0.33;
+    const INTERACTIVE_TOUCH_SELECTORS = 'button, input, textarea, select, a, label, .topbar, .side-feed, #messages';
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = '(max-width: 920px), (hover: none) and (pointer: coarse)';
     const P2FK_BASE_URL = 'https://p2fk.io';
     const IPFS_GATEWAY_URLS = [
@@ -619,9 +622,14 @@
     const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
-      return Boolean(target.closest('button, input, textarea, select, a, label, .topbar, .side-feed, #messages'));
+      return Boolean(target.closest(INTERACTIVE_TOUCH_SELECTORS));
     };
     const shouldRenderCardImages = () => !window.matchMedia(MOBILE_CARD_IMAGE_MEDIA_QUERY).matches;
+    const swipeTugReleaseMs = () => {
+      const cssMs = window.getComputedStyle(dom.app).getPropertyValue('--swipe-tug-transition-ms').trim();
+      const parsed = Number.parseFloat(cssMs);
+      return Number.isFinite(parsed) ? parsed : 180;
+    };
     const formatUtcDate = (value) => {
       if (!value) return '';
       const date = new Date(value);
@@ -1816,7 +1824,7 @@
           swipeTugResetTimeoutId = window.setTimeout(() => {
             dom.app.classList.remove('swipe-tug-release');
             swipeTugResetTimeoutId = null;
-          }, 220);
+          }, swipeTugReleaseMs());
         }
       };
       const applySwipeTug = (deltaX, deltaY, ignoreSwipe) => {
@@ -1824,7 +1832,7 @@
           clearSwipeTug(false);
           return;
         }
-        const distance = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, (-deltaX) * 0.33));
+        const distance = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, (-deltaX) * SWIPE_TUG_DAMPING_FACTOR));
         if (distance < SWIPE_TUG_START_X_PX) {
           clearSwipeTug(false);
           return;
