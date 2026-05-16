@@ -2,11 +2,32 @@
 
 Play the most recent Sup!? video by search string.
 
+- p2fk.io: https://p2fk.io
+- SupTV repository: https://github.com/embiimob/SupTV
+- Live demo: https://supgalaxy.org/TV
+
 ## Standalone player
 
 Open `index.html` from the repository root in a browser to launch the fullscreen-capable SupTV player.
-It auto-searches p2fk.io (default query: `mp4`), starts playback immediately, and overlays live social cards sourced from the same search results.
-The search field starts empty; submitting an empty query still searches the default `mp4` keyword.
-Playback uses a finite queue (up to 50 results) and advances until exhausted, then shows an off-air screen.
+It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=100` (where `100` matches the configured trending quantity in `index.html`).
+It selects up to the top 5 search strings, pulls up to 100 records for each search, combines them, and sorts by newest `BlockDate`.
+Playback then starts immediately.
+If the trending API is empty/unavailable, it falls back to `mp4` as the default.
+The search field starts empty; submitting your own query still runs a normal keyword search, while submitting empty keeps the trending-default behavior.
+Playback uses a larger queue for trending mode (up to 500 combined results) and advances until exhausted, then shows an off-air screen.
 You can skip the current video with **Skip** (or mobile left-swipe), and the UI now includes queue + buffering indicators for long streams.
 You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp4`).
+
+## Pointing `index.html` at a local p2fk-compatible API
+
+Edit `index.html` and update these constants near the top of the script:
+
+- `P2FK_BASE_URL` (default: `https://p2fk.io`) → set this to your local API base URL
+- `TRENDING_SEARCH_QTY` (default: `100`) → change this only if you want a different trending fetch size
+
+Example local values:
+
+- `P2FK_BASE_URL = 'http://localhost:5000'`
+- `TRENDING_SEARCH_QTY = 100`
+
+`TRENDING_SEARCHES_ENDPOINT` is derived from these values in code (`${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_SEARCH_QTY}`).
