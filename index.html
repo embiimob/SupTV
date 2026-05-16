@@ -566,7 +566,7 @@
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
-    const SWIPE_SKIP_MIN_X_PX = 120;
+    const SWIPE_SKIP_MIN_X_PX = 120; // Higher than before to reduce accidental skips while interacting on mobile.
     const SWIPE_SKIP_MAX_Y_PX = 80;
     const SWIPE_TUG_MAX_X_PX = 44;
     const SWIPE_TUG_START_X_PX = 12;
@@ -575,7 +575,7 @@
     const FORM_INTERACTIVE_TOUCH_SELECTORS = 'button, input, textarea, select, a, label';
     const NON_SWIPE_REGION_SELECTORS = '.topbar, .side-feed, #messages';
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
-    const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px), (hover: none) and (pointer: coarse)`;
+    const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
@@ -1831,7 +1831,7 @@
         }
       };
       const applySwipeTug = (deltaX, deltaY, ignoreSwipe) => {
-        if (ignoreSwipe || deltaY > SWIPE_SKIP_MAX_Y_PX || deltaX >= 0) {
+        if (ignoreSwipe || deltaY > SWIPE_SKIP_MAX_Y_PX || deltaX > 0) {
           clearSwipeTug(false);
           return;
         }
