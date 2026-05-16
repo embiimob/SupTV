@@ -595,6 +595,71 @@
       return [];
     }
 
+    function unwrapRootPayload(payload) {
+      if (!payload || typeof payload !== 'object') return payload;
+      return payload.Root || payload.root || payload;
+    }
+
+    function messageBlockDate(payload) {
+      const root = unwrapRootPayload(payload);
+      return root?.BlockDate || root?.blockDate || root?.['Block Date'] || '';
+    }
+
+    function messageTxid(payload) {
+      const root = unwrapRootPayload(payload);
+      return cleanDisplayText(normalize(root?.TransactionId || root?.transactionId || root?.['Transaction Id'] || root?.['Transaction ID'] || ''));
+    }
+
+    function messageTimestamp(payload) {
+      return toTimestamp(messageBlockDate(payload));
+    }
+
+    function sortByNewestTimestamp(a, b) {
+      if (Number.isNaN(a) && Number.isNaN(b)) return 0;
+      if (Number.isNaN(a)) return 1;
+      if (Number.isNaN(b)) return -1;
+      return b - a;
+    }
+
+    function mergeUniqueMessagesByTxid(...groups) {
+      const merged = groups.flat().filter(Boolean).sort((a, b) => sortByNewestTimestamp(messageTimestamp(a), messageTimestamp(b)));
+      const seenTx = new Set();
+      const seenFallback = new Set();
+      const output = [];
+      for (const message of merged) {
+        const txid = messageTxid(message).toLowerCase();
+        if (txid) {
+          if (seenTx.has(txid)) continue;
+          seenTx.add(txid);
+          output.push(message);
+          continue;
+        }
+        const root = unwrapRootPayload(message) || {};
+        const fallbackKey = `${normalize(root?.FromAddress || root?.fromAddress || '')}|${normalize(root?.Message || root?.message || root?.text || '')}|${normalize(messageBlockDate(root))}`;
+        if (seenFallback.has(fallbackKey)) continue;
+        seenFallback.add(fallbackKey);
+        output.push(message);
+      }
+      return output;
+    }
+
+    function dedupeItemsByTxid(items) {
+      const seenTx = new Set();
+      const seenUrl = new Set();
+      return items.filter((item) => {
+        const txid = normalize(item?.txid).toLowerCase();
+        if (txid) {
+          if (seenTx.has(txid)) return false;
+          seenTx.add(txid);
+          return true;
+        }
+        if (!item?.url) return false;
+        if (seenUrl.has(item.url)) return false;
+        seenUrl.add(item.url);
+        return true;
+      });
+    }
+
     function parseItems(messages) {
       const seen = new Set();
       const isValidIpfsVideoMessage = (messageText) => {
@@ -604,7 +669,8 @@
       };
       return messages
         .map((msg) => {
-          const messageText = normalize(msg?.Message || msg?.message || msg?.text);
+          const root = unwrapRootPayload(msg) || {};
+          const messageText = normalize(root?.Message || root?.message || root?.text);
           if (!messageText) return null;
 
           const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
@@ -612,19 +678,19 @@
             const directUrl = directMatch[1];
             if (seen.has(directUrl)) return null;
             seen.add(directUrl);
-            const title = cleanDisplayText(normalize(msg?.Subject) || normalize(msg?.subject) || 'Direct stream');
+            const title = cleanDisplayText(normalize(root?.Subject) || normalize(root?.subject) || 'Direct stream');
             return {
               url: directUrl,
               title,
               description: cleanDisplayText(messageText),
               tags: [],
-              from: cleanDisplayText(msg?.FromAddress || msg?.fromAddress || ''),
-              createdAt: msg?.BlockDate || msg?.blockDate || '',
+              from: cleanDisplayText(root?.FromAddress || root?.fromAddress || ''),
+              createdAt: messageBlockDate(root),
               hash: '',
-              subject: cleanDisplayText(normalize(msg?.Subject || msg?.subject || '')),
+              subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
               imageUrl: extractImageUrl(messageText),
-              txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || '')),
-              timestamp: toTimestamp(msg?.BlockDate || msg?.blockDate || '')
+              txid: messageTxid(root),
+              timestamp: messageTimestamp(root)
             };
           }
 
@@ -642,34 +708,30 @@
             title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
             description: cleanDisplayText(messageText),
             tags: [],
-            from: cleanDisplayText(msg?.FromAddress || msg?.fromAddress || ''),
-            createdAt: msg?.BlockDate || msg?.blockDate || '',
+            from: cleanDisplayText(root?.FromAddress || root?.fromAddress || ''),
+            createdAt: messageBlockDate(root),
             hash,
-            subject: cleanDisplayText(normalize(msg?.Subject || msg?.subject || '')),
+            subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
             imageUrl: extractImageUrl(messageText),
-            txid: cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || '')),
-            timestamp: toTimestamp(msg?.BlockDate || msg?.blockDate || '')
+            txid: messageTxid(root),
+            timestamp: messageTimestamp(root)
           };
         })
         .filter(Boolean)
-        .sort((a, b) => {
-          if (Number.isNaN(a.timestamp) && Number.isNaN(b.timestamp)) return 0;
-          if (Number.isNaN(a.timestamp)) return 1;
-          if (Number.isNaN(b.timestamp)) return -1;
-          return b.timestamp - a.timestamp;
-        });
+        .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp));
     }
 
     function parseSocialCards(messages) {
       return messages
         .map((msg) => {
-          const messageText = normalize(msg?.Message || msg?.message || msg?.text);
+          const root = unwrapRootPayload(msg) || {};
+          const messageText = normalize(root?.Message || root?.message || root?.text);
           if (!messageText) return null;
-          const subject = cleanDisplayText(normalize(msg?.Subject || msg?.subject || ''));
-          const from = cleanDisplayText(msg?.FromAddress || msg?.fromAddress || '');
-          const createdAt = msg?.BlockDate || msg?.blockDate || '';
-          const timestamp = toTimestamp(createdAt);
-          const txid = cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || ''));
+          const subject = cleanDisplayText(normalize(root?.Subject || root?.subject || ''));
+          const from = cleanDisplayText(root?.FromAddress || root?.fromAddress || '');
+          const createdAt = messageBlockDate(root);
+          const timestamp = messageTimestamp(root);
+          const txid = messageTxid(root);
           return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
             meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
@@ -683,12 +745,7 @@
           });
         })
         .filter(Boolean)
-        .sort((a, b) => {
-          if (Number.isNaN(a.timestamp) && Number.isNaN(b.timestamp)) return 0;
-          if (Number.isNaN(a.timestamp)) return 1;
-          if (Number.isNaN(b.timestamp)) return -1;
-          return a.timestamp - b.timestamp;
-        });
+        .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp) * -1);
     }
 
     function statusForItem(item, index) {
@@ -1023,12 +1080,30 @@
       return asArray(payload);
     }
 
-    async function queryP2FK(keyword) {
+    async function getKnownRootsBySearchString(searchString, skip = 0, qty = 200) {
+      const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(searchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`search lookup failed (${response.status})`);
+      const payload = await response.json();
+      return asArray(payload);
+    }
+
+    async function getKeywordChannelMessages(keyword) {
       const address = await getPublicAddressByKeyword(keyword);
-      const messages = await getPublicMessagesByAddress(address, 0, 200);
-      const items = parseItems(messages);
+      return getPublicMessagesByAddress(address, 0, 200);
+    }
+
+    async function queryP2FK(keyword) {
+      const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
+        getKeywordChannelMessages(keyword),
+        getKnownRootsBySearchString(keyword, 0, 200)
+      ]);
+      const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
+      const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
+      const messages = mergeUniqueMessagesByTxid(keywordMessages, mainSearchMessages);
+      const items = dedupeItemsByTxid(parseItems(messages));
       if (!items.length) {
-        throw new Error('no playable videos in keyword channel');
+        throw new Error('no playable videos in keyword or search results');
       }
       return { items, messages };
     }
