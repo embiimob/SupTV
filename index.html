@@ -960,8 +960,22 @@
       primePreloadCandidates();
       scheduleTimelineForCurrent(entry, playQueue[1] || null);
       showWaiting(`Loading "${entry.title}"…`);
-      dom.video.src = entry.url;
-      dom.video.load();
+      const probe = preloadElements.get(entry.url);
+      if (probe) {
+        probe.muted = dom.video.muted;
+        probe.volume = dom.video.volume;
+        probe.id = dom.video.id;
+        probe.setAttribute('playsinline', '');
+        probe.setAttribute('aria-label', dom.video.getAttribute('aria-label') || 'SupTV video player');
+        probe.tabIndex = dom.video.tabIndex;
+        dom.video.parentNode.replaceChild(probe, dom.video);
+        dom.video = probe;
+        preloadElements.delete(entry.url);
+        attachVideoListeners(dom.video);
+      } else {
+        dom.video.src = entry.url;
+        dom.video.load();
+      }
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
         setStatus(`Loaded "${entry.title}" — tap/click to play`);
@@ -1054,6 +1068,50 @@
       }
     }
 
+    function attachVideoListeners(videoEl) {
+      videoEl.addEventListener('ended', nextVideo);
+      videoEl.addEventListener('error', () => {
+        console.warn('Video playback error, skipping to next source');
+        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
+        nextVideo();
+      });
+      videoEl.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
+      videoEl.addEventListener('stalled', () => showWaiting('Network is slow, waiting for stream data…'));
+      videoEl.addEventListener('playing', hideWaiting);
+      videoEl.addEventListener('canplay', hideWaiting);
+      videoEl.addEventListener('loadedmetadata', () => {
+        if (!currentEntry) return;
+        if (videoEl.currentSrc && videoEl.currentSrc.includes(currentEntry.url)) {
+          scheduleTimelineForCurrent(currentEntry, playQueue[1] || null);
+        }
+      });
+      videoEl.addEventListener('click', () => {
+        enableAudioFromUserGesture();
+        videoEl.play().catch(() => {});
+      });
+      videoEl.addEventListener('click', showHudTemporarily);
+      videoEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          enableAudioFromUserGesture();
+          videoEl.play().catch(() => {});
+        }
+      });
+      videoEl.addEventListener('touchstart', (event) => {
+        if (!event.changedTouches?.length) return;
+        const touch = event.changedTouches[0];
+        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
+      }, { passive: true });
+      videoEl.addEventListener('touchend', (event) => {
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
+        lastTouchPointer = null;
+      }, { passive: true });
+    }
+
     function bootstrap() {
       const urlQuery = new URLSearchParams(window.location.search).get('q');
       const initial = normalize(urlQuery) || DEFAULT_KEYWORD;
@@ -1066,50 +1124,10 @@
         loadSearch(dom.query.value);
       });
 
-      dom.video.addEventListener('ended', nextVideo);
-      dom.video.addEventListener('error', () => {
-        console.warn('Video playback error, skipping to next source');
-        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
-        nextVideo();
-      });
-      dom.video.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
-      dom.video.addEventListener('stalled', () => showWaiting('Network is slow, waiting for stream data…'));
-      dom.video.addEventListener('playing', hideWaiting);
-      dom.video.addEventListener('canplay', hideWaiting);
-      dom.video.addEventListener('loadedmetadata', () => {
-        if (!currentEntry) return;
-        if (dom.video.currentSrc && dom.video.currentSrc.includes(currentEntry.url)) {
-          scheduleTimelineForCurrent(currentEntry, playQueue[1] || null);
-        }
-      });
-      dom.video.addEventListener('click', () => {
-        enableAudioFromUserGesture();
-        dom.video.play().catch(() => {});
-      });
-      dom.video.addEventListener('click', showHudTemporarily);
-      dom.video.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          enableAudioFromUserGesture();
-          dom.video.play().catch(() => {});
-        }
-      });
+      attachVideoListeners(dom.video);
       dom.audioBtn.addEventListener('click', toggleAudio);
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
-      dom.video.addEventListener('touchstart', (event) => {
-        if (!event.changedTouches?.length) return;
-        const touch = event.changedTouches[0];
-        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
-      }, { passive: true });
-      dom.video.addEventListener('touchend', (event) => {
-        if (!event.changedTouches?.length || !lastTouchPointer) return;
-        const touch = event.changedTouches[0];
-        const deltaX = touch.clientX - lastTouchPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
-        if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
-        lastTouchPointer = null;
-      }, { passive: true });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
         if (!document.fullscreenElement) return;
