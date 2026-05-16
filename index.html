@@ -474,7 +474,7 @@
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const IPFS_GATEWAY_URL = 'https://ipfs.io/ipfs/';
-    const USE_MAINNET = false;
+    const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
@@ -529,6 +529,17 @@
       const time = new Date(value).getTime();
       return Number.isNaN(time) ? Number.NaN : time;
     };
+    const createSocialCard = ({ title, meta, body, imageUrl = '', links = [], keywords = [], createdAt = '', timestamp = Number.NaN, key = '' }) => ({
+      title,
+      meta,
+      body,
+      imageUrl,
+      links,
+      keywords,
+      createdAt,
+      timestamp,
+      key
+    });
     const shortTitle = (value, max = 28) => {
       const text = cleanDisplayText(value || '');
       return text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -544,6 +555,7 @@
       const keywords = [];
       const pushKeyword = (raw) => {
         const keyword = normalize(raw).replace(/^#/, '').toLowerCase();
+        // Keep this guard for fallback non-hashtag tokens as well as hashtag matches.
         if (!keyword || keyword.length < 2 || keywords.includes(keyword)) return;
         keywords.push(keyword);
       };
@@ -643,7 +655,7 @@
           const createdAt = msg?.BlockDate || msg?.blockDate || '';
           const timestamp = toTimestamp(createdAt);
           const txid = cleanDisplayText(normalize(msg?.TransactionId || msg?.transactionId || ''));
-          return {
+          return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
             meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
             body: cleanDisplayText(messageText),
@@ -653,7 +665,7 @@
             createdAt,
             timestamp,
             key: txid || `${timestamp}:${subject || messageText.slice(0, 40)}`
-          };
+          });
         })
         .filter(Boolean)
         .sort((a, b) => {
@@ -829,7 +841,7 @@
       streamCardPool = parseSocialCards(messages);
       shownSocialCardKeys = new Set();
       if (!streamCardPool.length) {
-        streamCardPool = [{ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, imageUrl: '', links: [], keywords: [keyword], createdAt: '', timestamp: Number.NaN, key: `none:${keyword}` }];
+        streamCardPool = [createSocialCard({ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, links: [], keywords: [keyword], key: `none:${keyword}` })];
       }
       socialTimeline = streamCardPool;
     }
@@ -866,7 +878,7 @@
     }
 
     async function getPublicAddressByKeyword(keyword) {
-      const endpoint = `${P2FK_BASE_URL}/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=${USE_MAINNET}`;
+      const endpoint = `${P2FK_BASE_URL}/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=${USE_P2FK_MAINNET}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`address lookup failed (${response.status})`);
       const payload = normalize(await response.text()).replace(/^"|"$/g, '');
@@ -875,7 +887,7 @@
     }
 
     async function getPublicMessagesByAddress(address, skip = 0, qty = 200) {
-      const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_MAINNET}`;
+      const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
       const payload = await response.json();
