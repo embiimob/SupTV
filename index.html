@@ -191,7 +191,7 @@
 </head>
 <body>
   <main id="app">
-    <video id="player" autoplay muted playsinline></video>
+    <video id="player" autoplay muted playsinline aria-label="SupTV video player" tabindex="0"></video>
     <div class="overlay"></div>
 
     <header class="topbar">
@@ -208,7 +208,7 @@
       <ul id="messages"></ul>
     </section>
 
-    <div class="status" id="status">Loading…</div>
+    <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
     <div class="ticker-wrap"><div id="ticker"></div></div>
   </main>
 
@@ -223,13 +223,21 @@
       fullscreenBtn: document.getElementById('fullscreenBtn')
     };
 
-    const STREAM_INTERVAL_MS = 2100;
+    const MESSAGE_UPDATE_INTERVAL_MS = 2100;
+    const P2FK_BASE_URL = 'https://p2fk.io';
+    const USE_MAINNET = false;
+    const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogg|mov|avi|m3u8))/i;
+    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
+    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogg|mov|avi|m3u8)(\?[^\s"']*)?)/i;
     let streamTimer = null;
     let playlist = [];
     let pointer = 0;
     let streamTextPool = [];
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+    const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
+    const toSafePath = (value) => normalize(value).split(/[\\/]+/).filter(Boolean).map((segment) => encodeURIComponent(segment)).join('/');
+    const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
 
     function setStatus(text) {
       dom.status.textContent = text;
@@ -247,16 +255,12 @@
 
     function parseItems(messages) {
       const seen = new Set();
-      const videoFileRegex = /([a-zA-Z0-9\s\-_.()]+\.(mp4|webm|ogg|mov|avi|m3u8))/i;
-      const ipfsRegex = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:\\([^\s]+))?/i;
-      const directVideoRegex = /(https?:\/\/[^\s"']+\.(mp4|webm|ogg|mov|avi|m3u8)(\?[^\s"']*)?)/i;
-
       return messages
         .map((msg) => {
           const messageText = normalize(msg?.Message || msg?.message || msg?.text);
           if (!messageText) return null;
 
-          const directMatch = messageText.match(directVideoRegex);
+          const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
           if (directMatch) {
             const directUrl = directMatch[1];
             if (seen.has(directUrl)) return null;
@@ -265,13 +269,14 @@
             return { url: directUrl, title, description: messageText, tags: [] };
           }
 
-          const ipfsMatch = messageText.match(ipfsRegex);
+          const ipfsMatch = messageText.match(IPFS_REGEX);
           if (!ipfsMatch) return null;
-          const fileMatch = messageText.match(videoFileRegex);
+          const fileMatch = messageText.match(VIDEO_FILE_REGEX);
           const hash = ipfsMatch[1];
           const namedPath = normalize(ipfsMatch[2] || '');
-          const filename = normalize(fileMatch?.[1] || namedPath);
-          const encodedPath = filename ? `/${encodeURIComponent(filename).replace(/%2F/g, '/')}` : '';
+          const sourcePath = normalize(fileMatch?.[1] || namedPath);
+          const filename = stripPathParts(sourcePath);
+          const encodedPath = sourcePath ? `/${toSafePath(sourcePath)}` : '';
           const url = `https://ipfs.io/ipfs/${hash}${encodedPath}`;
           if (seen.has(url)) return null;
           seen.add(url);
@@ -289,8 +294,8 @@
     function updateTicker(items, keyword) {
       const headlines = items.slice(0, 10).map((v, idx) => `${idx + 1}. ${v.title}`);
       dom.ticker.textContent = headlines.length
-        ? `LIVE • ${keyword.toUpperCase()} • ${headlines.join('  ✦  ')}`
-        : `LIVE • ${keyword.toUpperCase()} • No matching videos`; 
+        ? `${tickerLabel(keyword)}${headlines.join('  ✦  ')}`
+        : `${tickerLabel(keyword)}No matching videos`;
     }
 
     function addMessage(text) {
@@ -321,11 +326,11 @@
       streamTimer = setInterval(() => {
         const next = streamTextPool[Math.floor(Math.random() * streamTextPool.length)];
         addMessage(next);
-      }, STREAM_INTERVAL_MS);
+      }, MESSAGE_UPDATE_INTERVAL_MS);
     }
 
     async function getPublicAddressByKeyword(keyword) {
-      const endpoint = `https://p2fk.io/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=false`;
+      const endpoint = `${P2FK_BASE_URL}/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=${USE_MAINNET}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`address lookup failed (${response.status})`);
       const payload = normalize(await response.text()).replace(/^"|"$/g, '');
@@ -333,8 +338,8 @@
       return payload;
     }
 
-    async function getPublicMessagesByAddress(address, skip = 0, qty = 120) {
-      const endpoint = `https://p2fk.io/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=false`;
+    async function getPublicMessagesByAddress(address, skip = 0, qty = 200) {
+      const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_MAINNET}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
       const payload = await response.json();
@@ -356,6 +361,7 @@
       if (!entry) return;
       dom.video.src = entry.url;
       dom.video.play().catch(() => {
+        console.warn('Autoplay blocked or failed for video:', entry.url);
         setStatus(`Loaded "${entry.title}" — tap/click to play`);
       });
       setStatus(`Now Playing: ${entry.title}`);
@@ -395,7 +401,9 @@
     function requestFullscreen() {
       const target = document.documentElement;
       if (!document.fullscreenElement && target.requestFullscreen) {
-        target.requestFullscreen().catch(() => {});
+        target.requestFullscreen().catch(() => {
+          setStatus('Fullscreen is not available in this browser context');
+        });
       }
     }
 
@@ -410,10 +418,21 @@
       });
 
       dom.video.addEventListener('ended', nextVideo);
-      dom.video.addEventListener('error', nextVideo);
+      dom.video.addEventListener('error', () => {
+        console.warn('Video playback error, skipping to next source');
+        addMessage('Video playback issue detected; trying next video');
+        nextVideo();
+      });
       dom.video.addEventListener('click', () => dom.video.play().catch(() => {}));
+      dom.video.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          dom.video.play().catch(() => {});
+        }
+      });
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       window.addEventListener('keydown', (event) => {
+        if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
       });
 
