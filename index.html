@@ -641,6 +641,12 @@
     let tickerAnimationReady = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+    const decodeHtmlEntities = (text) => text
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'");
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
 
@@ -654,7 +660,7 @@
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
-    const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const cleanDisplayText = (value) => decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
       return Boolean(target.closest(INTERACTIVE_TOUCH_SELECTORS));
@@ -965,8 +971,8 @@
 
     function normalizeRootMsg(root) {
       const raw = root?.Message ?? root?.message ?? root?.text;
-      if (Array.isArray(raw)) return raw.join('\n').trim();
-      return normalize(raw);
+      const joined = Array.isArray(raw) ? raw.join('\n').trim() : normalize(raw);
+      return decodeHtmlEntities(joined);
     }
 
     function rootFromAddress(root) {
