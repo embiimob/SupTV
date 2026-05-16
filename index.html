@@ -714,7 +714,7 @@
     }
 
     function setStatus(text) {
-      const statusText = normalize(text).replace(/\s*[—-]\s*tap\/click to play\s*$/i, '');
+      const statusText = normalize(text).replace(/\s*[\u2013\u2014-]\s*tap\/click to play\s*$/i, '');
       dom.status.setAttribute('aria-label', statusText);
       dom.status.replaceChildren(buildInteractiveContent(statusText));
     }
