@@ -469,6 +469,9 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
+    const MIN_READY_BUFFER_SECONDS = 28;
+    const STREAM_READY_BUFFER_SECONDS = 18;
+    const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
@@ -494,6 +497,7 @@
     let socialTimeline = [];
     let shownSocialCardKeys = new Set();
     let preloadElements = new Map();
+    let preloadStatusPollers = new Map();
     let videoStatusByUrl = new Map();
     let trashedVideoUrls = new Set();
     let lastTouchPointer = null;
@@ -858,21 +862,62 @@
       dom.offAirScreen.classList.remove('visible');
     }
 
-    function isVideoFullyBuffered(videoEl) {
-      const duration = Number(videoEl?.duration);
-      if (!Number.isFinite(duration) || duration <= 0) return false;
+    function bufferedSecondsFromStart(videoEl) {
       const ranges = videoEl?.buffered;
-      if (!ranges || !ranges.length) return false;
-      const bufferedEnd = ranges.end(ranges.length - 1);
-      return bufferedEnd >= (duration - FULLY_BUFFERED_EPSILON_SECONDS);
+      if (!ranges || !ranges.length) return 0;
+      for (let i = 0; i < ranges.length; i += 1) {
+        const start = Number(ranges.start(i));
+        const end = Number(ranges.end(i));
+        if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+        if (start <= READY_RANGE_START_ALLOWANCE_SECONDS) return Math.max(0, end - Math.max(0, start));
+      }
+      return 0;
+    }
+
+    function isProbeReady(videoEl) {
+      const readyState = Number(videoEl?.readyState || 0);
+      if (readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
+      const bufferedFromStart = bufferedSecondsFromStart(videoEl);
+      if (bufferedFromStart <= 0) return false;
+      const duration = Number(videoEl?.duration);
+      if (Number.isFinite(duration) && duration > 0) {
+        if (bufferedFromStart >= (duration - FULLY_BUFFERED_EPSILON_SECONDS)) return true;
+        return bufferedFromStart >= Math.min(duration, MIN_READY_BUFFER_SECONDS) && readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+      }
+      return bufferedFromStart >= STREAM_READY_BUFFER_SECONDS && readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+    }
+
+    function clearPreloadProbe(url, media) {
+      const probe = media || preloadElements.get(url);
+      if (probe) {
+        probe.removeAttribute('src');
+        probe.load();
+      }
+      preloadElements.delete(url);
+      const poller = preloadStatusPollers.get(url);
+      if (poller) {
+        clearInterval(poller);
+        preloadStatusPollers.delete(url);
+      }
+    }
+
+    function stopPreloadPoller(url) {
+      const poller = preloadStatusPollers.get(url);
+      if (!poller) return;
+      clearInterval(poller);
+      preloadStatusPollers.delete(url);
+    }
+
+    function clearAllPreloadProbes() {
+      for (const [url, media] of preloadElements.entries()) {
+        clearPreloadProbe(url, media);
+      }
     }
 
     function primePreloadCandidates() {
       for (const [url, media] of preloadElements.entries()) {
         if (!playQueue.some((item) => item.url === url)) {
-          media.removeAttribute('src');
-          media.load();
-          preloadElements.delete(url);
+          clearPreloadProbe(url, media);
         }
       }
       for (const candidate of playQueue.slice(1, PRELOAD_COUNT + 1)) {
@@ -884,26 +929,39 @@
         probe.playsInline = true;
         videoStatusByUrl.set(candidate.url, 'downloading');
         const refreshProbeStatus = () => {
-          const nextStatus = isVideoFullyBuffered(probe) ? 'ready' : 'downloading';
+          const nextStatus = isProbeReady(probe) ? 'ready' : 'downloading';
           if (videoStatusByUrl.get(candidate.url) !== nextStatus) {
             videoStatusByUrl.set(candidate.url, nextStatus);
             updateTicker();
           }
         };
         probe.addEventListener('loadedmetadata', refreshProbeStatus);
+        probe.addEventListener('loadeddata', refreshProbeStatus);
         probe.addEventListener('progress', refreshProbeStatus);
         probe.addEventListener('canplay', refreshProbeStatus);
         probe.addEventListener('canplaythrough', refreshProbeStatus);
+        probe.addEventListener('durationchange', refreshProbeStatus);
         probe.addEventListener('suspend', refreshProbeStatus);
         probe.addEventListener('error', () => {
           videoStatusByUrl.set(candidate.url, 'error');
-          preloadElements.delete(candidate.url);
+          clearPreloadProbe(candidate.url, probe);
           updateTicker();
           queueMicrotask(primePreloadCandidates);
         });
         probe.src = candidate.url;
         probe.load();
         preloadElements.set(candidate.url, probe);
+        const pollId = window.setInterval(() => {
+          if (!preloadElements.has(candidate.url)) {
+            clearPreloadProbe(candidate.url, probe);
+            return;
+          }
+          refreshProbeStatus();
+          if (videoStatusByUrl.get(candidate.url) === 'ready') stopPreloadPoller(candidate.url);
+          if (videoStatusByUrl.get(candidate.url) === 'error') clearPreloadProbe(candidate.url, probe);
+        }, 1400);
+        preloadStatusPollers.set(candidate.url, pollId);
+        refreshProbeStatus();
       }
       updateTicker();
     }
@@ -997,6 +1055,7 @@
         probe.tabIndex = dom.video.tabIndex;
         dom.video.parentNode.replaceChild(probe, dom.video);
         dom.video = probe;
+        stopPreloadPoller(entry.url);
         preloadElements.delete(entry.url);
         attachVideoListeners(dom.video);
       } else {
@@ -1061,6 +1120,7 @@
       const cleaned = normalize(keyword) || DEFAULT_KEYWORD;
       currentKeyword = cleaned;
       clearScheduledMessages();
+      clearAllPreloadProbes();
 
       const url = new URL(window.location.href);
       url.searchParams.set('q', cleaned);
