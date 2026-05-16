@@ -1298,7 +1298,7 @@
       }
     }
 
-    function downloadIndexHtml() {
+    async function downloadIndexHtml() {
       const sourceUrl = new URL(window.location.href);
       sourceUrl.search = '';
       sourceUrl.hash = '';
@@ -1308,14 +1308,36 @@
       } else {
         sourceUrl.pathname = pathname.endsWith('/') ? `${pathname}index.html` : `${pathname}/index.html`;
       }
-      const anchor = document.createElement('a');
-      anchor.href = sourceUrl.toString();
-      anchor.download = 'index.html';
-      anchor.rel = 'noopener noreferrer';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setStatus('Downloading index.html…');
+      try {
+        setStatus('Preparing index.html download…');
+        let htmlText = '';
+        if (window.location.protocol === 'file:') {
+          htmlText = `<!DOCTYPE html>\n${document.documentElement.outerHTML}`;
+        } else {
+          const response = await fetch(sourceUrl.toString(), {
+            cache: 'no-store',
+            credentials: 'same-origin'
+          });
+          if (!response.ok) {
+            throw new Error(`download request failed (${response.status})`);
+          }
+          htmlText = await response.text();
+        }
+        const downloadBlob = new Blob([htmlText], { type: 'application/octet-stream' });
+        const downloadUrl = URL.createObjectURL(downloadBlob);
+        const anchor = document.createElement('a');
+        anchor.href = downloadUrl;
+        anchor.download = 'index.html';
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        setStatus('Downloading index.html…');
+      } catch (error) {
+        console.warn('Unable to download index.html', error);
+        setStatus('Unable to download index.html right now');
+      }
     }
 
     function attachVideoListeners(videoEl) {
