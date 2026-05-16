@@ -1715,17 +1715,17 @@
           // Some WebKit builds return void, others return a thenable.
           if (webkitResult && typeof webkitResult.then === 'function') await webkitResult;
           await new Promise((resolve) => window.setTimeout(resolve, FULLSCREEN_ACTIVATION_DELAY_MS));
-          if (!getNativeFullscreenElement()) throw new Error('webkit fullscreen did not activate');
+          if (!getNativeFullscreenElement()) throw new Error(`WebKit fullscreen did not activate after ${FULLSCREEN_ACTIVATION_DELAY_MS}ms`);
           return;
         }
         if (dom.video.webkitEnterFullscreen) {
           dom.video.webkitEnterFullscreen();
           await new Promise((resolve) => window.setTimeout(resolve, FULLSCREEN_ACTIVATION_DELAY_MS));
-          if (!dom.video.webkitDisplayingFullscreen) throw new Error('video fullscreen did not activate');
+          if (!dom.video.webkitDisplayingFullscreen) throw new Error(`Video WebKit fullscreen did not activate after ${FULLSCREEN_ACTIVATION_DELAY_MS}ms`);
           return;
         }
       } catch (error) {
-        console.warn('Native fullscreen request failed, using fallback mode', error);
+        console.warn('Native fullscreen request failed, using pseudo-fullscreen fallback mode', error);
       }
       pseudoFullscreenActive = true;
       updateFullscreenUiState();
