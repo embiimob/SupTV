@@ -17,6 +17,18 @@
 
     * { box-sizing: border-box; }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     html, body {
       width: 100%;
       height: 100%;
@@ -149,7 +161,7 @@
       backdrop-filter: blur(7px);
       padding: .7rem .75rem;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .26);
-      animation: cardInOut 10.5s ease forwards;
+      animation: cardInOut 13.5s ease forwards;
       pointer-events: auto;
       max-height: min(56vh, 560px);
       overflow-y: auto;
@@ -188,6 +200,23 @@
       line-height: 1.27;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
+    }
+
+    .message-card-body a {
+      color: #97ccff;
+      text-decoration: underline;
+      word-break: break-word;
+    }
+
+    .message-card-body button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .08rem .45rem;
+      font-size: .72rem;
+      cursor: pointer;
+      margin: 0 .12rem;
     }
 
     .message-card-image {
@@ -235,16 +264,16 @@
 
     .waiting-overlay {
       position: absolute;
-      inset: 0;
+      right: 1rem;
+      bottom: 3.4rem;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at center, rgba(7, 12, 25, .82), rgba(0, 0, 0, .72));
-      color: #f1f7ff;
+      align-items: flex-end;
+      justify-content: flex-end;
+      color: #deebff;
       opacity: 0;
       pointer-events: none;
-      transition: opacity .25s ease;
-      z-index: 4;
+      transition: opacity .2s ease;
+      z-index: 8;
     }
 
     .waiting-overlay.visible {
@@ -252,27 +281,18 @@
     }
 
     .waiting-box {
-      text-align: center;
-      background: rgba(8, 14, 28, .65);
-      border: 1px solid rgba(142, 167, 228, .34);
-      border-radius: .9rem;
-      padding: .85rem 1rem;
-      min-width: min(74vw, 350px);
-      box-shadow: 0 10px 35px rgba(0, 0, 0, .32);
-    }
-
-    .waiting-spinner {
-      width: 1.5rem;
-      height: 1.5rem;
-      margin: 0 auto .55rem;
-      border: 2px solid rgba(208, 224, 255, .22);
-      border-top-color: #9bc7ff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      text-align: left;
+      background: rgba(8, 14, 28, .38);
+      border: 1px solid rgba(142, 167, 228, .24);
+      border-radius: 999px;
+      padding: .2rem .55rem;
+      min-width: 0;
+      font-size: .72rem;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(4px);
     }
 
     .off-air-screen {
@@ -343,7 +363,8 @@
     .hidden-ui .topbar,
     .hidden-ui .ticker-wrap,
     .hidden-ui .status,
-    .hidden-ui .side-feed {
+    .hidden-ui .side-feed,
+    .hidden-ui .waiting-overlay {
       opacity: 0;
       pointer-events: none;
     }
@@ -364,12 +385,31 @@
       position: absolute;
       left: 1rem;
       bottom: 3.6rem;
-      pointer-events: none;
+      pointer-events: auto;
       font-size: .95rem;
       color: #e9f1ff;
       text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
       max-width: min(70vw, 900px);
       z-index: 7;
+    }
+
+    .status a {
+      color: #97ccff;
+      text-decoration: underline;
+      pointer-events: auto;
+      word-break: break-word;
+    }
+
+    .status button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .08rem .48rem;
+      font-size: .74rem;
+      cursor: pointer;
+      pointer-events: auto;
+      margin: 0 .15rem;
     }
 
     .ticker-wrap {
@@ -409,6 +449,7 @@
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
       .brand span { display: none; }
+      .waiting-overlay { right: .65rem; bottom: 3.25rem; }
     }
   </style>
 </head>
@@ -422,6 +463,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
+        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
@@ -440,8 +482,8 @@
 
     <section class="waiting-overlay" id="waitingOverlay" aria-live="polite">
       <div class="waiting-box">
-        <div class="waiting-spinner" aria-hidden="true"></div>
-        <div id="waitingText">Buffering next stream…</div>
+        <div id="waitingText" aria-hidden="true">⏳</div>
+        <span class="sr-only" id="waitingA11yText">Buffering stream</span>
       </div>
     </section>
 
@@ -458,24 +500,37 @@
       query: document.getElementById('query'),
       searchForm: document.getElementById('searchForm'),
       audioBtn: document.getElementById('audioBtn'),
+      downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       app: document.getElementById('app'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
-      waitingText: document.getElementById('waitingText')
+      waitingText: document.getElementById('waitingText'),
+      waitingA11yText: document.getElementById('waitingA11yText')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
+    const STREAM_RETRY_LIMIT = 1;
+    const IPFS_GATEWAY_RETRY_LIMIT = 1;
+    const ACTIVE_STREAM_TIMEOUT_MS = 12000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
-    const MESSAGE_ROTATION_INTERVAL_MS = 10500;
+    const MESSAGE_ROTATION_INTERVAL_MS = 13500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
+    const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
+    const SWIPE_SKIP_MIN_X_PX = 70;
+    const SWIPE_SKIP_MAX_Y_PX = 80;
     const P2FK_BASE_URL = 'https://p2fk.io';
-    const IPFS_GATEWAY_URL = 'https://ipfs.io/ipfs/';
+    const IPFS_GATEWAY_URLS = [
+      'https://ipfs.io/ipfs/',
+      'https://cloudflare-ipfs.com/ipfs/',
+      'https://dweb.link/ipfs/',
+      'https://gateway.pinata.cloud/ipfs/'
+    ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
@@ -483,7 +538,10 @@
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
     const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
+    const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    const STATUS_URL_MAX_LENGTH = 34;
+    const MESSAGE_URL_MAX_LENGTH = 34;
     let scheduledMessageTimeouts = [];
     let queuedMessages = [];
     let activeMessageTimeoutId = null;
@@ -501,6 +559,10 @@
     let lastTouchPointer = null;
     let lastMousePointer = null;
     let currentKeyword = DEFAULT_KEYWORD;
+    const profileByAddressCache = new Map();
+    const profileByUrnCache = new Map();
+    let streamRetryCountByUrl = new Map();
+    let activeStreamTimeoutId = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -508,21 +570,65 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const isInteractiveTouchTarget = (target) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(target.closest('button, input, textarea, select, a, label'));
+    };
     const formatUtcDate = (value) => {
       if (!value) return '';
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return '';
       return date.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
     };
-    const buildIpfsPathUrl = (hash, path) => {
+    const buildIpfsPathUrl = (hash, path, gatewayIndex = 0) => {
+      const gateway = IPFS_GATEWAY_URLS[gatewayIndex] || IPFS_GATEWAY_URLS[0];
       const cleanPath = normalize(path);
-      if (!cleanPath) return `${IPFS_GATEWAY_URL}${hash}`;
+      if (!cleanPath) return `${gateway}${hash}`;
       const encoded = cleanPath
         .split(/[\\/]+/)
         .filter(Boolean)
         .map((part) => encodeURIComponent(part))
         .join('/');
-      return `${IPFS_GATEWAY_URL}${hash}/${encoded}`;
+      return `${gateway}${hash}/${encoded}`;
+    };
+    const waitingSymbolText = (message = '') => {
+      const text = normalize(message).toLowerCase();
+      if (text.includes('slow') || text.includes('network')) return '📶↓';
+      if (text.includes('loading')) return '⏳▶';
+      if (text.includes('buffer')) return '◌⏳';
+      return '⏳';
+    };
+    const formatGatewayFallbackLabel = (nextIndex) => `backup IPFS gateway ${nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`;
+    const moveStatusToNewUrl = (oldUrl, nextUrl, fallbackStatus = 'downloading') => {
+      if (!oldUrl || !nextUrl || oldUrl === nextUrl) return;
+      const previousStatus = videoStatusByUrl.get(oldUrl);
+      videoStatusByUrl.delete(oldUrl);
+      videoStatusByUrl.set(nextUrl, previousStatus || fallbackStatus);
+    };
+    const tryNextIpfsGateway = (item) => {
+      if (!item?.hash) return null;
+      const currentIndex = Number.isInteger(item.gatewayIndex) ? item.gatewayIndex : 0;
+      if (currentIndex >= IPFS_GATEWAY_RETRY_LIMIT) return null;
+      const nextIndex = currentIndex + 1;
+      if (nextIndex >= IPFS_GATEWAY_URLS.length) return null;
+      const oldUrl = item.url;
+      const nextUrl = buildIpfsPathUrl(item.hash, item.path || '', nextIndex);
+      item.gatewayIndex = nextIndex;
+      item.url = nextUrl;
+      return { oldUrl, nextUrl, nextIndex };
+    };
+    const claimStreamRetry = (url) => {
+      const cleanUrl = normalize(url);
+      if (!cleanUrl) return false;
+      const used = streamRetryCountByUrl.get(cleanUrl) || 0;
+      if (used >= STREAM_RETRY_LIMIT) return false;
+      streamRetryCountByUrl.set(cleanUrl, used + 1);
+      return true;
+    };
+    const clearStreamRetry = (url) => {
+      const cleanUrl = normalize(url);
+      if (!cleanUrl) return;
+      streamRetryCountByUrl.delete(cleanUrl);
     };
     const extractImageUrl = (messageText) => {
       const direct = messageText.match(IMAGE_URL_REGEX);
@@ -535,6 +641,108 @@
       if (!value) return Number.NaN;
       const time = new Date(value).getTime();
       return Number.isNaN(time) ? Number.NaN : time;
+    };
+    const unwrapQuotedText = (value) => normalize(value).replace(/^"|"$/g, '');
+    const splitInlineIpfsSuffix = (value) => {
+      const text = normalize(value);
+      if (!text) return { primary: '', suffix: '' };
+      const inlineIpfsIndex = text.search(/IPFS:(?:[a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})/i);
+      if (inlineIpfsIndex <= 0) return { primary: text, suffix: '' };
+      return {
+        primary: text.slice(0, inlineIpfsIndex),
+        suffix: text.slice(inlineIpfsIndex)
+      };
+    };
+    const stripTrailingUrlPunctuation = (value) => {
+      let text = normalize(value);
+      if (!text) return '';
+      text = text.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+      while (text.endsWith(')')) {
+        const openCount = (text.match(/\(/g) || []).length;
+        const closeCount = (text.match(/\)/g) || []).length;
+        if (closeCount <= openCount) break;
+        text = text.slice(0, -1);
+      }
+      return text;
+    };
+    const formatLinkLabel = (value, max = 42) => {
+      const text = cleanDisplayText(value || '');
+      if (!text) return '';
+      let display = text;
+      try {
+        const parsed = new URL(text);
+        display = `${parsed.hostname.replace(/^www\./i, '')}${parsed.pathname === '/' ? '' : parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch {
+        display = text.replace(/^https?:\/\//i, '');
+      }
+      return display.length > max ? `${display.slice(0, max - 1)}…` : display;
+    };
+    const rootAddressCandidate = (root) => normalize(
+      root?.FromAddress
+      || root?.fromAddress
+      || root?.['From Address']
+      || root?.['from address']
+      || root?.['Signed By']
+      || root?.SignedBy
+      || ''
+    );
+    const normalizeAddressForCompare = (value) => cleanDisplayText(value || '').trim();
+    const sameAddressValue = (a, b) => {
+      const left = normalizeAddressForCompare(a);
+      const right = normalizeAddressForCompare(b);
+      if (!left || !right) return false;
+      if (left === right) return true;
+      if (left.startsWith('0x') && right.startsWith('0x')) return left.toLowerCase() === right.toLowerCase();
+      return false;
+    };
+    const extractProfileUrn = (profile) => cleanDisplayText(profile?.urn || profile?.URN || profile?.Urn || profile?.profileURN || profile?.ProfileURN || '');
+    const normalizeCreatorValue = (value) => {
+      if (!value) return '';
+      if (typeof value === 'string') return normalizeAddressForCompare(value);
+      if (typeof value === 'object') {
+        return normalizeAddressForCompare(
+          value.address
+          || value.Address
+          || value.creatorId
+          || value.CreatorId
+          || value.publicAddress
+          || value.PublicAddress
+          || ''
+        );
+      }
+      return '';
+    };
+    const extractCreatorAddresses = (profile) => {
+      if (!profile || typeof profile !== 'object') return [];
+      const creators = profile.Creators || profile.creators || profile.CreatorAddresses || profile.creatorAddresses || [];
+      const normalizedCreators = Array.isArray(creators)
+        ? creators.map((creator) => normalizeCreatorValue(creator)).filter(Boolean)
+        : [];
+      if (normalizedCreators.length) return normalizedCreators;
+      const creatorId = normalizeCreatorValue(profile.CreatorId || profile.creatorId || profile.Creator || profile.creator || profile.PublicAddress || profile.publicAddress || '');
+      return creatorId ? [creatorId] : [];
+    };
+    const profileHasCreatorMatch = (profile, address) => {
+      const creatorAddresses = extractCreatorAddresses(profile);
+      if (!creatorAddresses.length) return false;
+      return creatorAddresses.some((creatorAddress) => sameAddressValue(creatorAddress, address));
+    };
+    const profileDisplayName = (profile) => {
+      if (!profile || typeof profile !== 'object') return '';
+      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || '');
+      if (urn) return urn;
+      const displayName = cleanDisplayText(profile.dnm || profile.DNM || profile.displayName || profile.DisplayName || '');
+      if (displayName) return displayName;
+      const fullName = [
+        profile.fnm, profile.FNM, profile.firstName, profile.FirstName,
+        profile.mnm, profile.MNM, profile.middleName, profile.MiddleName,
+        profile.lnm, profile.LNM, profile.lastName, profile.LastName,
+        profile.sfx, profile.SFX, profile.suffix, profile.Suffix
+      ]
+        .map((part) => cleanDisplayText(part || ''))
+        .filter(Boolean)
+        .join(' ');
+      return cleanDisplayText(fullName);
     };
     const createSocialCard = ({ title, meta, body, imageUrl = '', links = [], keywords = [], createdAt = '', timestamp = Number.NaN, key = '' }) => ({
       title,
@@ -555,7 +763,10 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
-      const unique = [...new Set(matches.map((link) => link.replace(/[),.;]+$/, '')))];
+      const unique = [...new Set(matches
+        .map((link) => splitInlineIpfsSuffix(link).primary || link)
+        .map((link) => stripTrailingUrlPunctuation(link))
+        .filter(Boolean))];
       return unique.slice(0, 4);
     };
     const extractKeywords = (messageText, subjectText) => {
@@ -579,8 +790,70 @@
       return keywords.slice(0, 5);
     };
 
+    function triggerKeywordSearch(keyword) {
+      dom.query.value = keyword;
+      loadSearch(keyword);
+    }
+
+    function appendInteractiveTokenText(fragment, text) {
+      const source = normalize(text);
+      if (!source) return;
+      const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
+      let lastIndex = 0;
+      let match;
+      while ((match = hashtagRegex.exec(source)) !== null) {
+        const before = source.slice(lastIndex, match.index);
+        if (before) fragment.appendChild(document.createTextNode(before));
+        const keyword = normalize(match[1]).toLowerCase();
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `#${keyword}`;
+        button.addEventListener('click', () => triggerKeywordSearch(keyword));
+        fragment.appendChild(button);
+        lastIndex = hashtagRegex.lastIndex;
+      }
+      const trailing = source.slice(lastIndex);
+      if (trailing) fragment.appendChild(document.createTextNode(trailing));
+    }
+
+    function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
+      const content = document.createDocumentFragment();
+      const source = normalize(text);
+      const urlRegex = new RegExp(URL_REGEX.source, 'gi');
+      let lastIndex = 0;
+      let match;
+      while ((match = urlRegex.exec(source)) !== null) {
+        const start = match.index ?? 0;
+        appendInteractiveTokenText(content, source.slice(lastIndex, start));
+        const matchedUrl = match[0];
+        const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
+        const candidateUrl = matchedPrimaryUrl || matchedUrl;
+        const cleanUrl = stripTrailingUrlPunctuation(candidateUrl);
+        if (!cleanUrl) {
+          appendInteractiveTokenText(content, matchedUrl);
+          lastIndex = start + matchedUrl.length;
+          continue;
+        }
+        const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
+        const anchor = document.createElement('a');
+        anchor.href = cleanUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.title = cleanUrl;
+        anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
+        content.appendChild(anchor);
+        if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
+        if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
+        lastIndex = start + matchedUrl.length;
+      }
+      appendInteractiveTokenText(content, source.slice(lastIndex));
+      return content;
+    }
+
     function setStatus(text) {
-      dom.status.textContent = text;
+      const statusText = normalize(text).replace(/\s*[\u2013\u2014-]\s*tap\/click to play\s*$/i, '');
+      dom.status.setAttribute('aria-label', statusText);
+      dom.status.replaceChildren(buildInteractiveContent(statusText, { urlMaxLength: STATUS_URL_MAX_LENGTH }));
     }
 
     function asArray(payload) {
@@ -605,7 +878,12 @@
     }
 
     function rootFromAddress(root) {
-      return cleanDisplayText(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '');
+      return cleanDisplayText(rootAddressCandidate(root));
+    }
+
+    function displayFromAddress(root, addressLabels = new Map()) {
+      const address = rootFromAddress(root);
+      return addressLabels.get(address) || address;
     }
 
     function messageBlockDate(payload) {
@@ -620,6 +898,62 @@
 
     function messageTimestamp(payload) {
       return toTimestamp(messageBlockDate(payload));
+    }
+
+    async function getProfileByAddress(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return null;
+      if (profileByAddressCache.has(cleanAddress)) return profileByAddressCache.get(cleanAddress);
+      const lookup = (async () => {
+        try {
+          const endpoint = `${P2FK_BASE_URL}/GetProfileByAddress/${encodeURIComponent(cleanAddress)}?mainnet=${USE_P2FK_MAINNET}`;
+          const response = await fetch(endpoint);
+          if (!response.ok) return null;
+          return await response.json();
+        } catch {
+          return null;
+        }
+      })();
+      profileByAddressCache.set(cleanAddress, lookup);
+      return lookup;
+    }
+
+    async function getProfileByURN(urn) {
+      const cleanUrn = cleanDisplayText(unwrapQuotedText(urn || ''));
+      if (!cleanUrn) return null;
+      if (profileByUrnCache.has(cleanUrn)) return profileByUrnCache.get(cleanUrn);
+      const lookup = (async () => {
+        try {
+          const endpoint = `${P2FK_BASE_URL}/GetProfileByURN/${encodeURIComponent(cleanUrn)}?mainnet=${USE_P2FK_MAINNET}`;
+          const response = await fetch(endpoint);
+          if (!response.ok) return null;
+          return await response.json();
+        } catch {
+          return null;
+        }
+      })();
+      profileByUrnCache.set(cleanUrn, lookup);
+      return lookup;
+    }
+
+    async function resolveAddressDisplay(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return '';
+      const addressProfile = await getProfileByAddress(cleanAddress);
+      const profileUrn = extractProfileUrn(addressProfile);
+      if (profileUrn) {
+        const validatedProfile = await getProfileByURN(profileUrn);
+        if (validatedProfile && profileHasCreatorMatch(validatedProfile, cleanAddress)) {
+          return extractProfileUrn(validatedProfile) || profileDisplayName(validatedProfile) || profileUrn;
+        }
+      }
+      return cleanAddress;
+    }
+
+    async function resolveAddressLabels(messages) {
+      const addresses = [...new Set(messages.map((message) => rootFromAddress(unwrapRootPayload(message) || {})).filter(Boolean))];
+      const entries = await Promise.all(addresses.map(async (address) => [address, await resolveAddressDisplay(address)]));
+      return new Map(entries);
     }
 
     function sortByNewestTimestamp(a, b) {
@@ -643,7 +977,7 @@
           continue;
         }
         const root = unwrapRootPayload(message) || {};
-        const fallbackKey = `${normalize(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '')}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
+        const fallbackKey = `${normalize(rootAddressCandidate(root))}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
         if (seenFallback.has(fallbackKey)) continue;
         seenFallback.add(fallbackKey);
         output.push(message);
@@ -668,7 +1002,7 @@
       });
     }
 
-    function parseItems(messages) {
+    function parseItems(messages, addressLabels = new Map()) {
       const seen = new Set();
       const isValidIpfsVideoMessage = (messageText) => {
         const ipfsMatch = messageText.match(IPFS_REGEX);
@@ -692,7 +1026,9 @@
               title,
               description: cleanDisplayText(messageText),
               tags: [],
-              from: rootFromAddress(root),
+              links: extractLinks(messageText),
+              keywords: extractKeywords(messageText, title),
+              from: displayFromAddress(root, addressLabels),
               createdAt: messageBlockDate(root),
               hash: '',
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
@@ -707,42 +1043,46 @@
           const hash = ipfsMatch[1];
           const sourcePath = normalize(fileMatch[1] || '');
           const filename = stripPathParts(sourcePath).trim();
-          const url = `${IPFS_GATEWAY_URL}${hash}`;
+          const url = buildIpfsPathUrl(hash, '', 0);
           if (seen.has(url)) return null;
           seen.add(url);
 
-          return {
-            url,
-            title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
-            description: cleanDisplayText(messageText),
-            tags: [],
-            from: rootFromAddress(root),
-            createdAt: messageBlockDate(root),
-            hash,
-            subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
-            imageUrl: extractImageUrl(messageText),
-            txid: messageTxid(root),
-            timestamp: messageTimestamp(root)
-          };
+            return {
+              url,
+              title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
+              description: cleanDisplayText(messageText),
+              tags: [],
+              links: extractLinks(messageText),
+              keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
+              from: displayFromAddress(root, addressLabels),
+              createdAt: messageBlockDate(root),
+              hash,
+              path: '',
+              gatewayIndex: 0,
+              subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
+              imageUrl: extractImageUrl(messageText),
+              txid: messageTxid(root),
+              timestamp: messageTimestamp(root)
+            };
         })
         .filter(Boolean)
         .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp));
     }
 
-    function parseSocialCards(messages) {
+    function parseSocialCards(messages, addressLabels = new Map()) {
       return messages
         .map((msg) => {
           const root = unwrapRootPayload(msg) || {};
           const messageText = normalizeRootMsg(root);
           if (!messageText) return null;
           const subject = cleanDisplayText(normalize(root?.Subject || root?.subject || ''));
-          const from = rootFromAddress(root);
+          const from = displayFromAddress(root, addressLabels);
           const createdAt = messageBlockDate(root);
           const timestamp = messageTimestamp(root);
           const txid = messageTxid(root);
           return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
-            meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
+            meta: `${from ? shortTitle(from, 18) : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
             body: cleanDisplayText(messageText),
             imageUrl: extractImageUrl(messageText),
             links: extractLinks(messageText),
@@ -812,38 +1152,8 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.textContent = cleanDisplayText(card.body);
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
         li.appendChild(body);
-      }
-
-      if (Array.isArray(card.links) && card.links.length) {
-        const linksWrap = document.createElement('div');
-        linksWrap.className = 'message-card-links';
-        for (const url of card.links) {
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.target = '_blank';
-          anchor.rel = 'noopener noreferrer';
-          anchor.textContent = shortTitle(url, 44);
-          linksWrap.appendChild(anchor);
-        }
-        li.appendChild(linksWrap);
-      }
-
-      if (Array.isArray(card.keywords) && card.keywords.length) {
-        const keywordWrap = document.createElement('div');
-        keywordWrap.className = 'message-card-keywords';
-        for (const keyword of card.keywords) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = `#${keyword}`;
-          button.addEventListener('click', () => {
-            dom.query.value = keyword;
-            loadSearch(keyword);
-          });
-          keywordWrap.appendChild(button);
-        }
-        li.appendChild(keywordWrap);
       }
 
       if (card.imageUrl) {
@@ -871,7 +1181,7 @@
       if (activeMessageTimeoutId || !queuedMessages.length) return;
       const card = queuedMessages.shift();
       const li = renderMessageCard(card);
-      dom.messages.prepend(li);
+      dom.messages.replaceChildren(li);
       activeMessageTimeoutId = window.setTimeout(() => {
         if (li.parentElement === dom.messages) dom.messages.removeChild(li);
         activeMessageTimeoutId = null;
@@ -893,12 +1203,27 @@
         clearTimeout(activeMessageTimeoutId);
         activeMessageTimeoutId = null;
       }
-      dom.messages.innerHTML = '';
+      dom.messages.replaceChildren();
     }
 
     function showWaiting(message) {
-      dom.waitingText.textContent = message || 'Buffering next stream…';
+      dom.waitingText.textContent = waitingSymbolText(message);
+      dom.waitingOverlay.setAttribute('aria-label', message || 'Buffering stream');
+      dom.waitingA11yText.textContent = message || 'Buffering stream';
       dom.waitingOverlay.classList.add('visible');
+      clearTimeout(activeStreamTimeoutId);
+      activeStreamTimeoutId = window.setTimeout(() => {
+        const activeItem = playQueue[0];
+        if (!activeItem?.url || activeItem.url !== currentEntry?.url) return;
+        activeStreamTimeoutId = null;
+        addMessage({
+          title: 'Playback timeout',
+          meta: 'player',
+          body: `Timed out waiting for "${activeItem.title || 'current video'}"; retrying once before skip`
+        });
+        videoStatusByUrl.set(activeItem.url, 'error');
+        playCurrent();
+      }, ACTIVE_STREAM_TIMEOUT_MS);
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'downloading');
         updateTicker();
@@ -907,6 +1232,10 @@
 
     function hideWaiting() {
       dom.waitingOverlay.classList.remove('visible');
+      if (activeStreamTimeoutId) {
+        clearTimeout(activeStreamTimeoutId);
+        activeStreamTimeoutId = null;
+      }
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'playing');
         updateTicker();
@@ -914,6 +1243,10 @@
     }
 
     function showOffAir(message) {
+      if (activeStreamTimeoutId) {
+        clearTimeout(activeStreamTimeoutId);
+        activeStreamTimeoutId = null;
+      }
       dom.offAirScreen.classList.add('visible');
       hideWaiting();
       dom.video.removeAttribute('src');
@@ -1028,8 +1361,8 @@
       updateTicker();
     }
 
-    function prepareSocialFeed(messages, keyword) {
-      streamCardPool = parseSocialCards(messages);
+    function prepareSocialFeed(messages, keyword, addressLabels = new Map()) {
+      streamCardPool = parseSocialCards(messages, addressLabels);
       shownSocialCardKeys = new Set();
       if (!streamCardPool.length) {
         streamCardPool = [createSocialCard({ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, links: [], keywords: [keyword], key: `none:${keyword}` })];
@@ -1039,12 +1372,14 @@
 
     function scheduleTimelineForCurrent(entry, nextEntry) {
       clearScheduledMessages();
-      const creator = entry.from ? `${entry.from.slice(0, 12)}…` : 'p2fk';
+      const creator = entry.from ? shortTitle(entry.from, 18) : 'p2fk';
       addMessage({
         title: `Now Playing: ${entry.title}`,
         meta: `${creator}${entry.createdAt ? ` · ${formatUtcDate(entry.createdAt)}` : ''}${entry.hash ? ` · ${entry.hash.slice(0, 12)}…` : ''}`,
         body: entry.description,
-        imageUrl: entry.imageUrl || ''
+        imageUrl: entry.imageUrl || '',
+        links: Array.isArray(entry.links) ? entry.links : [],
+        keywords: Array.isArray(entry.keywords) ? entry.keywords : []
       });
 
       const currentTs = entry.timestamp;
@@ -1106,17 +1441,46 @@
       const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
       const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
       const messages = mergeUniqueMessagesByTxid(keywordMessages, mainSearchMessages);
-      const items = dedupeItemsByTxid(parseItems(messages));
+      const addressLabels = await resolveAddressLabels(messages);
+      const items = dedupeItemsByTxid(parseItems(messages, addressLabels));
       if (!items.length) {
         throw new Error('no playable videos in keyword or search results');
       }
-      return { items, messages };
+      return { items, messages, addressLabels };
     }
 
     function playCurrent() {
+      while (playQueue.length) {
+        const candidate = playQueue[0];
+        if (videoStatusByUrl.get(candidate.url) !== 'error') break;
+        if (claimStreamRetry(candidate.url)) {
+          videoStatusByUrl.set(candidate.url, 'downloading');
+          addMessage({
+            title: 'Retrying stream',
+            meta: 'player',
+            body: `Retrying "${candidate.title}" once after preload error`
+          });
+          break;
+        }
+        const failed = playQueue.shift();
+        if (!failed) break;
+        clearPreloadProbe(failed.url, preloadElements.get(failed.url));
+        clearStreamRetry(failed.url);
+        videoStatusByUrl.delete(failed.url);
+        addMessage({
+          title: 'Video skipped',
+          meta: 'player',
+          body: `Skipped "${failed.title}" after repeated stream errors`
+        });
+      }
       const entry = playQueue[0];
       if (!entry) {
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         showOffAir('OFF AIR • Playlist reached the end of search results');
+        updateTicker(playQueue, currentKeyword);
         return;
       }
       currentEntry = entry;
@@ -1145,18 +1509,25 @@
       primePreloadCandidates();
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
-        setStatus(`Loaded "${entry.title}" — tap/click to play`);
       });
       setStatus(`Now Playing: ${entry.title} (${playQueue.length} left)`);
     }
 
     function nextVideo() {
       if (!playQueue.length) {
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         showOffAir('OFF AIR • Playlist reached the end of search results');
         return;
       }
       const last = playQueue.shift();
-      if (last?.url) videoStatusByUrl.delete(last.url);
+      if (last?.url) {
+        clearPreloadProbe(last.url, preloadElements.get(last.url));
+        clearStreamRetry(last.url);
+        videoStatusByUrl.delete(last.url);
+      }
       playCurrent();
     }
 
@@ -1164,6 +1535,7 @@
       const current = playQueue[0];
       if (!current) return;
       trashedVideoUrls.add(current.url);
+      clearStreamRetry(current.url);
       videoStatusByUrl.delete(current.url);
       playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
       addMessage({
@@ -1209,17 +1581,27 @@
       setStatus(`Searching p2fk.io for "${cleaned}"…`);
 
       try {
-        const { items, messages } = await queryP2FK(cleaned);
+        const { items, messages, addressLabels } = await queryP2FK(cleaned);
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
+        streamRetryCountByUrl = new Map();
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
         updateTicker(playQueue, cleaned);
-        prepareSocialFeed(messages, cleaned);
+        prepareSocialFeed(messages, cleaned, addressLabels);
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
         searchResultTotal = 0;
         videoStatusByUrl = new Map();
+        streamRetryCountByUrl = new Map();
+        if (activeStreamTimeoutId) {
+          clearTimeout(activeStreamTimeoutId);
+          activeStreamTimeoutId = null;
+        }
         playQueue = [];
         updateTicker([], cleaned);
         prepareSocialFeed([], cleaned);
@@ -1236,11 +1618,80 @@
       }
     }
 
+    async function downloadIndexHtml() {
+      const sourceUrl = new URL(window.location.href);
+      sourceUrl.search = '';
+      sourceUrl.hash = '';
+      const pathname = sourceUrl.pathname || '/';
+      if (/\.html?$/i.test(pathname)) {
+        sourceUrl.pathname = pathname.replace(/[^/]+$/, 'index.html');
+      } else {
+        sourceUrl.pathname = pathname.endsWith('/') ? `${pathname}index.html` : `${pathname}/index.html`;
+      }
+      try {
+        setStatus('Preparing index.html download…');
+        let htmlText = '';
+        if (window.location.protocol === 'file:') {
+          htmlText = `<!DOCTYPE html>\n${document.documentElement.outerHTML}`;
+        } else {
+          if (sourceUrl.origin !== window.location.origin) {
+            throw new Error('download source must stay on the current origin');
+          }
+          const response = await fetch(sourceUrl.toString(), {
+            cache: 'no-store',
+            credentials: 'same-origin'
+          });
+          if (!response.ok) {
+            throw new Error(`download request failed (${response.status})`);
+          }
+          htmlText = await response.text();
+        }
+        const downloadBlob = new Blob([htmlText], { type: 'text/html;charset=utf-8' });
+        const downloadUrl = URL.createObjectURL(downloadBlob);
+        const anchor = document.createElement('a');
+        anchor.href = downloadUrl;
+        anchor.download = 'index.html';
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS);
+        setStatus('Downloading index.html…');
+      } catch (error) {
+        console.warn('Unable to download index.html', error);
+        setStatus('Unable to download index.html right now');
+      }
+    }
+
     function attachVideoListeners(videoEl) {
       videoEl.addEventListener('ended', nextVideo);
       videoEl.addEventListener('error', () => {
-        console.warn('Video playback error, skipping to next source');
-        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
+        const activeItem = playQueue[0];
+        const gatewayFallback = tryNextIpfsGateway(activeItem);
+        if (gatewayFallback) {
+          moveStatusToNewUrl(gatewayFallback.oldUrl, gatewayFallback.nextUrl, 'downloading');
+          showWaiting('Switching IPFS gateway…');
+          addMessage({
+            title: 'Gateway fallback',
+            meta: 'player',
+            body: `Switching stream to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
+          });
+          playCurrent();
+          return;
+        }
+        if (activeItem?.url) videoStatusByUrl.set(activeItem.url, 'error');
+        if (claimStreamRetry(activeItem?.url || '')) {
+          showWaiting('Retrying stream once…');
+          addMessage({
+            title: 'Playback retry',
+            meta: 'player',
+            body: `Retrying "${activeItem?.title || 'current video'}" one more time before skip`
+          });
+          playCurrent();
+          return;
+        }
+        console.warn('Video playback error after retry, skipping to next source');
+        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue persisted; skipping to next video' });
         nextVideo();
       });
       videoEl.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
@@ -1265,19 +1716,6 @@
           videoEl.play().catch(() => {});
         }
       });
-      videoEl.addEventListener('touchstart', (event) => {
-        if (!event.changedTouches?.length) return;
-        const touch = event.changedTouches[0];
-        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
-      }, { passive: true });
-      videoEl.addEventListener('touchend', (event) => {
-        if (!event.changedTouches?.length || !lastTouchPointer) return;
-        const touch = event.changedTouches[0];
-        const deltaX = touch.clientX - lastTouchPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
-        if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
-        lastTouchPointer = null;
-      }, { passive: true });
     }
 
     function bootstrap() {
@@ -1294,6 +1732,7 @@
 
       attachVideoListeners(dom.video);
       dom.audioBtn.addEventListener('click', toggleAudio);
+      dom.downloadBtn.addEventListener('click', downloadIndexHtml);
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
@@ -1316,6 +1755,25 @@
         if (event.key === 'Escape') showHudTemporarily();
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      dom.app.addEventListener('touchstart', (event) => {
+        if (!event.changedTouches?.length) return;
+        const touch = event.changedTouches[0];
+        lastTouchPointer = {
+          x: touch.clientX,
+          y: touch.clientY,
+          ignoreSwipe: isInteractiveTouchTarget(event.target)
+        };
+      }, { passive: true });
+      dom.app.addEventListener('touchend', (event) => {
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        if (!lastTouchPointer.ignoreSwipe && deltaX < -SWIPE_SKIP_MIN_X_PX && deltaY < SWIPE_SKIP_MAX_Y_PX) {
+          trashCurrentVideo();
+        }
+        lastTouchPointer = null;
+      }, { passive: true });
 
       loadSearch(initial);
     }
