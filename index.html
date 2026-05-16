@@ -61,6 +61,7 @@
       padding: 1rem 1.1rem;
       background: linear-gradient(to bottom, rgba(1,3,8,.8), rgba(1,3,8,.08));
       pointer-events: auto;
+      z-index: 8;
     }
 
     .brand {
@@ -120,7 +121,7 @@
       width: min(30vw, 360px);
       min-height: 6rem;
       pointer-events: auto;
-      z-index: 3;
+      z-index: 7;
     }
 
     #messages {
@@ -266,8 +267,9 @@
       align-items: center;
       justify-content: center;
       background: radial-gradient(circle at center, #2f2f33, #15161b 58%, #09090b 100%);
-      z-index: 3;
+      z-index: 2;
       overflow: hidden;
+      pointer-events: none;
     }
 
     .off-air-screen.visible {
@@ -285,14 +287,14 @@
     }
 
     .off-air-card {
-      width: min(84vw, 640px);
-      aspect-ratio: 4 / 3;
-      border-radius: .9rem;
-      border: 2px solid rgba(240, 246, 255, .38);
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      border: none;
       background: linear-gradient(180deg, #f0f0f0 0%, #dedede 38%, #999 60%, #272727 100%);
       position: relative;
       overflow: hidden;
-      box-shadow: 0 15px 44px rgba(0, 0, 0, .48);
+      box-shadow: none;
     }
 
     .off-air-bars {
@@ -350,6 +352,7 @@
       color: #e9f1ff;
       text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
       max-width: min(70vw, 900px);
+      z-index: 7;
     }
 
     .ticker-wrap {
@@ -363,6 +366,7 @@
       overflow: hidden;
       pointer-events: none;
       transition: opacity .25s ease;
+      z-index: 7;
     }
 
     #ticker {
@@ -372,6 +376,8 @@
       line-height: 2.7rem;
       color: #dbebff;
       font-weight: 600;
+      font-size: .94rem;
+      letter-spacing: .015em;
       animation: crawl 50s linear infinite;
     }
 
@@ -657,13 +663,13 @@
     }
 
     function updateTicker(items = playQueue, keyword = currentKeyword) {
-      const statusCards = items.slice(0, 12).map((item, idx) => {
+      const statusCards = items.slice(0, 8).map((item, idx) => {
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
-        return `${marker}:${shortTitle(item.title, 20)} [${statusForItem(item, idx).toUpperCase()}]`;
+        return `${marker} ${shortTitle(item.title, 24)} • ${statusForItem(item, idx).toUpperCase()}`;
       });
-      const summary = `found:${searchResultTotal} • active:${items.length} • keyword:${keyword}`;
+      const summary = `FOUND ${searchResultTotal} • ACTIVE ${items.length} • KEYWORD ${keyword}`;
       dom.ticker.textContent = statusCards.length
-        ? `${tickerLabel(keyword)}${summary}          ${statusCards.join('          ✦          ')}`
+        ? `${tickerLabel(keyword)}${summary}     ║     ${statusCards.join('     ✦     ')}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
     }
 
