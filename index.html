@@ -513,6 +513,7 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
+    const STREAM_RETRY_LIMIT = 1;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 13500;
@@ -558,6 +559,7 @@
     let currentKeyword = DEFAULT_KEYWORD;
     const keywordByAddressCache = new Map();
     const profileByAddressCache = new Map();
+    let streamRetryCountByUrl = new Map();
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -610,6 +612,19 @@
       item.gatewayIndex = nextIndex;
       item.url = nextUrl;
       return { oldUrl, nextUrl, nextIndex };
+    };
+    const claimStreamRetry = (url) => {
+      const cleanUrl = normalize(url);
+      if (!cleanUrl) return false;
+      const used = streamRetryCountByUrl.get(cleanUrl) || 0;
+      if (used >= STREAM_RETRY_LIMIT) return false;
+      streamRetryCountByUrl.set(cleanUrl, used + 1);
+      return true;
+    };
+    const clearStreamRetry = (url) => {
+      const cleanUrl = normalize(url);
+      if (!cleanUrl) return;
+      streamRetryCountByUrl.delete(cleanUrl);
     };
     const extractImageUrl = (messageText) => {
       const direct = messageText.match(IMAGE_URL_REGEX);
@@ -1335,9 +1350,33 @@
     }
 
     function playCurrent() {
+      while (playQueue.length) {
+        const candidate = playQueue[0];
+        if (videoStatusByUrl.get(candidate.url) !== 'error') break;
+        if (claimStreamRetry(candidate.url)) {
+          videoStatusByUrl.set(candidate.url, 'downloading');
+          addMessage({
+            title: 'Retrying stream',
+            meta: 'player',
+            body: `Retrying "${candidate.title}" once after preload error`
+          });
+          break;
+        }
+        const failed = playQueue.shift();
+        if (!failed) break;
+        clearPreloadProbe(failed.url, preloadElements.get(failed.url));
+        clearStreamRetry(failed.url);
+        videoStatusByUrl.delete(failed.url);
+        addMessage({
+          title: 'Video skipped',
+          meta: 'player',
+          body: `Skipped "${failed.title}" after repeated stream errors`
+        });
+      }
       const entry = playQueue[0];
       if (!entry) {
         showOffAir('OFF AIR • Playlist reached the end of search results');
+        updateTicker(playQueue, currentKeyword);
         return;
       }
       currentEntry = entry;
@@ -1376,7 +1415,11 @@
         return;
       }
       const last = playQueue.shift();
-      if (last?.url) videoStatusByUrl.delete(last.url);
+      if (last?.url) {
+        clearPreloadProbe(last.url, preloadElements.get(last.url));
+        clearStreamRetry(last.url);
+        videoStatusByUrl.delete(last.url);
+      }
       playCurrent();
     }
 
@@ -1384,6 +1427,7 @@
       const current = playQueue[0];
       if (!current) return;
       trashedVideoUrls.add(current.url);
+      clearStreamRetry(current.url);
       videoStatusByUrl.delete(current.url);
       playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
       addMessage({
@@ -1432,6 +1476,7 @@
         const { items, messages, addressLabels } = await queryP2FK(cleaned);
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
+        streamRetryCountByUrl = new Map();
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
         updateTicker(playQueue, cleaned);
         prepareSocialFeed(messages, cleaned, addressLabels);
@@ -1440,6 +1485,7 @@
       } catch (error) {
         searchResultTotal = 0;
         videoStatusByUrl = new Map();
+        streamRetryCountByUrl = new Map();
         playQueue = [];
         updateTicker([], cleaned);
         prepareSocialFeed([], cleaned);
@@ -1517,8 +1563,19 @@
           playCurrent();
           return;
         }
-        console.warn('Video playback error, skipping to next source');
-        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
+        if (activeItem?.url) videoStatusByUrl.set(activeItem.url, 'error');
+        if (claimStreamRetry(activeItem?.url || '')) {
+          showWaiting('Retrying stream once…');
+          addMessage({
+            title: 'Playback retry',
+            meta: 'player',
+            body: `Retrying "${activeItem?.title || 'current video'}" one more time before skip`
+          });
+          playCurrent();
+          return;
+        }
+        console.warn('Video playback error after retry, skipping to next source');
+        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue persisted; skipping to next video' });
         nextVideo();
       });
       videoEl.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
