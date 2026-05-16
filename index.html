@@ -482,6 +482,8 @@
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
+    const SWIPE_SKIP_MIN_X_PX = 70;
+    const SWIPE_SKIP_MAX_Y_PX = 80;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
@@ -521,6 +523,10 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const isInteractiveTouchTarget = (target) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(target.closest('button, input, textarea, select, a, label'));
+    };
     const formatUtcDate = (value) => {
       if (!value) return '';
       const date = new Date(value);
@@ -1354,19 +1360,6 @@
           videoEl.play().catch(() => {});
         }
       });
-      videoEl.addEventListener('touchstart', (event) => {
-        if (!event.changedTouches?.length) return;
-        const touch = event.changedTouches[0];
-        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
-      }, { passive: true });
-      videoEl.addEventListener('touchend', (event) => {
-        if (!event.changedTouches?.length || !lastTouchPointer) return;
-        const touch = event.changedTouches[0];
-        const deltaX = touch.clientX - lastTouchPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
-        if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
-        lastTouchPointer = null;
-      }, { passive: true });
     }
 
     function bootstrap() {
@@ -1406,6 +1399,25 @@
         if (event.key === 'Escape') showHudTemporarily();
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      dom.app.addEventListener('touchstart', (event) => {
+        if (!event.changedTouches?.length) return;
+        const touch = event.changedTouches[0];
+        lastTouchPointer = {
+          x: touch.clientX,
+          y: touch.clientY,
+          ignoreSwipe: isInteractiveTouchTarget(event.target)
+        };
+      }, { passive: true });
+      dom.app.addEventListener('touchend', (event) => {
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        if (!lastTouchPointer.ignoreSwipe && deltaX < -SWIPE_SKIP_MIN_X_PX && deltaY < SWIPE_SKIP_MAX_Y_PX) {
+          trashCurrentVideo();
+        }
+        lastTouchPointer = null;
+      }, { passive: true });
 
       loadSearch(initial);
     }
