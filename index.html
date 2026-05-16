@@ -469,6 +469,7 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const PRELOAD_COUNT = 5;
+    const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
@@ -646,7 +647,13 @@
             timestamp: toTimestamp(msg?.BlockDate || msg?.blockDate || '')
           };
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (Number.isNaN(a.timestamp) && Number.isNaN(b.timestamp)) return 0;
+          if (Number.isNaN(a.timestamp)) return 1;
+          if (Number.isNaN(b.timestamp)) return -1;
+          return b.timestamp - a.timestamp;
+        });
     }
 
     function parseSocialCards(messages) {
@@ -684,11 +691,11 @@
       if (!item) return 'queued';
       if (currentEntry?.url === item.url) return 'playing';
       if (videoStatusByUrl.has(item.url)) return videoStatusByUrl.get(item.url);
-      return index < PRELOAD_COUNT ? 'downloading' : 'queued';
+      return index > 0 && index <= PRELOAD_COUNT ? 'downloading' : 'queued';
     }
 
     function updateTicker(items = playQueue, keyword = currentKeyword) {
-      const statusCards = items.slice(0, 5).map((item, idx) => {
+      const statusCards = items.slice(0, PRELOAD_COUNT + 1).map((item, idx) => {
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
         return `${marker} ${shortTitle(item.title, 28)} • ${statusForItem(item, idx).toUpperCase()}`;
       });
@@ -851,6 +858,15 @@
       dom.offAirScreen.classList.remove('visible');
     }
 
+    function isVideoFullyBuffered(videoEl) {
+      const duration = Number(videoEl?.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return false;
+      const ranges = videoEl?.buffered;
+      if (!ranges || !ranges.length) return false;
+      const bufferedEnd = ranges.end(ranges.length - 1);
+      return bufferedEnd >= (duration - FULLY_BUFFERED_EPSILON_SECONDS);
+    }
+
     function primePreloadCandidates() {
       for (const [url, media] of preloadElements.entries()) {
         if (!playQueue.some((item) => item.url === url)) {
@@ -859,19 +875,31 @@
           preloadElements.delete(url);
         }
       }
-      for (const candidate of playQueue.slice(0, PRELOAD_COUNT)) {
+      for (const candidate of playQueue.slice(1, PRELOAD_COUNT + 1)) {
         if (preloadElements.has(candidate.url)) continue;
+        if (videoStatusByUrl.get(candidate.url) === 'error') continue;
         const probe = document.createElement('video');
         probe.preload = 'auto';
         probe.muted = true;
+        probe.playsInline = true;
         videoStatusByUrl.set(candidate.url, 'downloading');
-        probe.addEventListener('canplay', () => {
-          videoStatusByUrl.set(candidate.url, 'ready');
-          updateTicker();
-        });
+        const refreshProbeStatus = () => {
+          const nextStatus = isVideoFullyBuffered(probe) ? 'ready' : 'downloading';
+          if (videoStatusByUrl.get(candidate.url) !== nextStatus) {
+            videoStatusByUrl.set(candidate.url, nextStatus);
+            updateTicker();
+          }
+        };
+        probe.addEventListener('loadedmetadata', refreshProbeStatus);
+        probe.addEventListener('progress', refreshProbeStatus);
+        probe.addEventListener('canplay', refreshProbeStatus);
+        probe.addEventListener('canplaythrough', refreshProbeStatus);
+        probe.addEventListener('suspend', refreshProbeStatus);
         probe.addEventListener('error', () => {
           videoStatusByUrl.set(candidate.url, 'error');
+          preloadElements.delete(candidate.url);
           updateTicker();
+          queueMicrotask(primePreloadCandidates);
         });
         probe.src = candidate.url;
         probe.load();
@@ -957,7 +985,6 @@
       videoStatusByUrl.set(entry.url, 'playing');
       hideOffAir();
       updateTicker(playQueue, currentKeyword);
-      primePreloadCandidates();
       scheduleTimelineForCurrent(entry, playQueue[1] || null);
       showWaiting(`Loading "${entry.title}"…`);
       const probe = preloadElements.get(entry.url);
@@ -976,6 +1003,7 @@
         dom.video.src = entry.url;
         dom.video.load();
       }
+      primePreloadCandidates();
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
         setStatus(`Loaded "${entry.title}" — tap/click to play`);
