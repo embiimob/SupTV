@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupTV</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #02020a;
+      --panel: rgba(5, 8, 18, 0.62);
+      --accent: #41d1ff;
+      --accent-2: #b18fff;
+      --text: #f4f7ff;
+      --muted: #a4b1d8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top right, #16233d, #050811 40%, #02020a 80%);
+      border: 1px solid rgba(137, 166, 232, .16);
+      box-shadow: inset 0 0 0 2px rgba(130, 167, 255, .06), inset 0 0 120px rgba(41, 95, 205, .15);
+    }
+
+    #player {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent 20%, transparent 70%, rgba(0,0,0,.65));
+    }
+
+    .topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.1rem;
+      background: linear-gradient(to bottom, rgba(1,3,8,.8), rgba(1,3,8,.08));
+      pointer-events: auto;
+      z-index: 8;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: .5rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+
+    .brand b { font-size: 1.15rem; }
+    .brand span { color: var(--muted); font-size: .85rem; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      width: min(58vw, 680px);
+      pointer-events: auto;
+    }
+
+    .controls input {
+      flex: 1;
+      background: rgba(12, 18, 34, 0.86);
+      border: 1px solid rgba(120, 143, 198, .4);
+      color: var(--text);
+      border-radius: .7rem;
+      padding: .65rem .8rem;
+      font-size: .96rem;
+      outline: none;
+    }
+
+    .controls button {
+      border: none;
+      border-radius: .7rem;
+      padding: .65rem .9rem;
+      color: #00131f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      font-weight: 700;
+      font-size: 1.05rem;
+      cursor: pointer;
+      min-width: 2.6rem;
+    }
+
+    .controls .skip-inline {
+      background: rgba(13, 21, 41, .78);
+      color: #dbe7ff;
+      border: 1px solid rgba(132, 157, 217, .36);
+      font-weight: 700;
+    }
+
+    .controls .audio-toggle {
+      background: rgba(13, 21, 41, .78);
+      color: #dbe7ff;
+      border: 1px solid rgba(132, 157, 217, .36);
+      font-weight: 700;
+      min-width: 3rem;
+    }
+
+    .side-feed {
+      position: absolute;
+      right: 1rem;
+      top: 6rem;
+      width: min(30vw, 360px);
+      min-height: 6rem;
+      max-height: calc(100vh - 10.4rem);
+      overflow: hidden;
+      pointer-events: auto;
+      z-index: 7;
+    }
+
+    #messages {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    #messages li {
+      opacity: 0;
+      transform: translate3d(0, 10px, 0);
+      border-radius: .85rem;
+      border: 1px solid rgba(122, 149, 216, .2);
+      background: rgba(12, 18, 32, .34);
+      backdrop-filter: blur(7px);
+      padding: .7rem .75rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .26);
+      animation: cardInOut 10.5s ease forwards;
+      pointer-events: auto;
+      max-height: min(56vh, 560px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+
+    @keyframes cardInOut {
+      0% { opacity: 0; transform: translate3d(0, 10px, 0); }
+      10% { opacity: .92; transform: translate3d(0, 0, 0); }
+      78% { opacity: .92; transform: translate3d(0, 0, 0); }
+      100% { opacity: 0; transform: translate3d(0, -8px, 0); }
+    }
+
+    .message-card-title {
+      font-size: .84rem;
+      font-weight: 700;
+      margin-bottom: .2rem;
+      line-height: 1.2;
+      color: #f0f6ff;
+      overflow-wrap: anywhere;
+    }
+
+    .message-card-meta {
+      font-size: .69rem;
+      letter-spacing: .02em;
+      color: #b9cbf8;
+      margin-bottom: .25rem;
+      opacity: .85;
+      overflow-wrap: anywhere;
+    }
+
+    .message-card-body {
+      font-size: .78rem;
+      color: #dbe8ff;
+      line-height: 1.27;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .message-card-image {
+      display: block;
+      width: 100%;
+      max-height: min(34vh, 260px);
+      margin-top: .45rem;
+      object-fit: contain;
+      border-radius: .6rem;
+      border: 1px solid rgba(135, 160, 214, .25);
+      opacity: .95;
+      background: rgba(7, 14, 28, .7);
+    }
+
+    .message-card-links {
+      display: grid;
+      gap: .2rem;
+      margin-top: .35rem;
+    }
+
+    .message-card-links a {
+      color: #97ccff;
+      font-size: .72rem;
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    .message-card-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .25rem;
+      margin-top: .35rem;
+    }
+
+    .message-card-keywords button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .12rem .5rem;
+      font-size: .68rem;
+      cursor: pointer;
+    }
+
+
+    .waiting-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, rgba(7, 12, 25, .82), rgba(0, 0, 0, .72));
+      color: #f1f7ff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+      z-index: 4;
+    }
+
+    .waiting-overlay.visible {
+      opacity: 1;
+    }
+
+    .waiting-box {
+      text-align: center;
+      background: rgba(8, 14, 28, .65);
+      border: 1px solid rgba(142, 167, 228, .34);
+      border-radius: .9rem;
+      padding: .85rem 1rem;
+      min-width: min(74vw, 350px);
+      box-shadow: 0 10px 35px rgba(0, 0, 0, .32);
+    }
+
+    .waiting-spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      margin: 0 auto .55rem;
+      border: 2px solid rgba(208, 224, 255, .22);
+      border-top-color: #9bc7ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .off-air-screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #2f2f33, #15161b 58%, #09090b 100%);
+      z-index: 2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .off-air-screen.visible {
+      display: flex;
+    }
+
+    .off-air-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,.04), rgba(255,255,255,.04) 2px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px);
+      mix-blend-mode: soft-light;
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    .off-air-card {
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      border: none;
+      background: linear-gradient(180deg, #f0f0f0 0%, #dedede 38%, #999 60%, #272727 100%);
+      position: relative;
+      overflow: hidden;
+      box-shadow: none;
+    }
+
+    .off-air-bars {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(to right,
+          #f7f7f7 0 15%,
+          #f8da3d 15% 30%,
+          #38d9e8 30% 45%,
+          #65e264 45% 60%,
+          #e45757 60% 75%,
+          #6c69e8 75% 100%);
+      opacity: .68;
+    }
+
+    .off-air-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #f7fbff;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, .58);
+      font-weight: 800;
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      background: radial-gradient(circle at center, rgba(0,0,0,.15), rgba(0,0,0,.6));
+    }
+
+    .hidden-ui .topbar,
+    .hidden-ui .ticker-wrap,
+    .hidden-ui .status,
+    .hidden-ui .side-feed {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .fullscreen-mode #player {
+      object-fit: contain;
+    }
+
+    .fullscreen-mode .status {
+      bottom: 1rem;
+    }
+
+    #messages {
+      margin: 0;
+    }
+
+    .status {
+      position: absolute;
+      left: 1rem;
+      bottom: 3.6rem;
+      pointer-events: none;
+      font-size: .95rem;
+      color: #e9f1ff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+      max-width: min(70vw, 900px);
+      z-index: 7;
+    }
+
+    .ticker-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3rem;
+      border-top: 1px solid rgba(131, 152, 206, .3);
+      background: rgba(4, 8, 20, .85);
+      overflow: hidden;
+      pointer-events: none;
+      transition: opacity .25s ease;
+      z-index: 7;
+    }
+
+    #ticker {
+      position: absolute;
+      white-space: nowrap;
+      padding-left: 108%;
+      padding-right: 5rem;
+      line-height: 3rem;
+      color: #dbebff;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: .02em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+      animation: crawl 68s linear infinite;
+    }
+
+    @keyframes crawl {
+      from { transform: translateX(0%); }
+      to { transform: translateX(-100%); }
+    }
+
+    @media (max-width: 920px) {
+      .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
+      .controls { width: min(72vw, 560px); }
+      .brand span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <video id="player" autoplay muted playsinline aria-label="SupTV video player" tabindex="0"></video>
+    <div class="overlay"></div>
+
+    <header class="topbar">
+      <div class="brand"><b>SupTV</b><span>uncensored</span></div>
+      <form class="controls" id="searchForm" autocomplete="off">
+        <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
+        <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
+        <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
+        <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
+      </form>
+    </header>
+
+    <section class="side-feed" aria-live="polite">
+      <ul id="messages"></ul>
+    </section>
+
+    <section class="off-air-screen" id="offAirScreen" aria-live="polite">
+      <div class="off-air-card" role="img" aria-label="Station off air signal">
+        <div class="off-air-bars"></div>
+        <div class="off-air-center">SUPTV · OFF AIR</div>
+      </div>
+    </section>
+
+    <section class="waiting-overlay" id="waitingOverlay" aria-live="polite">
+      <div class="waiting-box">
+        <div class="waiting-spinner" aria-hidden="true"></div>
+        <div id="waitingText">Buffering next stream…</div>
+      </div>
+    </section>
+
+    <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
+    <div class="ticker-wrap"><div id="ticker"></div></div>
+  </main>
+
+  <script>
+    const dom = {
+      video: document.getElementById('player'),
+      status: document.getElementById('status'),
+      ticker: document.getElementById('ticker'),
+      messages: document.getElementById('messages'),
+      query: document.getElementById('query'),
+      searchForm: document.getElementById('searchForm'),
+      audioBtn: document.getElementById('audioBtn'),
+      fullscreenBtn: document.getElementById('fullscreenBtn'),
+      skipInlineBtn: document.getElementById('skipInlineBtn'),
+      app: document.getElementById('app'),
+      offAirScreen: document.getElementById('offAirScreen'),
+      waitingOverlay: document.getElementById('waitingOverlay'),
+      waitingText: document.getElementById('waitingText')
+    };
+
+    const DEFAULT_KEYWORD = 'mp4';
+    const MAX_PLAYLIST_ITEMS = 50;
+    const PRELOAD_COUNT = 5;
+    const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
+    const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
+    const MESSAGE_ROTATION_INTERVAL_MS = 10500;
+    const HUD_IDLE_HIDE_MS = 2800;
+    const MOUSE_SHOW_DISTANCE_PX = 48;
+    const P2FK_BASE_URL = 'https://p2fk.io';
+    const IPFS_GATEWAY_URL = 'https://ipfs.io/ipfs/';
+    const USE_P2FK_MAINNET = false;
+    const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
+    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
+    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
+    const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
+    const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
+    const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
+    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    let scheduledMessageTimeouts = [];
+    let queuedMessages = [];
+    let activeMessageTimeoutId = null;
+    let hudTimer = null;
+    let playQueue = [];
+    let currentEntry = null;
+    let searchResultTotal = 0;
+    let streamCardPool = [];
+    let socialTimeline = [];
+    let shownSocialCardKeys = new Set();
+    let preloadElements = new Map();
+    let preloadStatusPollers = new Map();
+    let videoStatusByUrl = new Map();
+    let trashedVideoUrls = new Set();
+    let lastTouchPointer = null;
+    let lastMousePointer = null;
+    let currentKeyword = DEFAULT_KEYWORD;
+
+    const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+    const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
+    const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
+    const TICKER_SECTION_SEPARATOR = ' ║ ';
+    const TICKER_ITEM_SEPARATOR = ' ✦ ';
+    const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const formatUtcDate = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+    };
+    const buildIpfsPathUrl = (hash, path) => {
+      const cleanPath = normalize(path);
+      if (!cleanPath) return `${IPFS_GATEWAY_URL}${hash}`;
+      const encoded = cleanPath
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .map((part) => encodeURIComponent(part))
+        .join('/');
+      return `${IPFS_GATEWAY_URL}${hash}/${encoded}`;
+    };
+    const extractImageUrl = (messageText) => {
+      const direct = messageText.match(IMAGE_URL_REGEX);
+      if (direct) return direct[1];
+      const ipfsImage = messageText.match(IPFS_IMAGE_REGEX);
+      if (!ipfsImage || !ipfsImage[1]) return '';
+      return buildIpfsPathUrl(ipfsImage[1], ipfsImage[2] || '');
+    };
+    const toTimestamp = (value) => {
+      if (!value) return Number.NaN;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? Number.NaN : time;
+    };
+    const createSocialCard = ({ title, meta, body, imageUrl = '', links = [], keywords = [], createdAt = '', timestamp = Number.NaN, key = '' }) => ({
+      title,
+      meta,
+      body,
+      imageUrl,
+      links,
+      keywords,
+      createdAt,
+      timestamp,
+      key
+    });
+    const shortTitle = (value, max = 28) => {
+      const text = cleanDisplayText(value || '');
+      return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    };
+    const extractLinks = (value) => {
+      const text = normalize(value);
+      if (!text) return [];
+      const matches = text.match(URL_REGEX) || [];
+      const unique = [...new Set(matches.map((link) => link.replace(/[),.;]+$/, '')))];
+      return unique.slice(0, 4);
+    };
+    const extractKeywords = (messageText, subjectText) => {
+      const keywords = [];
+      const pushKeyword = (raw) => {
+        const keyword = normalize(raw).replace(/^#/, '').toLowerCase();
+        // Keep this guard for fallback non-hashtag tokens as well as hashtag matches.
+        if (!keyword || keyword.length < 2 || keywords.includes(keyword)) return;
+        keywords.push(keyword);
+      };
+      for (const source of [subjectText, messageText]) {
+        for (const match of source.matchAll(KEYWORD_REGEX)) pushKeyword(match[1]);
+      }
+      if (!keywords.length) {
+        for (const token of `${subjectText} ${messageText}`.split(/[^a-zA-Z0-9_-]+/)) {
+          if (token.length < 3) continue;
+          pushKeyword(token);
+          if (keywords.length >= 4) break;
+        }
+      }
+      return keywords.slice(0, 5);
+    };
+
+    function setStatus(text) {
+      dom.status.textContent = text;
+    }
+
+    function asArray(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== 'object') return [];
+      if (Array.isArray(payload.results)) return payload.results;
+      if (Array.isArray(payload.data)) return payload.data;
+      if (Array.isArray(payload.items)) return payload.items;
+      if (payload.data && Array.isArray(payload.data.items)) return payload.data.items;
+      return [];
+    }
+
+    function unwrapRootPayload(payload) {
+      if (!payload || typeof payload !== 'object') return payload;
+      return payload.Root || payload.root || payload;
+    }
+
+    function normalizeRootMsg(root) {
+      const raw = root?.Message ?? root?.message ?? root?.text;
+      if (Array.isArray(raw)) return raw.join('\n').trim();
+      return normalize(raw);
+    }
+
+    function rootFromAddress(root) {
+      return cleanDisplayText(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '');
+    }
+
+    function messageBlockDate(payload) {
+      const root = unwrapRootPayload(payload);
+      return root?.BlockDate || root?.blockDate || root?.['Block Date'] || '';
+    }
+
+    function messageTxid(payload) {
+      const root = unwrapRootPayload(payload);
+      return cleanDisplayText(normalize(root?.TransactionId || root?.transactionId || root?.['Transaction Id'] || root?.['Transaction ID'] || ''));
+    }
+
+    function messageTimestamp(payload) {
+      return toTimestamp(messageBlockDate(payload));
+    }
+
+    function sortByNewestTimestamp(a, b) {
+      if (Number.isNaN(a) && Number.isNaN(b)) return 0;
+      if (Number.isNaN(a)) return 1;
+      if (Number.isNaN(b)) return -1;
+      return b - a;
+    }
+
+    function mergeUniqueMessagesByTxid(...groups) {
+      const merged = groups.flat().filter(Boolean).sort((a, b) => sortByNewestTimestamp(messageTimestamp(a), messageTimestamp(b)));
+      const seenTx = new Set();
+      const seenFallback = new Set();
+      const output = [];
+      for (const message of merged) {
+        const txid = messageTxid(message).toLowerCase();
+        if (txid) {
+          if (seenTx.has(txid)) continue;
+          seenTx.add(txid);
+          output.push(message);
+          continue;
+        }
+        const root = unwrapRootPayload(message) || {};
+        const fallbackKey = `${normalize(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '')}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
+        if (seenFallback.has(fallbackKey)) continue;
+        seenFallback.add(fallbackKey);
+        output.push(message);
+      }
+      return output;
+    }
+
+    function dedupeItemsByTxid(items) {
+      const seenTx = new Set();
+      const seenUrl = new Set();
+      return items.filter((item) => {
+        const txid = normalize(item?.txid).toLowerCase();
+        if (txid) {
+          if (seenTx.has(txid)) return false;
+          seenTx.add(txid);
+          return true;
+        }
+        if (!item?.url) return false;
+        if (seenUrl.has(item.url)) return false;
+        seenUrl.add(item.url);
+        return true;
+      });
+    }
+
+    function parseItems(messages) {
+      const seen = new Set();
+      const isValidIpfsVideoMessage = (messageText) => {
+        const ipfsMatch = messageText.match(IPFS_REGEX);
+        const fileMatch = messageText.match(VIDEO_FILE_REGEX);
+        return { ipfsMatch, fileMatch, valid: Boolean(ipfsMatch && fileMatch) };
+      };
+      return messages
+        .map((msg) => {
+          const root = unwrapRootPayload(msg) || {};
+          const messageText = normalizeRootMsg(root);
+          if (!messageText) return null;
+
+          const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
+          if (directMatch) {
+            const directUrl = directMatch[1];
+            if (seen.has(directUrl)) return null;
+            seen.add(directUrl);
+            const title = cleanDisplayText(normalize(root?.Subject) || normalize(root?.subject) || 'Direct stream');
+            return {
+              url: directUrl,
+              title,
+              description: cleanDisplayText(messageText),
+              tags: [],
+              from: rootFromAddress(root),
+              createdAt: messageBlockDate(root),
+              hash: '',
+              subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
+              imageUrl: extractImageUrl(messageText),
+              txid: messageTxid(root),
+              timestamp: messageTimestamp(root)
+            };
+          }
+
+          const { ipfsMatch, fileMatch, valid } = isValidIpfsVideoMessage(messageText);
+          if (!valid) return null;
+          const hash = ipfsMatch[1];
+          const sourcePath = normalize(fileMatch[1] || '');
+          const filename = stripPathParts(sourcePath).trim();
+          const url = `${IPFS_GATEWAY_URL}${hash}`;
+          if (seen.has(url)) return null;
+          seen.add(url);
+
+          return {
+            url,
+            title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
+            description: cleanDisplayText(messageText),
+            tags: [],
+            from: rootFromAddress(root),
+            createdAt: messageBlockDate(root),
+            hash,
+            subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
+            imageUrl: extractImageUrl(messageText),
+            txid: messageTxid(root),
+            timestamp: messageTimestamp(root)
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp));
+    }
+
+    function parseSocialCards(messages) {
+      return messages
+        .map((msg) => {
+          const root = unwrapRootPayload(msg) || {};
+          const messageText = normalizeRootMsg(root);
+          if (!messageText) return null;
+          const subject = cleanDisplayText(normalize(root?.Subject || root?.subject || ''));
+          const from = rootFromAddress(root);
+          const createdAt = messageBlockDate(root);
+          const timestamp = messageTimestamp(root);
+          const txid = messageTxid(root);
+          return createSocialCard({
+            title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
+            meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
+            body: cleanDisplayText(messageText),
+            imageUrl: extractImageUrl(messageText),
+            links: extractLinks(messageText),
+            keywords: extractKeywords(messageText, subject),
+            createdAt,
+            timestamp,
+            key: txid || `${timestamp}:${subject || messageText.slice(0, 40)}`
+          });
+        })
+        .filter(Boolean)
+        .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp) * -1);
+    }
+
+    function statusForItem(item, index) {
+      if (!item) return 'queued';
+      if (currentEntry?.url === item.url) return 'playing';
+      if (videoStatusByUrl.has(item.url)) return videoStatusByUrl.get(item.url);
+      return index > 0 && index <= PRELOAD_COUNT ? 'downloading' : 'queued';
+    }
+
+    function updateTicker(items = playQueue, keyword = currentKeyword) {
+      const statusCards = items.slice(0, PRELOAD_COUNT + 1).map((item, idx) => {
+        const marker = idx === 0 ? '▶' : `${idx + 1}`;
+        return `${marker} ${shortTitle(item.title, 28)} • ${statusForItem(item, idx).toUpperCase()}`;
+      });
+      const summary = `FOUND ${searchResultTotal} • ACTIVE ${items.length} • ${keyword.toUpperCase()}`;
+      dom.ticker.textContent = statusCards.length
+        ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
+        : `${tickerLabel(keyword)}${summary} • No matching videos`;
+    }
+
+    function syncAudioUi() {
+      if (!dom.audioBtn) return;
+      const muted = Boolean(dom.video.muted || dom.video.volume === 0);
+      dom.audioBtn.textContent = muted ? '🔇' : '🔊';
+      dom.audioBtn.title = muted ? 'Unmute' : 'Mute';
+      dom.audioBtn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+    }
+
+    function toggleAudio() {
+      dom.video.muted = !dom.video.muted;
+      if (!dom.video.muted && dom.video.volume === 0) dom.video.volume = 1;
+      syncAudioUi();
+    }
+
+    function enableAudioFromUserGesture() {
+      if (!dom.video.muted) return;
+      dom.video.muted = false;
+      if (dom.video.volume === 0) dom.video.volume = 1;
+      syncAudioUi();
+    }
+
+    function renderMessageCard(card) {
+      const li = document.createElement('li');
+      const title = document.createElement('div');
+      title.className = 'message-card-title';
+      title.textContent = cleanDisplayText(card.title || 'Live update');
+      li.appendChild(title);
+
+      if (card.meta) {
+        const meta = document.createElement('div');
+        meta.className = 'message-card-meta';
+        meta.textContent = cleanDisplayText(card.meta);
+        li.appendChild(meta);
+      }
+
+      if (card.body) {
+        const body = document.createElement('div');
+        body.className = 'message-card-body';
+        body.textContent = cleanDisplayText(card.body);
+        li.appendChild(body);
+      }
+
+      if (Array.isArray(card.links) && card.links.length) {
+        const linksWrap = document.createElement('div');
+        linksWrap.className = 'message-card-links';
+        for (const url of card.links) {
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.textContent = shortTitle(url, 44);
+          linksWrap.appendChild(anchor);
+        }
+        li.appendChild(linksWrap);
+      }
+
+      if (Array.isArray(card.keywords) && card.keywords.length) {
+        const keywordWrap = document.createElement('div');
+        keywordWrap.className = 'message-card-keywords';
+        for (const keyword of card.keywords) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `#${keyword}`;
+          button.addEventListener('click', () => {
+            dom.query.value = keyword;
+            loadSearch(keyword);
+          });
+          keywordWrap.appendChild(button);
+        }
+        li.appendChild(keywordWrap);
+      }
+
+      if (card.imageUrl) {
+        const image = document.createElement('img');
+        image.className = 'message-card-image';
+        image.loading = 'lazy';
+        image.alt = cleanDisplayText(card.title || 'Post image');
+        image.src = card.imageUrl;
+        image.addEventListener('error', () => image.remove());
+        if (Array.isArray(card.links) && card.links[0]) {
+          const imageLink = document.createElement('a');
+          imageLink.href = card.links[0];
+          imageLink.target = '_blank';
+          imageLink.rel = 'noopener noreferrer';
+          imageLink.appendChild(image);
+          li.appendChild(imageLink);
+        } else {
+          li.appendChild(image);
+        }
+      }
+      return li;
+    }
+
+    function flushNextQueuedMessage() {
+      if (activeMessageTimeoutId || !queuedMessages.length) return;
+      const card = queuedMessages.shift();
+      const li = renderMessageCard(card);
+      dom.messages.prepend(li);
+      activeMessageTimeoutId = window.setTimeout(() => {
+        if (li.parentElement === dom.messages) dom.messages.removeChild(li);
+        activeMessageTimeoutId = null;
+        flushNextQueuedMessage();
+      }, MESSAGE_ROTATION_INTERVAL_MS);
+    }
+
+    function addMessage(card) {
+      if (!card) return;
+      queuedMessages.push(card);
+      flushNextQueuedMessage();
+    }
+
+    function clearScheduledMessages() {
+      for (const timeoutId of scheduledMessageTimeouts) clearTimeout(timeoutId);
+      scheduledMessageTimeouts = [];
+      queuedMessages = [];
+      if (activeMessageTimeoutId) {
+        clearTimeout(activeMessageTimeoutId);
+        activeMessageTimeoutId = null;
+      }
+      dom.messages.innerHTML = '';
+    }
+
+    function showWaiting(message) {
+      dom.waitingText.textContent = message || 'Buffering next stream…';
+      dom.waitingOverlay.classList.add('visible');
+      if (currentEntry?.url) {
+        videoStatusByUrl.set(currentEntry.url, 'downloading');
+        updateTicker();
+      }
+    }
+
+    function hideWaiting() {
+      dom.waitingOverlay.classList.remove('visible');
+      if (currentEntry?.url) {
+        videoStatusByUrl.set(currentEntry.url, 'playing');
+        updateTicker();
+      }
+    }
+
+    function showOffAir(message) {
+      dom.offAirScreen.classList.add('visible');
+      hideWaiting();
+      dom.video.removeAttribute('src');
+      dom.video.load();
+      updateTicker([], currentKeyword);
+      setStatus(message || 'OFF AIR • No more queued search results');
+      addMessage({ title: 'Station Notice', meta: currentKeyword, body: message || 'No more search results. SupTV is now off air.', imageUrl: '' });
+    }
+
+    function hideOffAir() {
+      dom.offAirScreen.classList.remove('visible');
+    }
+
+    function isBufferedFromStartThroughEnd(videoEl) {
+      const duration = Number(videoEl?.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return false;
+      const ranges = videoEl?.buffered;
+      if (!ranges || !ranges.length) return false;
+      for (let i = 0; i < ranges.length; i += 1) {
+        const start = Number(ranges.start(i));
+        const end = Number(ranges.end(i));
+        if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+        if (start <= READY_RANGE_START_ALLOWANCE_SECONDS && end >= (duration - FULLY_BUFFERED_EPSILON_SECONDS)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function isProbeReady(videoEl) {
+      const readyState = Number(videoEl?.readyState || 0);
+      if (readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return false;
+      return isBufferedFromStartThroughEnd(videoEl);
+    }
+
+    function clearPreloadProbe(url, media) {
+      const probe = media || preloadElements.get(url);
+      if (probe) {
+        probe.removeAttribute('src');
+        probe.load();
+      }
+      preloadElements.delete(url);
+      const poller = preloadStatusPollers.get(url);
+      if (poller) {
+        clearInterval(poller);
+        preloadStatusPollers.delete(url);
+      }
+    }
+
+    function stopPreloadPoller(url) {
+      const poller = preloadStatusPollers.get(url);
+      if (!poller) return;
+      clearInterval(poller);
+      preloadStatusPollers.delete(url);
+    }
+
+    function clearAllPreloadProbes() {
+      for (const [url, media] of preloadElements.entries()) {
+        clearPreloadProbe(url, media);
+      }
+    }
+
+    function primePreloadCandidates() {
+      for (const [url, media] of preloadElements.entries()) {
+        if (!playQueue.some((item) => item.url === url)) {
+          clearPreloadProbe(url, media);
+        }
+      }
+      for (const candidate of playQueue.slice(1, PRELOAD_COUNT + 1)) {
+        if (preloadElements.has(candidate.url)) continue;
+        if (videoStatusByUrl.get(candidate.url) === 'error') continue;
+        const probe = document.createElement('video');
+        probe.preload = 'auto';
+        probe.muted = true;
+        probe.playsInline = true;
+        videoStatusByUrl.set(candidate.url, 'downloading');
+        const refreshProbeStatus = () => {
+          const nextStatus = isProbeReady(probe) ? 'ready' : 'downloading';
+          if (videoStatusByUrl.get(candidate.url) !== nextStatus) {
+            videoStatusByUrl.set(candidate.url, nextStatus);
+            updateTicker();
+          }
+        };
+        probe.addEventListener('loadedmetadata', refreshProbeStatus);
+        probe.addEventListener('loadeddata', refreshProbeStatus);
+        probe.addEventListener('progress', refreshProbeStatus);
+        probe.addEventListener('canplay', refreshProbeStatus);
+        probe.addEventListener('canplaythrough', refreshProbeStatus);
+        probe.addEventListener('durationchange', refreshProbeStatus);
+        probe.addEventListener('suspend', refreshProbeStatus);
+        probe.addEventListener('error', () => {
+          videoStatusByUrl.set(candidate.url, 'error');
+          clearPreloadProbe(candidate.url, probe);
+          updateTicker();
+          queueMicrotask(primePreloadCandidates);
+        });
+        probe.src = candidate.url;
+        probe.load();
+        preloadElements.set(candidate.url, probe);
+        const pollId = window.setInterval(() => {
+          if (!preloadElements.has(candidate.url)) {
+            clearPreloadProbe(candidate.url, probe);
+            return;
+          }
+          refreshProbeStatus();
+          if (videoStatusByUrl.get(candidate.url) === 'ready') stopPreloadPoller(candidate.url);
+          if (videoStatusByUrl.get(candidate.url) === 'error') clearPreloadProbe(candidate.url, probe);
+        }, 1400);
+        preloadStatusPollers.set(candidate.url, pollId);
+        refreshProbeStatus();
+      }
+      updateTicker();
+    }
+
+    function prepareSocialFeed(messages, keyword) {
+      streamCardPool = parseSocialCards(messages);
+      shownSocialCardKeys = new Set();
+      if (!streamCardPool.length) {
+        streamCardPool = [createSocialCard({ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, links: [], keywords: [keyword], key: `none:${keyword}` })];
+      }
+      socialTimeline = streamCardPool;
+    }
+
+    function scheduleTimelineForCurrent(entry, nextEntry) {
+      clearScheduledMessages();
+      const creator = entry.from ? `${entry.from.slice(0, 12)}…` : 'p2fk';
+      addMessage({
+        title: `Now Playing: ${entry.title}`,
+        meta: `${creator}${entry.createdAt ? ` · ${formatUtcDate(entry.createdAt)}` : ''}${entry.hash ? ` · ${entry.hash.slice(0, 12)}…` : ''}`,
+        body: entry.description,
+        imageUrl: entry.imageUrl || ''
+      });
+
+      const currentTs = entry.timestamp;
+      const nextTs = nextEntry?.timestamp;
+      let cards = socialTimeline.filter((card) => {
+        if (Number.isNaN(currentTs)) return true;
+        if (Number.isNaN(card.timestamp)) return false;
+        if (Number.isNaN(nextTs)) return card.timestamp >= currentTs;
+        return card.timestamp >= currentTs && card.timestamp < nextTs;
+      });
+      cards = cards.filter((card) => !shownSocialCardKeys.has(card.key));
+      const durationSeconds = Number.isFinite(dom.video.duration) && dom.video.duration > 0 ? dom.video.duration : 90;
+      const spacing = Math.max(2200, Math.floor((durationSeconds * 1000) / ((cards.length || 1) + 1)));
+      for (const [index, card] of cards.slice(0, 25).entries()) {
+        const timeoutId = window.setTimeout(() => {
+          if (shownSocialCardKeys.has(card.key)) return;
+          shownSocialCardKeys.add(card.key);
+          addMessage(card);
+        }, spacing * (index + 1));
+        scheduledMessageTimeouts.push(timeoutId);
+      }
+    }
+
+    async function getPublicAddressByKeyword(keyword) {
+      const endpoint = `${P2FK_BASE_URL}/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=${USE_P2FK_MAINNET}`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`address lookup failed (${response.status})`);
+      const payload = normalize(await response.text()).replace(/^"|"$/g, '');
+      if (!payload) throw new Error('keyword address not found');
+      return payload;
+    }
+
+    async function getPublicMessagesByAddress(address, skip = 0, qty = 200) {
+      const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
+      const payload = await response.json();
+      return asArray(payload);
+    }
+
+    async function getKnownRootsBySearchString(searchString, skip = 0, qty = 200) {
+      const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(searchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`search lookup failed (${response.status})`);
+      const payload = await response.json();
+      return asArray(payload);
+    }
+
+    async function getKeywordChannelMessages(keyword) {
+      const address = await getPublicAddressByKeyword(keyword);
+      return getPublicMessagesByAddress(address, 0, 200);
+    }
+
+    async function queryP2FK(keyword) {
+      const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
+        getKeywordChannelMessages(keyword),
+        getKnownRootsBySearchString(keyword, 0, 200)
+      ]);
+      const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
+      const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
+      const messages = mergeUniqueMessagesByTxid(keywordMessages, mainSearchMessages);
+      const items = dedupeItemsByTxid(parseItems(messages));
+      if (!items.length) {
+        throw new Error('no playable videos in keyword or search results');
+      }
+      return { items, messages };
+    }
+
+    function playCurrent() {
+      const entry = playQueue[0];
+      if (!entry) {
+        showOffAir('OFF AIR • Playlist reached the end of search results');
+        return;
+      }
+      currentEntry = entry;
+      videoStatusByUrl.set(entry.url, 'playing');
+      hideOffAir();
+      updateTicker(playQueue, currentKeyword);
+      scheduleTimelineForCurrent(entry, playQueue[1] || null);
+      showWaiting(`Loading "${entry.title}"…`);
+      const probe = preloadElements.get(entry.url);
+      if (probe) {
+        probe.muted = dom.video.muted;
+        probe.volume = dom.video.volume;
+        probe.id = dom.video.id;
+        probe.setAttribute('playsinline', '');
+        probe.setAttribute('aria-label', dom.video.getAttribute('aria-label') || 'SupTV video player');
+        probe.tabIndex = dom.video.tabIndex;
+        dom.video.parentNode.replaceChild(probe, dom.video);
+        dom.video = probe;
+        stopPreloadPoller(entry.url);
+        preloadElements.delete(entry.url);
+        attachVideoListeners(dom.video);
+      } else {
+        dom.video.src = entry.url;
+        dom.video.load();
+      }
+      primePreloadCandidates();
+      dom.video.play().catch(() => {
+        console.warn('Autoplay blocked or failed for video:', entry.url);
+        setStatus(`Loaded "${entry.title}" — tap/click to play`);
+      });
+      setStatus(`Now Playing: ${entry.title} (${playQueue.length} left)`);
+    }
+
+    function nextVideo() {
+      if (!playQueue.length) {
+        showOffAir('OFF AIR • Playlist reached the end of search results');
+        return;
+      }
+      const last = playQueue.shift();
+      if (last?.url) videoStatusByUrl.delete(last.url);
+      playCurrent();
+    }
+
+    function trashCurrentVideo() {
+      const current = playQueue[0];
+      if (!current) return;
+      trashedVideoUrls.add(current.url);
+      videoStatusByUrl.delete(current.url);
+      playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
+      addMessage({
+        title: 'Video skipped',
+        meta: 'skip',
+        body: `Skipped "${current.title}" for this session`,
+        imageUrl: ''
+      });
+      if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
+      playCurrent();
+    }
+
+    function showHudTemporarily() {
+      if (!document.fullscreenElement) return;
+      dom.app.classList.remove('hidden-ui');
+      if (hudTimer) clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => {
+        if (document.fullscreenElement) dom.app.classList.add('hidden-ui');
+      }, HUD_IDLE_HIDE_MS);
+    }
+
+    function updateFullscreenUiState() {
+      const inFullscreen = Boolean(document.fullscreenElement);
+      dom.app.classList.toggle('fullscreen-mode', inFullscreen);
+      if (inFullscreen) {
+        showHudTemporarily();
+      } else {
+        dom.app.classList.remove('hidden-ui');
+        if (hudTimer) clearTimeout(hudTimer);
+      }
+    }
+
+    async function loadSearch(keyword) {
+      const cleaned = normalize(keyword) || DEFAULT_KEYWORD;
+      currentKeyword = cleaned;
+      clearScheduledMessages();
+      clearAllPreloadProbes();
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('q', cleaned);
+      window.history.replaceState({}, '', url);
+
+      setStatus(`Searching p2fk.io for "${cleaned}"…`);
+
+      try {
+        const { items, messages } = await queryP2FK(cleaned);
+        searchResultTotal = items.length;
+        videoStatusByUrl = new Map();
+        playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
+        updateTicker(playQueue, cleaned);
+        prepareSocialFeed(messages, cleaned);
+        if (!playQueue.length) throw new Error('all videos were trashed in this session');
+        playCurrent();
+      } catch (error) {
+        searchResultTotal = 0;
+        videoStatusByUrl = new Map();
+        playQueue = [];
+        updateTicker([], cleaned);
+        prepareSocialFeed([], cleaned);
+        showOffAir(`Unable to load playable results for "${cleaned}" (${error?.message || 'request failed'})`);
+      }
+    }
+
+    function requestFullscreen() {
+      const target = document.documentElement;
+      if (!document.fullscreenElement && target.requestFullscreen) {
+        target.requestFullscreen().catch(() => {
+          setStatus('Fullscreen is not available in this browser context');
+        });
+      }
+    }
+
+    function attachVideoListeners(videoEl) {
+      videoEl.addEventListener('ended', nextVideo);
+      videoEl.addEventListener('error', () => {
+        console.warn('Video playback error, skipping to next source');
+        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
+        nextVideo();
+      });
+      videoEl.addEventListener('waiting', () => showWaiting('Buffering next stream…'));
+      videoEl.addEventListener('stalled', () => showWaiting('Network is slow, waiting for stream data…'));
+      videoEl.addEventListener('playing', hideWaiting);
+      videoEl.addEventListener('canplay', hideWaiting);
+      videoEl.addEventListener('loadedmetadata', () => {
+        if (!currentEntry) return;
+        if (videoEl.currentSrc && videoEl.currentSrc.includes(currentEntry.url)) {
+          scheduleTimelineForCurrent(currentEntry, playQueue[1] || null);
+        }
+      });
+      videoEl.addEventListener('click', () => {
+        enableAudioFromUserGesture();
+        videoEl.play().catch(() => {});
+      });
+      videoEl.addEventListener('click', showHudTemporarily);
+      videoEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          enableAudioFromUserGesture();
+          videoEl.play().catch(() => {});
+        }
+      });
+      videoEl.addEventListener('touchstart', (event) => {
+        if (!event.changedTouches?.length) return;
+        const touch = event.changedTouches[0];
+        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
+      }, { passive: true });
+      videoEl.addEventListener('touchend', (event) => {
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
+        lastTouchPointer = null;
+      }, { passive: true });
+    }
+
+    function bootstrap() {
+      const urlQuery = new URLSearchParams(window.location.search).get('q');
+      const initial = normalize(urlQuery) || DEFAULT_KEYWORD;
+      // Keep the input blank so the UI starts clean while still using DEFAULT_KEYWORD fallback.
+      dom.query.value = '';
+      syncAudioUi();
+
+      dom.searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadSearch(dom.query.value);
+      });
+
+      attachVideoListeners(dom.video);
+      dom.audioBtn.addEventListener('click', toggleAudio);
+      dom.fullscreenBtn.addEventListener('click', requestFullscreen);
+      dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
+      document.addEventListener('fullscreenchange', updateFullscreenUiState);
+      dom.app.addEventListener('mousemove', (event) => {
+        if (!document.fullscreenElement) return;
+        if (!lastMousePointer) {
+          lastMousePointer = { x: event.clientX, y: event.clientY };
+          return;
+        }
+        const dx = event.clientX - lastMousePointer.x;
+        const dy = event.clientY - lastMousePointer.y;
+        if ((dx * dx) + (dy * dy) >= (MOUSE_SHOW_DISTANCE_PX * MOUSE_SHOW_DISTANCE_PX)) {
+          showHudTemporarily();
+          lastMousePointer = { x: event.clientX, y: event.clientY };
+        }
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
+        if (event.key.toLowerCase() === 'f') requestFullscreen();
+        if (event.key === 'Escape') showHudTemporarily();
+      });
+      dom.app.addEventListener('click', showHudTemporarily);
+
+      loadSearch(initial);
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
