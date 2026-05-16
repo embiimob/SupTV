@@ -161,7 +161,7 @@
       backdrop-filter: blur(7px);
       padding: .7rem .75rem;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .26);
-      animation: cardInOut 10.5s ease forwards;
+      animation: cardInOut 13.5s ease forwards;
       pointer-events: auto;
       max-height: min(56vh, 560px);
       overflow-y: auto;
@@ -368,12 +368,31 @@
       position: absolute;
       left: 1rem;
       bottom: 3.6rem;
-      pointer-events: none;
+      pointer-events: auto;
       font-size: .95rem;
       color: #e9f1ff;
       text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
       max-width: min(70vw, 900px);
       z-index: 7;
+    }
+
+    .status a {
+      color: #97ccff;
+      text-decoration: underline;
+      pointer-events: auto;
+      word-break: break-word;
+    }
+
+    .status button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .08rem .48rem;
+      font-size: .74rem;
+      cursor: pointer;
+      pointer-events: auto;
+      margin: 0 .15rem;
     }
 
     .ticker-wrap {
@@ -479,7 +498,7 @@
     const PRELOAD_COUNT = 5;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
-    const MESSAGE_ROTATION_INTERVAL_MS = 10500;
+    const MESSAGE_ROTATION_INTERVAL_MS = 13500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
@@ -625,8 +644,60 @@
       return keywords.slice(0, 5);
     };
 
+    function appendStatusTokenText(fragment, text) {
+      const source = normalize(text);
+      if (!source) return;
+      const hashtagRegex = /#([a-zA-Z0-9_-]{2,32})/g;
+      let lastIndex = 0;
+      let match;
+      while ((match = hashtagRegex.exec(source)) !== null) {
+        const before = source.slice(lastIndex, match.index);
+        if (before) fragment.appendChild(document.createTextNode(before));
+        const keyword = normalize(match[1]).toLowerCase();
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `#${keyword}`;
+        button.addEventListener('click', () => {
+          dom.query.value = keyword;
+          loadSearch(keyword);
+        });
+        fragment.appendChild(button);
+        lastIndex = hashtagRegex.lastIndex;
+      }
+      const trailing = source.slice(lastIndex);
+      if (trailing) fragment.appendChild(document.createTextNode(trailing));
+    }
+
+    function buildStatusContent(text) {
+      const content = document.createDocumentFragment();
+      const source = normalize(text);
+      const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
+      let lastIndex = 0;
+      let match;
+      while ((match = urlRegex.exec(source)) !== null) {
+        const start = match.index ?? 0;
+        appendStatusTokenText(content, source.slice(lastIndex, start));
+        const matchedUrl = match[0];
+        const cleanUrl = matchedUrl.replace(/[),.;]+$/, '');
+        const trailingPunctuation = matchedUrl.slice(cleanUrl.length);
+        const anchor = document.createElement('a');
+        anchor.href = cleanUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.textContent = cleanUrl;
+        content.appendChild(anchor);
+        appendStatusTokenText(content, trailingPunctuation);
+        lastIndex = start + matchedUrl.length;
+      }
+      appendStatusTokenText(content, source.slice(lastIndex));
+      return content;
+    }
+
     function setStatus(text) {
-      dom.status.textContent = text;
+      const statusText = normalize(text);
+      dom.status.textContent = '';
+      dom.status.setAttribute('aria-label', statusText);
+      dom.status.appendChild(buildStatusContent(statusText));
     }
 
     function asArray(payload) {
@@ -919,6 +990,7 @@
       if (activeMessageTimeoutId || !queuedMessages.length) return;
       const card = queuedMessages.shift();
       const li = renderMessageCard(card);
+      dom.messages.innerHTML = '';
       dom.messages.prepend(li);
       activeMessageTimeoutId = window.setTimeout(() => {
         if (li.parentElement === dom.messages) dom.messages.removeChild(li);
