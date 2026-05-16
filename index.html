@@ -1614,6 +1614,24 @@
       }
     }
 
+    function batchItemsRoundRobin(perKeywordItems, batchSize = TRENDING_KEYWORD_BATCH_SIZE) {
+      const orderedItems = [];
+      const seenKeys = new Set();
+      const maxGroupLength = perKeywordItems.reduce((max, group) => Math.max(max, group.length), 0);
+      for (let offset = 0; offset < maxGroupLength; offset += batchSize) {
+        for (const group of perKeywordItems) {
+          const batch = group.slice(offset, offset + batchSize);
+          for (const item of batch) {
+            const dedupeKey = normalize(item.txid) || item.url;
+            if (!dedupeKey || seenKeys.has(dedupeKey)) continue;
+            seenKeys.add(dedupeKey);
+            orderedItems.push(item);
+          }
+        }
+      }
+      return orderedItems;
+    }
+
     async function queryTrendingP2FK() {
       const keywords = await getTrendingKeywords();
       const searchResults = await Promise.allSettled(
@@ -1625,20 +1643,7 @@
       const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
       const addressLabels = await resolveAddressLabels(messages);
       const perKeywordItems = keywordGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
-      const items = [];
-      const seenKeys = new Set();
-      const maxGroupLength = perKeywordItems.reduce((max, group) => Math.max(max, group.length), 0);
-      for (let offset = 0; offset < maxGroupLength; offset += TRENDING_KEYWORD_BATCH_SIZE) {
-        for (const group of perKeywordItems) {
-          const batch = group.slice(offset, offset + TRENDING_KEYWORD_BATCH_SIZE);
-          for (const item of batch) {
-            const dedupeKey = normalize(item.txid) || item.url;
-            if (!dedupeKey || seenKeys.has(dedupeKey)) continue;
-            seenKeys.add(dedupeKey);
-            items.push(item);
-          }
-        }
-      }
+      const items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
       if (!items.length) {
         throw new Error('no playable videos in trending results');
       }
