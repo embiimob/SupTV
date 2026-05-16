@@ -537,6 +537,8 @@
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const URL_TRAILING_PUNCTUATION_REGEX = /[),.;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    const STATUS_URL_MAX_LENGTH = 34;
+    const MESSAGE_URL_MAX_LENGTH = 34;
     let scheduledMessageTimeouts = [];
     let queuedMessages = [];
     let activeMessageTimeoutId = null;
@@ -640,7 +642,12 @@
       if (urn) return urn;
       const displayName = cleanDisplayText(profile.dnm || profile.DNM || profile.displayName || profile.DisplayName || '');
       if (displayName) return displayName;
-      const fullName = [profile.fnm, profile.FNM, profile.firstName, profile.FirstName, profile.mnm, profile.MNM, profile.middleName, profile.MiddleName, profile.lnm, profile.LNM, profile.lastName, profile.LastName, profile.sfx, profile.SFX, profile.suffix, profile.Suffix]
+      const fullName = [
+        profile.fnm, profile.FNM, profile.firstName, profile.FirstName,
+        profile.mnm, profile.MNM, profile.middleName, profile.MiddleName,
+        profile.lnm, profile.LNM, profile.lastName, profile.LastName,
+        profile.sfx, profile.SFX, profile.suffix, profile.Suffix
+      ]
         .map((part) => cleanDisplayText(part || ''))
         .filter(Boolean)
         .join(' ');
@@ -744,7 +751,7 @@
     function setStatus(text) {
       const statusText = normalize(text).replace(/\s*[\u2013\u2014-]\s*tap\/click to play\s*$/i, '');
       dom.status.setAttribute('aria-label', statusText);
-      dom.status.replaceChildren(buildInteractiveContent(statusText, { urlMaxLength: 34 }));
+      dom.status.replaceChildren(buildInteractiveContent(statusText, { urlMaxLength: STATUS_URL_MAX_LENGTH }));
     }
 
     function asArray(payload) {
@@ -1038,7 +1045,7 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: 34 }));
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
         li.appendChild(body);
       }
 
