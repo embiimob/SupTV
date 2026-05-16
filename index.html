@@ -602,13 +602,13 @@
     ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
-    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
-    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
-    const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
+    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
+    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
+    const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
     const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
-    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
     let scheduledMessageTimeouts = [];
