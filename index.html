@@ -748,6 +748,7 @@
       let text = normalize(value);
       if (!text) return '';
       text = text.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+      text = text.replace(/(?:&(?:gt|lt);?)+$/gi, '');
       while (text.endsWith(')')) {
         const openCount = (text.match(/\(/g) || []).length;
         const closeCount = (text.match(/\)/g) || []).length;
@@ -1108,7 +1109,8 @@
 
           const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
           if (directMatch) {
-            const directUrl = directMatch[1];
+            const directUrl = stripTrailingUrlPunctuation(directMatch[1]);
+            if (!directUrl) return null;
             if (seen.has(directUrl)) return null;
             seen.add(directUrl);
             const title = cleanDisplayText(normalize(root?.Subject) || normalize(root?.subject) || 'Direct stream');
