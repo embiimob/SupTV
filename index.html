@@ -99,6 +99,12 @@
       font-weight: 700;
       letter-spacing: .02em;
       white-space: nowrap;
+      background: none;
+      border: none;
+      color: inherit;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
     }
 
     .brand b { font-size: 1.15rem; }
@@ -509,7 +515,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <div class="brand"><b>SupTV</b><span>uncensored</span></div>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="SupTV – back to trending"><b>SupTV</b><span>uncensored</span></button>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -553,6 +559,7 @@
       downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
+      brandBtn: document.getElementById('brandBtn'),
       app: document.getElementById('app'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
@@ -563,12 +570,10 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
-    const TRENDING_KEYWORD_LIMIT = 5;
+    const TRENDING_KEYWORD_LIMIT = 20;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
-    const TRENDING_VIDEOS_PER_KEYWORD = 5;
     const STANDARD_SEARCH_QTY = 100;
-    const TRENDING_SEARCH_QTY = 100;
-    const TRENDING_SEARCH_PAGE_SIZE = 25;
+    const TRENDING_SEARCH_QTY = 200;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
@@ -593,7 +598,7 @@
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
-    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_SEARCH_QTY}`;
+    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_KEYWORD_LIMIT}`;
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -634,6 +639,7 @@
     let activeStreamTimeoutId = null;
     let swipeTugResetTimeoutId = null;
     let pseudoFullscreenActive = false;
+    let trendingResultsCache = null;
     let tickerAnimationFrameId = null;
     let tickerLastFrameTs = 0;
     let tickerPositionPx = 0;
@@ -1628,14 +1634,15 @@
       }
     }
 
-    async function getKnownRootsSearchWindow(searchString, maxSearchQty = TRENDING_SEARCH_QTY, targetPlayableCount = 0) {
+    async function getKnownRootsSearchWindow(searchString, maxSearchQty = STANDARD_SEARCH_QTY, targetPlayableCount = 0) {
+      const STANDARD_SEARCH_PAGE_SIZE = 25;
       const messages = [];
       let skip = 0;
       const playableSeenKeys = new Set();
       let playableCount = 0;
       while (skip < maxSearchQty) {
         const remaining = maxSearchQty - skip;
-        const qty = Math.min(TRENDING_SEARCH_PAGE_SIZE, remaining);
+        const qty = Math.min(STANDARD_SEARCH_PAGE_SIZE, remaining);
         const page = await getKnownRootsBySearchString(searchString, skip, qty);
         const pageRows = asArray(page);
         if (!pageRows.length) break;
@@ -1675,32 +1682,53 @@
     }
 
     async function queryTrendingP2FK() {
-      const keywords = await getTrendingKeywords();
+      if (trendingResultsCache) {
+        return trendingResultsCache;
+      }
+
+      // Fetch up to TRENDING_KEYWORD_LIMIT trending keywords, then fetch 200 raw rows per
+      // keyword in a single request each. Results are cached for the session so logo-clicks
+      // and queue refills never re-fetch.
+      const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
+
       const searchResults = await Promise.allSettled(
-        keywords.map((keyword) => getKnownRootsSearchWindow(keyword, TRENDING_SEARCH_QTY, TRENDING_VIDEOS_PER_KEYWORD))
+        keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
       );
       const keywordGroups = searchResults
-        .map((result) => (result.status === 'fulfilled' ? result.value : []));
+        .map((result) => (result.status === 'fulfilled' ? asArray(result.value) : []));
+
       const resultGroups = keywordGroups.filter((group) => group.length);
       const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
       const addressLabels = await resolveAddressLabels(messages);
-      const perKeywordItems = keywordGroups.map((group) => (
-        dedupeItemsByTxid(parseItems(group, addressLabels)).slice(0, TRENDING_VIDEOS_PER_KEYWORD)
-      ));
-      const items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+
+      // Parse all items per keyword — no per-keyword cap; round-robin gives natural interleaving.
+      const perKeywordItems = keywordGroups.map((group) =>
+        dedupeItemsByTxid(parseItems(group, addressLabels))
+      );
+
+      let items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+
+      // Fallback: if no playable items found from trending keywords, use the top keyword alone.
+      if (!items.length && keywords.length) {
+        const fallbackMessages = await getKnownRootsBySearchString(keywords[0], 0, TRENDING_SEARCH_QTY)
+          .then(asArray).catch(() => []);
+        const fallbackItems = dedupeItemsByTxid(parseItems(fallbackMessages, addressLabels));
+        if (fallbackItems.length) {
+          items = fallbackItems;
+        }
+      }
+
       if (!items.length) {
         throw new Error('no playable videos in trending results');
       }
+
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
         : 'trending';
-      return {
-        items,
-        messages,
-        addressLabels,
-        keywords,
-        displayKeyword
-      };
+
+      const result = { items, messages, addressLabels, keywords, displayKeyword };
+      trendingResultsCache = result;
+      return result;
     }
 
     function playCurrent() {
@@ -1830,6 +1858,9 @@
     async function loadSearch(keyword) {
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
+      // Clear the trending cache when the user performs an explicit keyword search so
+      // returning to trending later re-fetches fresh results.
+      if (!isTrendingDefault) trendingResultsCache = null;
       let displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
       currentKeyword = displayKeyword;
       clearScheduledMessages();
@@ -2048,6 +2079,10 @@
       dom.downloadBtn.addEventListener('click', downloadIndexHtml);
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
+      dom.brandBtn.addEventListener('click', () => {
+        dom.query.value = '';
+        loadSearch('');
+      });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
