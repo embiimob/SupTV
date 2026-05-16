@@ -857,15 +857,15 @@
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
               from: rootFromAddress(root),
-                createdAt: messageBlockDate(root),
-                hash,
+              createdAt: messageBlockDate(root),
+              hash,
               path: '',
               gatewayIndex: 0,
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
               imageUrl: extractImageUrl(messageText),
-            txid: messageTxid(root),
-            timestamp: messageTimestamp(root)
-          };
+              txid: messageTxid(root),
+              timestamp: messageTimestamp(root)
+            };
         })
         .filter(Boolean)
         .sort((a, b) => sortByNewestTimestamp(a.timestamp, b.timestamp));
@@ -1010,8 +1010,7 @@
       if (activeMessageTimeoutId || !queuedMessages.length) return;
       const card = queuedMessages.shift();
       const li = renderMessageCard(card);
-      dom.messages.replaceChildren();
-      dom.messages.prepend(li);
+      dom.messages.replaceChildren(li);
       activeMessageTimeoutId = window.setTimeout(() => {
         if (li.parentElement === dom.messages) dom.messages.removeChild(li);
         activeMessageTimeoutId = null;
