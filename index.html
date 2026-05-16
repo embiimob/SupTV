@@ -235,16 +235,16 @@
 
     .waiting-overlay {
       position: absolute;
-      inset: 0;
+      right: 1rem;
+      bottom: 3.4rem;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at center, rgba(7, 12, 25, .82), rgba(0, 0, 0, .72));
-      color: #f1f7ff;
+      align-items: flex-end;
+      justify-content: flex-end;
+      color: #deebff;
       opacity: 0;
       pointer-events: none;
-      transition: opacity .25s ease;
-      z-index: 4;
+      transition: opacity .2s ease;
+      z-index: 8;
     }
 
     .waiting-overlay.visible {
@@ -252,27 +252,18 @@
     }
 
     .waiting-box {
-      text-align: center;
-      background: rgba(8, 14, 28, .65);
-      border: 1px solid rgba(142, 167, 228, .34);
-      border-radius: .9rem;
-      padding: .85rem 1rem;
-      min-width: min(74vw, 350px);
-      box-shadow: 0 10px 35px rgba(0, 0, 0, .32);
-    }
-
-    .waiting-spinner {
-      width: 1.5rem;
-      height: 1.5rem;
-      margin: 0 auto .55rem;
-      border: 2px solid rgba(208, 224, 255, .22);
-      border-top-color: #9bc7ff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      text-align: left;
+      background: rgba(8, 14, 28, .38);
+      border: 1px solid rgba(142, 167, 228, .24);
+      border-radius: 999px;
+      padding: .2rem .55rem;
+      min-width: 0;
+      font-size: .72rem;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(4px);
     }
 
     .off-air-screen {
@@ -343,7 +334,8 @@
     .hidden-ui .topbar,
     .hidden-ui .ticker-wrap,
     .hidden-ui .status,
-    .hidden-ui .side-feed {
+    .hidden-ui .side-feed,
+    .hidden-ui .waiting-overlay {
       opacity: 0;
       pointer-events: none;
     }
@@ -409,6 +401,7 @@
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
       .brand span { display: none; }
+      .waiting-overlay { right: .65rem; bottom: 3.25rem; }
     }
   </style>
 </head>
@@ -422,6 +415,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
+        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
@@ -440,8 +434,7 @@
 
     <section class="waiting-overlay" id="waitingOverlay" aria-live="polite">
       <div class="waiting-box">
-        <div class="waiting-spinner" aria-hidden="true"></div>
-        <div id="waitingText">Buffering next stream…</div>
+        <div id="waitingText">⏳</div>
       </div>
     </section>
 
@@ -458,6 +451,7 @@
       query: document.getElementById('query'),
       searchForm: document.getElementById('searchForm'),
       audioBtn: document.getElementById('audioBtn'),
+      downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       app: document.getElementById('app'),
@@ -475,7 +469,12 @@
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const P2FK_BASE_URL = 'https://p2fk.io';
-    const IPFS_GATEWAY_URL = 'https://ipfs.io/ipfs/';
+    const IPFS_GATEWAY_URLS = [
+      'https://ipfs.io/ipfs/',
+      'https://cloudflare-ipfs.com/ipfs/',
+      'https://dweb.link/ipfs/',
+      'https://gateway.pinata.cloud/ipfs/'
+    ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
@@ -514,15 +513,40 @@
       if (Number.isNaN(date.getTime())) return '';
       return date.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
     };
-    const buildIpfsPathUrl = (hash, path) => {
+    const buildIpfsPathUrl = (hash, path, gatewayIndex = 0) => {
+      const gateway = IPFS_GATEWAY_URLS[gatewayIndex] || IPFS_GATEWAY_URLS[0];
       const cleanPath = normalize(path);
-      if (!cleanPath) return `${IPFS_GATEWAY_URL}${hash}`;
+      if (!cleanPath) return `${gateway}${hash}`;
       const encoded = cleanPath
         .split(/[\\/]+/)
         .filter(Boolean)
         .map((part) => encodeURIComponent(part))
         .join('/');
-      return `${IPFS_GATEWAY_URL}${hash}/${encoded}`;
+      return `${gateway}${hash}/${encoded}`;
+    };
+    const waitingSymbolText = (message = '') => {
+      const text = normalize(message).toLowerCase();
+      if (text.includes('slow') || text.includes('network')) return '📶↓';
+      if (text.includes('loading')) return '⏳▶';
+      if (text.includes('buffer')) return '◌⏳';
+      return '⏳';
+    };
+    const moveStatusToNewUrl = (oldUrl, nextUrl, fallbackStatus = 'downloading') => {
+      if (!oldUrl || !nextUrl || oldUrl === nextUrl) return;
+      const previousStatus = videoStatusByUrl.get(oldUrl);
+      videoStatusByUrl.delete(oldUrl);
+      videoStatusByUrl.set(nextUrl, previousStatus || fallbackStatus);
+    };
+    const tryNextIpfsGateway = (item) => {
+      if (!item?.hash) return null;
+      const currentIndex = Number.isInteger(item.gatewayIndex) ? item.gatewayIndex : 0;
+      const nextIndex = currentIndex + 1;
+      if (nextIndex >= IPFS_GATEWAY_URLS.length) return null;
+      const oldUrl = item.url;
+      const nextUrl = buildIpfsPathUrl(item.hash, item.path || '', nextIndex);
+      item.gatewayIndex = nextIndex;
+      item.url = nextUrl;
+      return { oldUrl, nextUrl, nextIndex };
     };
     const extractImageUrl = (messageText) => {
       const direct = messageText.match(IMAGE_URL_REGEX);
@@ -707,7 +731,7 @@
           const hash = ipfsMatch[1];
           const sourcePath = normalize(fileMatch[1] || '');
           const filename = stripPathParts(sourcePath).trim();
-          const url = `${IPFS_GATEWAY_URL}${hash}`;
+          const url = buildIpfsPathUrl(hash, '', 0);
           if (seen.has(url)) return null;
           seen.add(url);
 
@@ -717,10 +741,12 @@
             description: cleanDisplayText(messageText),
             tags: [],
             from: rootFromAddress(root),
-            createdAt: messageBlockDate(root),
-            hash,
-            subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
-            imageUrl: extractImageUrl(messageText),
+              createdAt: messageBlockDate(root),
+              hash,
+              path: '',
+              gatewayIndex: 0,
+              subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
+              imageUrl: extractImageUrl(messageText),
             txid: messageTxid(root),
             timestamp: messageTimestamp(root)
           };
@@ -897,7 +923,8 @@
     }
 
     function showWaiting(message) {
-      dom.waitingText.textContent = message || 'Buffering next stream…';
+      dom.waitingText.textContent = waitingSymbolText(message);
+      dom.waitingOverlay.setAttribute('aria-label', message || 'Buffering stream');
       dom.waitingOverlay.classList.add('visible');
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'downloading');
@@ -1005,6 +1032,19 @@
         probe.addEventListener('durationchange', refreshProbeStatus);
         probe.addEventListener('suspend', refreshProbeStatus);
         probe.addEventListener('error', () => {
+          const gatewayFallback = tryNextIpfsGateway(candidate);
+          if (gatewayFallback) {
+            clearPreloadProbe(gatewayFallback.oldUrl, probe);
+            moveStatusToNewUrl(gatewayFallback.oldUrl, gatewayFallback.nextUrl, 'downloading');
+            addMessage({
+              title: 'Gateway fallback',
+              meta: 'preload',
+              body: `Switching preload to backup IPFS gateway ${gatewayFallback.nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`
+            });
+            updateTicker();
+            queueMicrotask(primePreloadCandidates);
+            return;
+          }
           videoStatusByUrl.set(candidate.url, 'error');
           clearPreloadProbe(candidate.url, probe);
           updateTicker();
@@ -1236,9 +1276,37 @@
       }
     }
 
+    function downloadIndexHtml() {
+      const sourceUrl = new URL(window.location.href);
+      sourceUrl.search = '';
+      sourceUrl.hash = '';
+      sourceUrl.pathname = sourceUrl.pathname.replace(/[^/]*$/, 'index.html');
+      const anchor = document.createElement('a');
+      anchor.href = sourceUrl.toString();
+      anchor.download = 'index.html';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setStatus('Downloading index.html…');
+    }
+
     function attachVideoListeners(videoEl) {
       videoEl.addEventListener('ended', nextVideo);
       videoEl.addEventListener('error', () => {
+        const activeItem = playQueue[0];
+        const gatewayFallback = tryNextIpfsGateway(activeItem);
+        if (gatewayFallback) {
+          moveStatusToNewUrl(gatewayFallback.oldUrl, gatewayFallback.nextUrl, 'downloading');
+          showWaiting('Switching IPFS gateway…');
+          addMessage({
+            title: 'Gateway fallback',
+            meta: 'player',
+            body: `Switching stream to backup IPFS gateway ${gatewayFallback.nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`
+          });
+          playCurrent();
+          return;
+        }
         console.warn('Video playback error, skipping to next source');
         addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
         nextVideo();
@@ -1294,6 +1362,7 @@
 
       attachVideoListeners(dom.video);
       dom.audioBtn.addEventListener('click', toggleAudio);
+      dom.downloadBtn.addEventListener('click', downloadIndexHtml);
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
