@@ -538,7 +538,7 @@
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
     const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
-    const URL_TRAILING_PUNCTUATION_REGEX = /[),.;]+$/;
+    const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
@@ -653,6 +653,18 @@
         suffix: text.slice(inlineIpfsIndex)
       };
     };
+    const stripTrailingUrlPunctuation = (value) => {
+      let text = normalize(value);
+      if (!text) return '';
+      text = text.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+      while (text.endsWith(')')) {
+        const openCount = (text.match(/\(/g) || []).length;
+        const closeCount = (text.match(/\)/g) || []).length;
+        if (closeCount <= openCount) break;
+        text = text.slice(0, -1);
+      }
+      return text;
+    };
     const formatLinkLabel = (value, max = 42) => {
       const text = cleanDisplayText(value || '');
       if (!text) return '';
@@ -753,7 +765,7 @@
       const matches = text.match(URL_REGEX) || [];
       const unique = [...new Set(matches
         .map((link) => splitInlineIpfsSuffix(link).primary || link)
-        .map((link) => link.replace(/[),.;]+$/, ''))
+        .map((link) => stripTrailingUrlPunctuation(link))
         .filter(Boolean))];
       return unique.slice(0, 4);
     };
@@ -816,7 +828,7 @@
         const matchedUrl = match[0];
         const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
         const candidateUrl = matchedPrimaryUrl || matchedUrl;
-        const cleanUrl = candidateUrl.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+        const cleanUrl = stripTrailingUrlPunctuation(candidateUrl);
         if (!cleanUrl) {
           appendInteractiveTokenText(content, matchedUrl);
           lastIndex = start + matchedUrl.length;
