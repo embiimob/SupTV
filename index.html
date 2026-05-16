@@ -1630,7 +1630,10 @@
     function showHudTemporarily() {
       if (!isFullscreenLikeMode()) return;
       dom.app.classList.remove('hidden-ui');
-      if (hudTimer) clearTimeout(hudTimer);
+      if (hudTimer) {
+        clearTimeout(hudTimer);
+        hudTimer = null;
+      }
       hudTimer = setTimeout(() => {
         if (isFullscreenLikeMode()) dom.app.classList.add('hidden-ui');
       }, HUD_IDLE_HIDE_MS);
@@ -1709,6 +1712,7 @@
         }
         if (target.webkitRequestFullscreen) {
           const webkitResult = target.webkitRequestFullscreen();
+          // Some WebKit builds return void, others return a thenable.
           if (webkitResult && typeof webkitResult.then === 'function') await webkitResult;
           await new Promise((resolve) => window.setTimeout(resolve, FULLSCREEN_ACTIVATION_DELAY_MS));
           if (!getNativeFullscreenElement()) throw new Error('webkit fullscreen did not activate');
