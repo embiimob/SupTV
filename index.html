@@ -118,7 +118,7 @@
       top: 6rem;
       width: min(30vw, 360px);
       min-height: 6rem;
-      pointer-events: none;
+      pointer-events: auto;
       z-index: 3;
     }
 
@@ -138,6 +138,7 @@
       padding: .7rem .75rem;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .26);
       animation: cardInOut 10.5s ease forwards;
+      pointer-events: auto;
     }
 
     @keyframes cardInOut {
@@ -167,7 +168,7 @@
       font-size: .78rem;
       color: #dbe8ff;
       line-height: 1.27;
-      max-height: 3.4em;
+      max-height: 5.4em;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -175,12 +176,43 @@
     .message-card-image {
       display: block;
       width: 100%;
-      max-height: 132px;
+      max-height: 188px;
       margin-top: .45rem;
-      object-fit: cover;
+      object-fit: contain;
       border-radius: .6rem;
       border: 1px solid rgba(135, 160, 214, .25);
       opacity: .95;
+      background: rgba(7, 14, 28, .7);
+    }
+
+    .message-card-links {
+      display: grid;
+      gap: .2rem;
+      margin-top: .35rem;
+    }
+
+    .message-card-links a {
+      color: #97ccff;
+      font-size: .72rem;
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    .message-card-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .25rem;
+      margin-top: .35rem;
+    }
+
+    .message-card-keywords button {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .12rem .5rem;
+      font-size: .68rem;
+      cursor: pointer;
     }
 
     .skip-floating-btn {
@@ -208,51 +240,6 @@
     .skip-floating-btn:hover {
       transform: scale(1.04);
       background: rgba(22, 31, 54, .78);
-    }
-
-    .queue-panel {
-      position: absolute;
-      left: 1rem;
-      bottom: 4.45rem;
-      width: min(34vw, 430px);
-      border-radius: .95rem;
-      border: 1px solid rgba(126, 158, 226, .25);
-      background: linear-gradient(160deg, rgba(9, 16, 32, .72), rgba(11, 21, 43, .56));
-      backdrop-filter: blur(8px);
-      padding: .65rem .75rem;
-      pointer-events: none;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
-    }
-
-    .queue-panel-title {
-      font-size: .72rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: #b1c6f7;
-      margin-bottom: .4rem;
-    }
-
-    #queueStatus {
-      font-size: .73rem;
-      color: #d8e8ff;
-      margin-bottom: .45rem;
-    }
-
-    #queueList {
-      display: grid;
-      gap: .28rem;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      font-size: .75rem;
-      color: #d7e4ff;
-    }
-
-    #queueList li {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      opacity: .9;
     }
 
     .waiting-overlay {
@@ -367,20 +354,12 @@
       pointer-events: none;
     }
 
-    .fullscreen-mode .ticker-wrap {
-      display: none;
-    }
-
-    .fullscreen-mode .queue-panel {
-      display: none;
+    .fullscreen-mode #player {
+      object-fit: contain;
     }
 
     .fullscreen-mode .status {
       bottom: 1rem;
-    }
-
-    .banner-hidden .ticker-wrap {
-      display: none;
     }
 
     #messages {
@@ -429,7 +408,6 @@
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 6.9rem; }
       .controls { width: min(72vw, 560px); }
       .brand span { display: none; }
-      .queue-panel { width: calc(100vw - 2rem); bottom: 3.55rem; }
     }
   </style>
 </head>
@@ -452,12 +430,6 @@
     <section class="side-feed" aria-live="polite">
       <ul id="messages"></ul>
     </section>
-
-    <aside class="queue-panel" aria-live="polite">
-      <div class="queue-panel-title">Queue Monitor</div>
-      <div id="queueStatus">Preparing queue…</div>
-      <ol id="queueList"></ol>
-    </aside>
 
     <section class="off-air-screen" id="offAirScreen" aria-live="polite">
       <div class="off-air-card" role="img" aria-label="Station off air signal">
@@ -489,8 +461,6 @@
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       trashBtn: document.getElementById('trashBtn'),
       app: document.getElementById('app'),
-      queueStatus: document.getElementById('queueStatus'),
-      queueList: document.getElementById('queueList'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
       waitingText: document.getElementById('waitingText')
@@ -509,14 +479,19 @@
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
+    const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
+    const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
     let scheduledMessageTimeouts = [];
     let hudTimer = null;
     let playQueue = [];
     let currentEntry = null;
+    let searchResultTotal = 0;
     let streamCardPool = [];
     let socialTimeline = [];
+    let shownSocialCardKeys = new Set();
     let preloadElements = new Map();
+    let videoStatusByUrl = new Map();
     let trashedVideoUrls = new Set();
     let lastTouchPointer = null;
     let lastMousePointer = null;
@@ -553,6 +528,36 @@
       if (!value) return Number.NaN;
       const time = new Date(value).getTime();
       return Number.isNaN(time) ? Number.NaN : time;
+    };
+    const shortTitle = (value, max = 28) => {
+      const text = cleanDisplayText(value || '');
+      return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    };
+    const extractLinks = (value) => {
+      const text = normalize(value);
+      if (!text) return [];
+      const matches = text.match(URL_REGEX) || [];
+      const unique = [...new Set(matches.map((link) => link.replace(/[),.;]+$/, '')))];
+      return unique.slice(0, 4);
+    };
+    const extractKeywords = (messageText, subjectText) => {
+      const keywords = [];
+      const pushKeyword = (raw) => {
+        const keyword = normalize(raw).replace(/^#/, '').toLowerCase();
+        if (!keyword || keyword.length < 2 || keywords.includes(keyword)) return;
+        keywords.push(keyword);
+      };
+      for (const source of [subjectText, messageText]) {
+        for (const match of source.matchAll(KEYWORD_REGEX)) pushKeyword(match[1]);
+      }
+      if (!keywords.length) {
+        for (const token of `${subjectText} ${messageText}`.split(/[^a-zA-Z0-9_-]+/)) {
+          if (token.length < 3) continue;
+          pushKeyword(token);
+          if (keywords.length >= 4) break;
+        }
+      }
+      return keywords.slice(0, 5);
     };
 
     function setStatus(text) {
@@ -643,8 +648,11 @@
             meta: `${from ? `${from.slice(0, 12)}…` : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
             body: cleanDisplayText(messageText),
             imageUrl: extractImageUrl(messageText),
+            links: extractLinks(messageText),
+            keywords: extractKeywords(messageText, subject),
             createdAt,
-            timestamp
+            timestamp,
+            key: txid || `${timestamp}:${subject || messageText.slice(0, 40)}`
           };
         })
         .filter(Boolean)
@@ -656,11 +664,22 @@
         });
     }
 
-    function updateTicker(items, keyword) {
-      const headlines = items.slice(0, MAX_PLAYLIST_ITEMS).map((v, idx) => `${idx + 1}. ${v.title}`);
-      dom.ticker.textContent = headlines.length
-        ? `${tickerLabel(keyword)}${headlines.join('  ✦  ')}`
-        : `${tickerLabel(keyword)}No matching videos`;
+    function statusForItem(item, index) {
+      if (!item) return 'queued';
+      if (currentEntry?.url === item.url) return 'playing';
+      if (videoStatusByUrl.has(item.url)) return videoStatusByUrl.get(item.url);
+      return index < PRELOAD_COUNT ? 'downloading' : 'queued';
+    }
+
+    function updateTicker(items = playQueue, keyword = currentKeyword) {
+      const statusCards = items.slice(0, 12).map((item, idx) => {
+        const marker = idx === 0 ? '▶' : `${idx + 1}`;
+        return `${marker}:${shortTitle(item.title, 20)} [${statusForItem(item, idx).toUpperCase()}]`;
+      });
+      const summary = `found:${searchResultTotal} • active:${items.length} • keyword:${keyword}`;
+      dom.ticker.textContent = statusCards.length
+        ? `${tickerLabel(keyword)}${summary} • ${statusCards.join('  ✦  ')}`
+        : `${tickerLabel(keyword)}${summary} • No matching videos`;
     }
 
     function addMessage(card) {
@@ -686,6 +705,36 @@
         li.appendChild(body);
       }
 
+      if (Array.isArray(card.links) && card.links.length) {
+        const linksWrap = document.createElement('div');
+        linksWrap.className = 'message-card-links';
+        for (const url of card.links) {
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.textContent = shortTitle(url, 44);
+          linksWrap.appendChild(anchor);
+        }
+        li.appendChild(linksWrap);
+      }
+
+      if (Array.isArray(card.keywords) && card.keywords.length) {
+        const keywordWrap = document.createElement('div');
+        keywordWrap.className = 'message-card-keywords';
+        for (const keyword of card.keywords) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `#${keyword}`;
+          button.addEventListener('click', () => {
+            dom.query.value = keyword;
+            loadSearch(keyword);
+          });
+          keywordWrap.appendChild(button);
+        }
+        li.appendChild(keywordWrap);
+      }
+
       if (card.imageUrl) {
         const image = document.createElement('img');
         image.className = 'message-card-image';
@@ -693,7 +742,16 @@
         image.alt = cleanDisplayText(card.title || 'Post image');
         image.src = card.imageUrl;
         image.addEventListener('error', () => image.remove());
-        li.appendChild(image);
+        if (Array.isArray(card.links) && card.links[0]) {
+          const imageLink = document.createElement('a');
+          imageLink.href = card.links[0];
+          imageLink.target = '_blank';
+          imageLink.rel = 'noopener noreferrer';
+          imageLink.appendChild(image);
+          li.appendChild(imageLink);
+        } else {
+          li.appendChild(image);
+        }
       }
 
       dom.messages.prepend(li);
@@ -710,10 +768,18 @@
     function showWaiting(message) {
       dom.waitingText.textContent = message || 'Buffering next stream…';
       dom.waitingOverlay.classList.add('visible');
+      if (currentEntry?.url) {
+        videoStatusByUrl.set(currentEntry.url, 'downloading');
+        updateTicker();
+      }
     }
 
     function hideWaiting() {
       dom.waitingOverlay.classList.remove('visible');
+      if (currentEntry?.url) {
+        videoStatusByUrl.set(currentEntry.url, 'playing');
+        updateTicker();
+      }
     }
 
     function showOffAir(message) {
@@ -721,28 +787,13 @@
       hideWaiting();
       dom.video.removeAttribute('src');
       dom.video.load();
-      dom.ticker.textContent = `LIVE • ${currentKeyword.toUpperCase()} • OFF AIR`;
+      updateTicker([], currentKeyword);
       setStatus(message || 'OFF AIR • No more queued search results');
       addMessage({ title: 'Station Notice', meta: currentKeyword, body: message || 'No more search results. SupTV is now off air.', imageUrl: '' });
-      renderQueueMonitor();
     }
 
     function hideOffAir() {
       dom.offAirScreen.classList.remove('visible');
-    }
-
-    function renderQueueMonitor() {
-      const queueCount = playQueue.length;
-      const preloadCount = Math.min(PRELOAD_COUNT, queueCount);
-      dom.queueStatus.textContent = queueCount
-        ? `${queueCount} queued • preloading ${preloadCount} • keyword "${currentKeyword}"`
-        : `Queue empty • keyword "${currentKeyword}"`;
-      dom.queueList.innerHTML = '';
-      for (const [index, item] of playQueue.slice(0, 8).entries()) {
-        const li = document.createElement('li');
-        li.textContent = `${index === 0 ? '▶' : `${index + 1}.`} ${cleanDisplayText(item.title)}`;
-        dom.queueList.appendChild(li);
-      }
     }
 
     function primePreloadCandidates() {
@@ -758,16 +809,27 @@
         const probe = document.createElement('video');
         probe.preload = 'metadata';
         probe.muted = true;
+        videoStatusByUrl.set(candidate.url, 'downloading');
+        probe.addEventListener('canplay', () => {
+          videoStatusByUrl.set(candidate.url, 'ready');
+          updateTicker();
+        });
+        probe.addEventListener('error', () => {
+          videoStatusByUrl.set(candidate.url, 'error');
+          updateTicker();
+        });
         probe.src = candidate.url;
         probe.load();
         preloadElements.set(candidate.url, probe);
       }
+      updateTicker();
     }
 
     function prepareSocialFeed(messages, keyword) {
       streamCardPool = parseSocialCards(messages);
+      shownSocialCardKeys = new Set();
       if (!streamCardPool.length) {
-        streamCardPool = [{ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, imageUrl: '', createdAt: '', timestamp: Number.NaN }];
+        streamCardPool = [{ title: 'No social thread posts', meta: keyword, body: `No social feed cards were found for "${keyword}"`, imageUrl: '', links: [], keywords: [keyword], createdAt: '', timestamp: Number.NaN, key: `none:${keyword}` }];
       }
       socialTimeline = streamCardPool;
     }
@@ -790,11 +852,15 @@
         if (Number.isNaN(nextTs)) return card.timestamp >= currentTs;
         return card.timestamp >= currentTs && card.timestamp < nextTs;
       });
-      if (!cards.length) cards = socialTimeline.slice(0, 8);
+      cards = cards.filter((card) => !shownSocialCardKeys.has(card.key));
       const durationSeconds = Number.isFinite(dom.video.duration) && dom.video.duration > 0 ? dom.video.duration : 90;
-      const spacing = Math.max(2200, Math.floor((durationSeconds * 1000) / (cards.length + 1)));
+      const spacing = Math.max(2200, Math.floor((durationSeconds * 1000) / ((cards.length || 1) + 1)));
       for (const [index, card] of cards.slice(0, 25).entries()) {
-        const timeoutId = window.setTimeout(() => addMessage(card), spacing * (index + 1));
+        const timeoutId = window.setTimeout(() => {
+          if (shownSocialCardKeys.has(card.key)) return;
+          shownSocialCardKeys.add(card.key);
+          addMessage(card);
+        }, spacing * (index + 1));
         scheduledMessageTimeouts.push(timeoutId);
       }
     }
@@ -833,8 +899,8 @@
         return;
       }
       currentEntry = entry;
+      videoStatusByUrl.set(entry.url, 'playing');
       hideOffAir();
-      renderQueueMonitor();
       updateTicker(playQueue, currentKeyword);
       primePreloadCandidates();
       scheduleTimelineForCurrent(entry, playQueue[1] || null);
@@ -853,7 +919,8 @@
         showOffAir('OFF AIR • Playlist reached the end of search results');
         return;
       }
-      playQueue.shift();
+      const last = playQueue.shift();
+      if (last?.url) videoStatusByUrl.delete(last.url);
       playCurrent();
     }
 
@@ -861,6 +928,7 @@
       const current = playQueue[0];
       if (!current) return;
       trashedVideoUrls.add(current.url);
+      videoStatusByUrl.delete(current.url);
       playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
       addMessage({
         title: 'Video skipped',
@@ -884,7 +952,6 @@
     function updateFullscreenUiState() {
       const inFullscreen = Boolean(document.fullscreenElement);
       dom.app.classList.toggle('fullscreen-mode', inFullscreen);
-      dom.app.classList.toggle('banner-hidden', inFullscreen);
       if (inFullscreen) {
         showHudTemporarily();
       } else {
@@ -906,12 +973,16 @@
 
       try {
         const { items, messages } = await queryP2FK(cleaned);
+        searchResultTotal = items.length;
+        videoStatusByUrl = new Map();
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
         updateTicker(playQueue, cleaned);
         prepareSocialFeed(messages, cleaned);
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
+        searchResultTotal = 0;
+        videoStatusByUrl = new Map();
         playQueue = [];
         updateTicker([], cleaned);
         prepareSocialFeed([], cleaned);
