@@ -1617,9 +1617,11 @@
       }
     }
 
-    async function getKnownRootsSearchWindow(searchString, maxSearchQty = TRENDING_SEARCH_QTY, targetVideos = 0) {
+    async function getKnownRootsSearchWindow(searchString, maxSearchQty = TRENDING_SEARCH_QTY, targetPlayableCount = 0) {
       const messages = [];
       let skip = 0;
+      const playableSeenKeys = new Set();
+      let playableCount = 0;
       while (skip < maxSearchQty) {
         const remaining = maxSearchQty - skip;
         const qty = Math.min(TRENDING_SEARCH_PAGE_SIZE, remaining);
@@ -1628,9 +1630,15 @@
         if (!pageRows.length) break;
         messages.push(...pageRows);
         skip += pageRows.length;
-        if (targetVideos > 0) {
-          const playableCount = dedupeItemsByTxid(parseItems(messages)).length;
-          if (playableCount >= targetVideos) break;
+        if (targetPlayableCount > 0) {
+          const pagePlayableItems = dedupeItemsByTxid(parseItems(pageRows));
+          for (const item of pagePlayableItems) {
+            const dedupeKey = normalize(item.txid).toLowerCase() || item.url;
+            if (!dedupeKey || playableSeenKeys.has(dedupeKey)) continue;
+            playableSeenKeys.add(dedupeKey);
+            playableCount += 1;
+          }
+          if (playableCount >= targetPlayableCount) break;
         }
         if (pageRows.length < qty) break;
       }
