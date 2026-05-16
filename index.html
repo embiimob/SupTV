@@ -479,6 +479,8 @@
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
+    const TICKER_SECTION_SEPARATOR = ' ║ ';
+    const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
     const formatUtcDate = (value) => {
       if (!value) return '';
@@ -669,7 +671,7 @@
       });
       const summary = `FOUND ${searchResultTotal} • ACTIVE ${items.length} • KEYWORD ${keyword}`;
       dom.ticker.textContent = statusCards.length
-        ? `${tickerLabel(keyword)}${summary}     ║     ${statusCards.join('     ✦     ')}`
+        ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
     }
 
@@ -993,7 +995,7 @@
     function bootstrap() {
       const urlQuery = new URLSearchParams(window.location.search).get('q');
       const initial = normalize(urlQuery) || DEFAULT_KEYWORD;
-      // Keep the input blank so fullscreen playback starts clean while still using DEFAULT_KEYWORD fallback.
+      // Keep the input blank so the UI starts clean while still using DEFAULT_KEYWORD fallback.
       dom.query.value = '';
 
       dom.searchForm.addEventListener('submit', (event) => {
