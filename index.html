@@ -1301,7 +1301,6 @@
       primePreloadCandidates();
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
-        setStatus(`Loaded "${entry.title}" — tap/click to play`);
       });
       setStatus(`Now Playing: ${entry.title} (${playQueue.length} left)`);
     }
