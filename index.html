@@ -17,6 +17,18 @@
 
     * { box-sizing: border-box; }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     html, body {
       width: 100%;
       height: 100%;
@@ -415,7 +427,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
-        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
+        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇ HTML</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
@@ -434,7 +446,8 @@
 
     <section class="waiting-overlay" id="waitingOverlay" aria-live="polite">
       <div class="waiting-box">
-        <div id="waitingText">⏳</div>
+        <div id="waitingText" aria-hidden="true">⏳</div>
+        <span class="sr-only" id="waitingA11yText">Buffering stream</span>
       </div>
     </section>
 
@@ -457,7 +470,8 @@
       app: document.getElementById('app'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
-      waitingText: document.getElementById('waitingText')
+      waitingText: document.getElementById('waitingText'),
+      waitingA11yText: document.getElementById('waitingA11yText')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -925,6 +939,7 @@
     function showWaiting(message) {
       dom.waitingText.textContent = waitingSymbolText(message);
       dom.waitingOverlay.setAttribute('aria-label', message || 'Buffering stream');
+      dom.waitingA11yText.textContent = message || 'Buffering stream';
       dom.waitingOverlay.classList.add('visible');
       if (currentEntry?.url) {
         videoStatusByUrl.set(currentEntry.url, 'downloading');
