@@ -1549,9 +1549,11 @@
         const payload = await response.json();
         const rows = asArray(payload);
         const unique = [];
+        const seen = new Set();
         for (const row of rows) {
           const candidate = extractSearchString(row);
-          if (!candidate || unique.includes(candidate)) continue;
+          if (!candidate || seen.has(candidate)) continue;
+          seen.add(candidate);
           unique.push(candidate);
         }
         if (!unique.length) return [DEFAULT_KEYWORD];
