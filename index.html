@@ -862,7 +862,7 @@
       for (const candidate of playQueue.slice(0, PRELOAD_COUNT)) {
         if (preloadElements.has(candidate.url)) continue;
         const probe = document.createElement('video');
-        probe.preload = 'metadata';
+        probe.preload = 'auto';
         probe.muted = true;
         videoStatusByUrl.set(candidate.url, 'downloading');
         probe.addEventListener('canplay', () => {
