@@ -482,6 +482,7 @@
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
+    const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
     const SWIPE_SKIP_MIN_X_PX = 70;
     const SWIPE_SKIP_MAX_Y_PX = 80;
     const P2FK_BASE_URL = 'https://p2fk.io';
@@ -1332,7 +1333,7 @@
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS);
         setStatus('Downloading index.html…');
       } catch (error) {
         console.warn('Unable to download index.html', error);
