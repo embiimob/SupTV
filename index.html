@@ -600,6 +600,16 @@
       return payload.Root || payload.root || payload;
     }
 
+    function normalizeRootMsg(root) {
+      const raw = root?.Message ?? root?.message ?? root?.text;
+      if (Array.isArray(raw)) return raw.join('\n').trim();
+      return normalize(raw);
+    }
+
+    function rootFromAddress(root) {
+      return cleanDisplayText(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '');
+    }
+
     function messageBlockDate(payload) {
       const root = unwrapRootPayload(payload);
       return root?.BlockDate || root?.blockDate || root?.['Block Date'] || '';
@@ -635,7 +645,7 @@
           continue;
         }
         const root = unwrapRootPayload(message) || {};
-        const fallbackKey = `${normalize(root?.FromAddress || root?.fromAddress || '')}|${normalize(root?.Message || root?.message || root?.text || '')}|${normalize(messageBlockDate(root))}`;
+        const fallbackKey = `${normalize(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '')}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
         if (seenFallback.has(fallbackKey)) continue;
         seenFallback.add(fallbackKey);
         output.push(message);
@@ -670,7 +680,7 @@
       return messages
         .map((msg) => {
           const root = unwrapRootPayload(msg) || {};
-          const messageText = normalize(root?.Message || root?.message || root?.text);
+          const messageText = normalizeRootMsg(root);
           if (!messageText) return null;
 
           const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
@@ -684,7 +694,7 @@
               title,
               description: cleanDisplayText(messageText),
               tags: [],
-              from: cleanDisplayText(root?.FromAddress || root?.fromAddress || ''),
+              from: rootFromAddress(root),
               createdAt: messageBlockDate(root),
               hash: '',
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
@@ -708,7 +718,7 @@
             title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
             description: cleanDisplayText(messageText),
             tags: [],
-            from: cleanDisplayText(root?.FromAddress || root?.fromAddress || ''),
+            from: rootFromAddress(root),
             createdAt: messageBlockDate(root),
             hash,
             subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
@@ -725,10 +735,10 @@
       return messages
         .map((msg) => {
           const root = unwrapRootPayload(msg) || {};
-          const messageText = normalize(root?.Message || root?.message || root?.text);
+          const messageText = normalizeRootMsg(root);
           if (!messageText) return null;
           const subject = cleanDisplayText(normalize(root?.Subject || root?.subject || ''));
-          const from = cleanDisplayText(root?.FromAddress || root?.fromAddress || '');
+          const from = rootFromAddress(root);
           const createdAt = messageBlockDate(root);
           const timestamp = messageTimestamp(root);
           const txid = messageTxid(root);
