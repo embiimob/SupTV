@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="SupTV — fullscreen-first infinite p2fk.io video stream with live social overlays." />
+  <meta name="description" content="SupTV - fullscreen-first infinite p2fk.io video stream with live social overlays." />
   <meta name="theme-color" content="#02020a" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SupTV" />
@@ -573,6 +573,7 @@
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
     const MESSAGE_ROTATION_INTERVAL_MS = 13500;
     const HUD_IDLE_HIDE_MS = 2800;
+    const FULLSCREEN_ACTIVATION_DELAY_MS = 120;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
     const SWIPE_SKIP_MIN_X_PX = 120; // Higher than before to reduce accidental skips while interacting on mobile.
@@ -1709,13 +1710,13 @@
         if (target.webkitRequestFullscreen) {
           const webkitResult = target.webkitRequestFullscreen();
           if (webkitResult && typeof webkitResult.then === 'function') await webkitResult;
-          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          await new Promise((resolve) => window.setTimeout(resolve, FULLSCREEN_ACTIVATION_DELAY_MS));
           if (!getNativeFullscreenElement()) throw new Error('webkit fullscreen did not activate');
           return;
         }
         if (dom.video.webkitEnterFullscreen) {
           dom.video.webkitEnterFullscreen();
-          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          await new Promise((resolve) => window.setTimeout(resolve, FULLSCREEN_ACTIVATION_DELAY_MS));
           if (!dom.video.webkitDisplayingFullscreen) throw new Error('video fullscreen did not activate');
           return;
         }
@@ -1867,11 +1868,14 @@
       window.addEventListener('keydown', (event) => {
         if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
-        if (event.key === 'Escape' && pseudoFullscreenActive) {
-          pseudoFullscreenActive = false;
-          updateFullscreenUiState();
+        if (event.key === 'Escape') {
+          if (pseudoFullscreenActive) {
+            pseudoFullscreenActive = false;
+            updateFullscreenUiState();
+          } else {
+            showHudTemporarily();
+          }
         }
-        if (event.key === 'Escape') showHudTemporarily();
       });
       dom.app.addEventListener('click', showHudTemporarily);
       dom.app.addEventListener('touchstart', showHudTemporarily, { passive: true });
