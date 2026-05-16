@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupTV</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #02020a;
+      --panel: rgba(5, 8, 18, 0.62);
+      --accent: #41d1ff;
+      --accent-2: #b18fff;
+      --text: #f4f7ff;
+      --muted: #a4b1d8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top right, #16233d, #050811 40%, #02020a 80%);
+    }
+
+    #player {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent 20%, transparent 70%, rgba(0,0,0,.65));
+    }
+
+    .topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.1rem;
+      background: linear-gradient(to bottom, rgba(1,3,8,.8), rgba(1,3,8,.08));
+      pointer-events: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: .5rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+
+    .brand b { font-size: 1.15rem; }
+    .brand span { color: var(--muted); font-size: .85rem; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      width: min(58vw, 680px);
+      pointer-events: auto;
+    }
+
+    .controls input {
+      flex: 1;
+      background: rgba(12, 18, 34, 0.86);
+      border: 1px solid rgba(120, 143, 198, .4);
+      color: var(--text);
+      border-radius: .7rem;
+      padding: .65rem .8rem;
+      font-size: .96rem;
+      outline: none;
+    }
+
+    .controls button {
+      border: none;
+      border-radius: .7rem;
+      padding: .65rem .9rem;
+      color: #00131f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .side-feed {
+      position: absolute;
+      right: 1rem;
+      top: 5.25rem;
+      width: min(32vw, 420px);
+      max-height: min(58vh, 520px);
+      overflow: hidden;
+      border-radius: 1rem;
+      background: var(--panel);
+      border: 1px solid rgba(129, 150, 204, .28);
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .side-feed h2 {
+      margin: 0;
+      padding: .8rem .9rem;
+      border-bottom: 1px solid rgba(129, 150, 204, .3);
+      font-size: .85rem;
+      letter-spacing: .09em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    #messages {
+      list-style: none;
+      margin: 0;
+      padding: .7rem .9rem .9rem;
+      display: grid;
+      gap: .45rem;
+      font-size: .9rem;
+    }
+
+    #messages li {
+      background: rgba(18, 28, 52, .42);
+      padding: .42rem .52rem;
+      border-radius: .45rem;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .status {
+      position: absolute;
+      left: 1rem;
+      bottom: 3.6rem;
+      pointer-events: none;
+      font-size: .95rem;
+      color: #e9f1ff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+      max-width: min(70vw, 900px);
+    }
+
+    .ticker-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2.7rem;
+      border-top: 1px solid rgba(131, 152, 206, .3);
+      background: rgba(4, 8, 20, .85);
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    #ticker {
+      position: absolute;
+      white-space: nowrap;
+      padding-left: 100%;
+      line-height: 2.7rem;
+      color: #dbebff;
+      font-weight: 600;
+      animation: crawl 26s linear infinite;
+    }
+
+    @keyframes crawl {
+      from { transform: translateX(0%); }
+      to { transform: translateX(-100%); }
+    }
+
+    @media (max-width: 920px) {
+      .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 6.9rem; max-height: 26vh; }
+      .controls { width: min(72vw, 560px); }
+      .brand span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <video id="player" autoplay muted playsinline></video>
+    <div class="overlay"></div>
+
+    <header class="topbar">
+      <div class="brand"><b>SupTV</b><span>Always-on stream</span></div>
+      <form class="controls" id="searchForm" autocomplete="off">
+        <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
+        <button type="submit">Play</button>
+        <button type="button" id="fullscreenBtn">Full Screen</button>
+      </form>
+    </header>
+
+    <section class="side-feed" aria-live="polite">
+      <h2>Live Messages</h2>
+      <ul id="messages"></ul>
+    </section>
+
+    <div class="status" id="status">Loading…</div>
+    <div class="ticker-wrap"><div id="ticker"></div></div>
+  </main>
+
+  <script>
+    const dom = {
+      video: document.getElementById('player'),
+      status: document.getElementById('status'),
+      ticker: document.getElementById('ticker'),
+      messages: document.getElementById('messages'),
+      query: document.getElementById('query'),
+      searchForm: document.getElementById('searchForm'),
+      fullscreenBtn: document.getElementById('fullscreenBtn')
+    };
+
+    const STREAM_INTERVAL_MS = 2100;
+    let streamTimer = null;
+    let playlist = [];
+    let pointer = 0;
+    let streamTextPool = [];
+
+    const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+
+    function setStatus(text) {
+      dom.status.textContent = text;
+    }
+
+    function asArray(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== 'object') return [];
+      if (Array.isArray(payload.results)) return payload.results;
+      if (Array.isArray(payload.data)) return payload.data;
+      if (Array.isArray(payload.items)) return payload.items;
+      if (payload.data && Array.isArray(payload.data.items)) return payload.data.items;
+      return [];
+    }
+
+    function parseItems(messages) {
+      const seen = new Set();
+      const videoFileRegex = /([a-zA-Z0-9\s\-_.()]+\.(mp4|webm|ogg|mov|avi|m3u8))/i;
+      const ipfsRegex = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:\\([^\s]+))?/i;
+      const directVideoRegex = /(https?:\/\/[^\s"']+\.(mp4|webm|ogg|mov|avi|m3u8)(\?[^\s"']*)?)/i;
+
+      return messages
+        .map((msg) => {
+          const messageText = normalize(msg?.Message || msg?.message || msg?.text);
+          if (!messageText) return null;
+
+          const directMatch = messageText.match(directVideoRegex);
+          if (directMatch) {
+            const directUrl = directMatch[1];
+            if (seen.has(directUrl)) return null;
+            seen.add(directUrl);
+            const title = normalize(msg?.Subject) || normalize(msg?.subject) || 'Direct stream';
+            return { url: directUrl, title, description: messageText, tags: [] };
+          }
+
+          const ipfsMatch = messageText.match(ipfsRegex);
+          if (!ipfsMatch) return null;
+          const fileMatch = messageText.match(videoFileRegex);
+          const hash = ipfsMatch[1];
+          const namedPath = normalize(ipfsMatch[2] || '');
+          const filename = normalize(fileMatch?.[1] || namedPath);
+          const encodedPath = filename ? `/${encodeURIComponent(filename).replace(/%2F/g, '/')}` : '';
+          const url = `https://ipfs.io/ipfs/${hash}${encodedPath}`;
+          if (seen.has(url)) return null;
+          seen.add(url);
+
+          return {
+            url,
+            title: filename || `IPFS ${hash.slice(0, 12)}`,
+            description: messageText,
+            tags: []
+          };
+        })
+        .filter(Boolean);
+    }
+
+    function updateTicker(items, keyword) {
+      const headlines = items.slice(0, 10).map((v, idx) => `${idx + 1}. ${v.title}`);
+      dom.ticker.textContent = headlines.length
+        ? `LIVE • ${keyword.toUpperCase()} • ${headlines.join('  ✦  ')}`
+        : `LIVE • ${keyword.toUpperCase()} • No matching videos`; 
+    }
+
+    function addMessage(text) {
+      if (!text) return;
+      const li = document.createElement('li');
+      li.textContent = text;
+      dom.messages.prepend(li);
+      while (dom.messages.children.length > 8) {
+        dom.messages.removeChild(dom.messages.lastChild);
+      }
+    }
+
+    function resetStreamMessages(items, keyword) {
+      streamTextPool = [];
+      for (const item of items.slice(0, 30)) {
+        streamTextPool.push(item.title);
+        if (item.description) streamTextPool.push(item.description);
+        for (const tag of item.tags || []) streamTextPool.push(`#${tag}`);
+      }
+      if (!streamTextPool.length) {
+        streamTextPool.push(`No live updates for "${keyword}"`);
+      }
+
+      dom.messages.innerHTML = '';
+      addMessage(`Searching for "${keyword}"`);
+
+      if (streamTimer) clearInterval(streamTimer);
+      streamTimer = setInterval(() => {
+        const next = streamTextPool[Math.floor(Math.random() * streamTextPool.length)];
+        addMessage(next);
+      }, STREAM_INTERVAL_MS);
+    }
+
+    async function getPublicAddressByKeyword(keyword) {
+      const endpoint = `https://p2fk.io/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=false`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`address lookup failed (${response.status})`);
+      const payload = normalize(await response.text()).replace(/^"|"$/g, '');
+      if (!payload) throw new Error('keyword address not found');
+      return payload;
+    }
+
+    async function getPublicMessagesByAddress(address, skip = 0, qty = 120) {
+      const endpoint = `https://p2fk.io/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=false`;
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
+      const payload = await response.json();
+      return asArray(payload);
+    }
+
+    async function queryP2FK(keyword) {
+      const address = await getPublicAddressByKeyword(keyword);
+      const messages = await getPublicMessagesByAddress(address, 0, 200);
+      const items = parseItems(messages);
+      if (!items.length) {
+        throw new Error('no playable videos in keyword channel');
+      }
+      return items;
+    }
+
+    function playCurrent() {
+      const entry = playlist[pointer];
+      if (!entry) return;
+      dom.video.src = entry.url;
+      dom.video.play().catch(() => {
+        setStatus(`Loaded "${entry.title}" — tap/click to play`);
+      });
+      setStatus(`Now Playing: ${entry.title}`);
+    }
+
+    function nextVideo() {
+      if (!playlist.length) return;
+      pointer = (pointer + 1) % playlist.length;
+      playCurrent();
+    }
+
+    async function loadSearch(keyword) {
+      const cleaned = keyword.trim();
+      if (!cleaned) return;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('q', cleaned);
+      window.history.replaceState({}, '', url);
+
+      setStatus(`Searching p2fk.io for "${cleaned}"…`);
+
+      try {
+        const items = await queryP2FK(cleaned);
+        playlist = items;
+        pointer = 0;
+        updateTicker(items, cleaned);
+        resetStreamMessages(items, cleaned);
+        playCurrent();
+      } catch (error) {
+        playlist = [];
+        updateTicker([], cleaned);
+        resetStreamMessages([], cleaned);
+        setStatus(`Unable to load playable results for "${cleaned}" (${error?.message || 'request failed'})`);
+      }
+    }
+
+    function requestFullscreen() {
+      const target = document.documentElement;
+      if (!document.fullscreenElement && target.requestFullscreen) {
+        target.requestFullscreen().catch(() => {});
+      }
+    }
+
+    function bootstrap() {
+      const urlQuery = new URLSearchParams(window.location.search).get('q');
+      const initial = urlQuery || 'supgalaxy';
+      dom.query.value = initial;
+
+      dom.searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadSearch(dom.query.value);
+      });
+
+      dom.video.addEventListener('ended', nextVideo);
+      dom.video.addEventListener('error', nextVideo);
+      dom.video.addEventListener('click', () => dom.video.play().catch(() => {}));
+      dom.fullscreenBtn.addEventListener('click', requestFullscreen);
+      window.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'f') requestFullscreen();
+      });
+
+      loadSearch(initial);
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
