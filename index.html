@@ -326,7 +326,8 @@
     let pointer = 0;
     let streamCardPool = [];
     let trashedVideoUrls = new Set();
-    let lastPointer = null;
+    let lastTouchPointer = null;
+    let lastMousePointer = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -635,6 +636,7 @@
     function bootstrap() {
       const urlQuery = new URLSearchParams(window.location.search).get('q');
       const initial = normalize(urlQuery) || DEFAULT_KEYWORD;
+      // Keep the input blank so fullscreen playback starts clean while still using DEFAULT_KEYWORD fallback.
       dom.query.value = '';
 
       dom.searchForm.addEventListener('submit', (event) => {
@@ -661,28 +663,28 @@
       dom.video.addEventListener('touchstart', (event) => {
         if (!event.changedTouches?.length) return;
         const touch = event.changedTouches[0];
-        lastPointer = { x: touch.clientX, y: touch.clientY };
+        lastTouchPointer = { x: touch.clientX, y: touch.clientY };
       }, { passive: true });
       dom.video.addEventListener('touchend', (event) => {
-        if (!event.changedTouches?.length || !lastPointer) return;
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
         const touch = event.changedTouches[0];
-        const deltaX = touch.clientX - lastPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastPointer.y);
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
         if (deltaX < -70 && deltaY < 80) trashCurrentVideo();
-        lastPointer = null;
+        lastTouchPointer = null;
       }, { passive: true });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
         if (!document.fullscreenElement) return;
-        if (!lastPointer) {
-          lastPointer = { x: event.clientX, y: event.clientY };
+        if (!lastMousePointer) {
+          lastMousePointer = { x: event.clientX, y: event.clientY };
           return;
         }
-        const dx = event.clientX - lastPointer.x;
-        const dy = event.clientY - lastPointer.y;
-        if (Math.hypot(dx, dy) >= MOUSE_SHOW_DISTANCE_PX) {
+        const dx = event.clientX - lastMousePointer.x;
+        const dy = event.clientY - lastMousePointer.y;
+        if ((dx * dx) + (dy * dy) >= (MOUSE_SHOW_DISTANCE_PX * MOUSE_SHOW_DISTANCE_PX)) {
           showHudTemporarily();
-          lastPointer = { x: event.clientX, y: event.clientY };
+          lastMousePointer = { x: event.clientX, y: event.clientY };
         }
       });
       window.addEventListener('keydown', (event) => {
