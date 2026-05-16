@@ -565,6 +565,9 @@
 
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
+    const TRENDING_MAX_PLAYLIST_ITEMS = 500;
+    const TRENDING_KEYWORD_LIMIT = 5;
+    const TRENDING_SEARCH_QTY = 100;
     const PRELOAD_COUNT = 5;
     const STREAM_RETRY_LIMIT = 1;
     const IPFS_GATEWAY_RETRY_LIMIT = 1;
@@ -587,6 +590,7 @@
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
+    const TRENDING_SEARCHES_ENDPOINT = 'https://bitfossil.org/GetTrendingRootSearches?qty=100';
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -1528,6 +1532,53 @@
       return { items, messages, addressLabels };
     }
 
+    function trendingSearchString(entry) {
+      return normalize(
+        entry?.searchString
+        || entry?.SearchString
+        || entry?.keyword
+        || entry?.Keyword
+        || ''
+      );
+    }
+
+    async function getTrendingKeywords(limit = TRENDING_KEYWORD_LIMIT) {
+      try {
+        const response = await fetch(TRENDING_SEARCHES_ENDPOINT, { cache: 'no-store' });
+        if (!response.ok) return [DEFAULT_KEYWORD];
+        const payload = await response.json();
+        const rows = asArray(payload);
+        const unique = [];
+        for (const row of rows) {
+          const candidate = trendingSearchString(row);
+          if (!candidate || unique.includes(candidate)) continue;
+          unique.push(candidate);
+        }
+        if (!unique.length) return [DEFAULT_KEYWORD];
+        if (unique.length > 1) return unique.slice(0, limit);
+        return [unique[0]];
+      } catch {
+        return [DEFAULT_KEYWORD];
+      }
+    }
+
+    async function queryTrendingP2FK() {
+      const keywords = await getTrendingKeywords();
+      const searchResults = await Promise.allSettled(
+        keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
+      );
+      const resultGroups = searchResults
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value);
+      const messages = mergeUniqueMessagesByTxid(...resultGroups);
+      const addressLabels = await resolveAddressLabels(messages);
+      const items = dedupeItemsByTxid(parseItems(messages, addressLabels));
+      if (!items.length) {
+        throw new Error('no playable videos in trending results');
+      }
+      return { items, messages, addressLabels, keywords };
+    }
+
     function playCurrent() {
       while (playQueue.length) {
         const candidate = playQueue[0];
@@ -1653,19 +1704,26 @@
     }
 
     async function loadSearch(keyword) {
-      const cleaned = normalize(keyword) || DEFAULT_KEYWORD;
-      currentKeyword = cleaned;
+      const cleanedInput = normalize(keyword);
+      const isTrendingDefault = !cleanedInput;
+      const displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
+      currentKeyword = displayKeyword;
       clearScheduledMessages();
       clearAllPreloadProbes();
 
       const url = new URL(window.location.href);
-      url.searchParams.set('q', cleaned);
+      if (cleanedInput) url.searchParams.set('q', cleanedInput);
+      else url.searchParams.delete('q');
       window.history.replaceState({}, '', url);
 
-      setStatus(`Searching p2fk.io for "${cleaned}"…`);
+      if (isTrendingDefault) setStatus('Loading trending searches…');
+      else setStatus(`Searching p2fk.io for "${cleanedInput}"…`);
 
       try {
-        const { items, messages, addressLabels } = await queryP2FK(cleaned);
+        const result = isTrendingDefault
+          ? await queryTrendingP2FK()
+          : await queryP2FK(cleanedInput);
+        const { items, messages, addressLabels } = result;
         searchResultTotal = items.length;
         videoStatusByUrl = new Map();
         streamRetryCountByUrl = new Map();
@@ -1673,9 +1731,10 @@
           clearTimeout(activeStreamTimeoutId);
           activeStreamTimeoutId = null;
         }
-        playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, MAX_PLAYLIST_ITEMS);
-        updateTicker(playQueue, cleaned);
-        prepareSocialFeed(messages, cleaned, addressLabels);
+        const maxItems = isTrendingDefault ? TRENDING_MAX_PLAYLIST_ITEMS : MAX_PLAYLIST_ITEMS;
+        playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, maxItems);
+        updateTicker(playQueue, displayKeyword);
+        prepareSocialFeed(messages, displayKeyword, addressLabels);
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
@@ -1687,9 +1746,9 @@
           activeStreamTimeoutId = null;
         }
         playQueue = [];
-        updateTicker([], cleaned);
-        prepareSocialFeed([], cleaned);
-        showOffAir(`Unable to load playable results for "${cleaned}" (${error?.message || 'request failed'})`);
+        updateTicker([], displayKeyword);
+        prepareSocialFeed([], displayKeyword);
+        showOffAir(`Unable to load playable results for "${displayKeyword}" (${error?.message || 'request failed'})`);
       }
     }
 
@@ -1845,7 +1904,7 @@
 
     function bootstrap() {
       const urlQuery = new URLSearchParams(window.location.search).get('q');
-      const initial = normalize(urlQuery) || DEFAULT_KEYWORD;
+      const initial = normalize(urlQuery);
       // Keep the input blank so the UI starts clean while still using DEFAULT_KEYWORD fallback.
       dom.query.value = '';
       syncAudioUi();
