@@ -23,9 +23,11 @@ You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp
 Edit `index.html` and update these constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`) → set this to your local API base URL
-- `TRENDING_SEARCHES_ENDPOINT` (default: `https://p2fk.io/GetTrendingRootSearches?qty=100`) → set this to your local trending endpoint if needed
+- `TRENDING_SEARCH_QTY` (default: `100`) → change this only if you want a different trending fetch size
 
 Example local values:
 
 - `P2FK_BASE_URL = 'http://localhost:5000'`
-- `TRENDING_SEARCHES_ENDPOINT = 'http://localhost:5000/GetTrendingRootSearches?qty=100'`
+- `TRENDING_SEARCH_QTY = 100`
+
+`TRENDING_SEARCHES_ENDPOINT` is derived from these values in code (`${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_SEARCH_QTY}`).

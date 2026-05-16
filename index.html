@@ -1558,7 +1558,8 @@
         }
         if (!unique.length) return [DEFAULT_KEYWORD];
         return unique.slice(0, limit);
-      } catch {
+      } catch (error) {
+        console.warn('Unable to load trending searches; falling back to default keyword', error);
         return [DEFAULT_KEYWORD];
       }
     }
