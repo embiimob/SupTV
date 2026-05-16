@@ -565,7 +565,9 @@
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
     const TRENDING_KEYWORD_LIMIT = 5;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
+    const TRENDING_VIDEOS_PER_KEYWORD = 5;
     const TRENDING_SEARCH_QTY = 100;
+    const TRENDING_SEARCH_PAGE_SIZE = 25;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
@@ -1614,6 +1616,24 @@
       }
     }
 
+    async function getTrendingKeywordSearchWindow(keyword, maxSearchQty = TRENDING_SEARCH_QTY, targetVideos = TRENDING_VIDEOS_PER_KEYWORD) {
+      const messages = [];
+      let skip = 0;
+      while (skip < maxSearchQty) {
+        const remaining = maxSearchQty - skip;
+        const qty = Math.min(TRENDING_SEARCH_PAGE_SIZE, remaining);
+        const page = await getKnownRootsBySearchString(keyword, skip, qty);
+        const pageRows = asArray(page);
+        if (!pageRows.length) break;
+        messages.push(...pageRows);
+        skip += pageRows.length;
+        const playableCount = dedupeItemsByTxid(parseItems(messages)).length;
+        if (playableCount >= targetVideos) break;
+        if (pageRows.length < qty) break;
+      }
+      return messages;
+    }
+
     function batchItemsRoundRobin(perKeywordItems, batchSize = TRENDING_KEYWORD_BATCH_SIZE) {
       const orderedItems = [];
       const seenKeys = new Set();
@@ -1635,14 +1655,16 @@
     async function queryTrendingP2FK() {
       const keywords = await getTrendingKeywords();
       const searchResults = await Promise.allSettled(
-        keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
+        keywords.map((keyword) => getTrendingKeywordSearchWindow(keyword))
       );
       const keywordGroups = searchResults
         .map((result) => (result.status === 'fulfilled' ? result.value : []));
       const resultGroups = keywordGroups.filter((group) => group.length);
       const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
       const addressLabels = await resolveAddressLabels(messages);
-      const perKeywordItems = keywordGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
+      const perKeywordItems = keywordGroups.map((group) => (
+        dedupeItemsByTxid(parseItems(group, addressLabels)).slice(0, TRENDING_VIDEOS_PER_KEYWORD)
+      ));
       const items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
       if (!items.length) {
         throw new Error('no playable videos in trending results');
