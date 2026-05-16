@@ -1200,7 +1200,6 @@
     }
 
     function measureTicker({ preservePosition = true } = {}) {
-      const previousWidth = tickerContentWidthPx || dom.ticker.scrollWidth || 0;
       tickerContentWidthPx = dom.ticker.scrollWidth || 0;
       const viewportWidth = tickerViewportWidth();
 
@@ -1213,7 +1212,7 @@
 
       if (!preservePosition) tickerPositionPx = viewportWidth;
       if (tickerPositionPx <= -tickerContentWidthPx) tickerPositionPx = viewportWidth;
-      if (tickerContentWidthPx > previousWidth && tickerPositionPx > viewportWidth) tickerPositionPx = viewportWidth;
+      if (tickerPositionPx > viewportWidth) tickerPositionPx = viewportWidth;
       applyTickerPosition();
     }
 
