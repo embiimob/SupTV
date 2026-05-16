@@ -628,7 +628,8 @@
     let pseudoFullscreenActive = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
-    const isFullscreenLikeMode = () => Boolean(document.fullscreenElement) || pseudoFullscreenActive;
+    const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
 
     function updateFullscreenButtonState() {
       const active = isFullscreenLikeMode();
@@ -1690,8 +1691,9 @@
 
     async function requestFullscreen() {
       const target = document.documentElement;
-      if (document.fullscreenElement && document.exitFullscreen) {
-        await document.exitFullscreen().catch(() => {});
+      if (getNativeFullscreenElement()) {
+        if (document.exitFullscreen) await document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         return;
       }
       if (pseudoFullscreenActive) {
@@ -1705,11 +1707,16 @@
           return;
         }
         if (target.webkitRequestFullscreen) {
-          target.webkitRequestFullscreen();
+          const webkitResult = target.webkitRequestFullscreen();
+          if (webkitResult && typeof webkitResult.then === 'function') await webkitResult;
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          if (!getNativeFullscreenElement()) throw new Error('webkit fullscreen did not activate');
           return;
         }
         if (dom.video.webkitEnterFullscreen) {
           dom.video.webkitEnterFullscreen();
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          if (!dom.video.webkitDisplayingFullscreen) throw new Error('video fullscreen did not activate');
           return;
         }
       } catch (error) {
@@ -1863,7 +1870,6 @@
         if (event.key === 'Escape' && pseudoFullscreenActive) {
           pseudoFullscreenActive = false;
           updateFullscreenUiState();
-          return;
         }
         if (event.key === 'Escape') showHudTemporarily();
       });
