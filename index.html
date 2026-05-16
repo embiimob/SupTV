@@ -545,6 +545,7 @@
       if (text.includes('buffer')) return '◌⏳';
       return '⏳';
     };
+    const formatGatewayFallbackLabel = (nextIndex) => `backup IPFS gateway ${nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`;
     const moveStatusToNewUrl = (oldUrl, nextUrl, fallbackStatus = 'downloading') => {
       if (!oldUrl || !nextUrl || oldUrl === nextUrl) return;
       const previousStatus = videoStatusByUrl.get(oldUrl);
@@ -1054,7 +1055,7 @@
             addMessage({
               title: 'Gateway fallback',
               meta: 'preload',
-              body: `Switching preload to backup IPFS gateway ${gatewayFallback.nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`
+              body: `Switching preload to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
             });
             updateTicker();
             queueMicrotask(primePreloadCandidates);
@@ -1295,7 +1296,12 @@
       const sourceUrl = new URL(window.location.href);
       sourceUrl.search = '';
       sourceUrl.hash = '';
-      sourceUrl.pathname = sourceUrl.pathname.replace(/[^/]*$/, 'index.html');
+      const pathname = sourceUrl.pathname || '/';
+      if (/\.html?$/i.test(pathname)) {
+        sourceUrl.pathname = pathname.replace(/[^/]+$/, 'index.html');
+      } else {
+        sourceUrl.pathname = pathname.endsWith('/') ? `${pathname}index.html` : `${pathname}/index.html`;
+      }
       const anchor = document.createElement('a');
       anchor.href = sourceUrl.toString();
       anchor.download = 'index.html';
@@ -1317,7 +1323,7 @@
           addMessage({
             title: 'Gateway fallback',
             meta: 'player',
-            body: `Switching stream to backup IPFS gateway ${gatewayFallback.nextIndex + 1}/${IPFS_GATEWAY_URLS.length}`
+            body: `Switching stream to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
           });
           playCurrent();
           return;
