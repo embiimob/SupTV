@@ -1576,12 +1576,13 @@
         throw new Error('no playable videos in trending results');
       }
       const usedFallbackKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase();
+      const fallbackDisplayKeyword = usedFallbackKeyword ? DEFAULT_KEYWORD : 'trending';
       return {
         items,
         messages,
         addressLabels,
         keywords,
-        displayKeyword: usedFallbackKeyword ? DEFAULT_KEYWORD : 'trending',
+        displayKeyword: fallbackDisplayKeyword,
         usedFallbackKeyword
       };
     }
