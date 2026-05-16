@@ -568,6 +568,7 @@
     const TRENDING_SEARCH_QTY = 100;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
+    const MS_PER_SECOND = 1000;
     const STREAM_RETRY_LIMIT = 1;
     const IPFS_GATEWAY_RETRY_LIMIT = 1;
     const ACTIVE_STREAM_TIMEOUT_MS = 12000;
@@ -1219,7 +1220,7 @@
     function tickTicker(timestamp) {
       if (!tickerAnimationReady) measureTicker({ preservePosition: false });
       if (!tickerLastFrameTs) tickerLastFrameTs = timestamp;
-      const elapsedSeconds = Math.max(0, (timestamp - tickerLastFrameTs) / 1000);
+      const elapsedSeconds = Math.max(0, (timestamp - tickerLastFrameTs) / MS_PER_SECOND);
       tickerLastFrameTs = timestamp;
 
       tickerPositionPx -= TICKER_SCROLL_SPEED_PX_PER_SECOND * elapsedSeconds;
@@ -1627,7 +1628,8 @@
       const perKeywordItems = keywordGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
       const items = [];
       const seenKeys = new Set();
-      for (let offset = 0; perKeywordItems.some((group) => offset < group.length); offset += TRENDING_KEYWORD_BATCH_SIZE) {
+      const maxGroupLength = perKeywordItems.reduce((max, group) => Math.max(max, group.length), 0);
+      for (let offset = 0; offset < maxGroupLength; offset += TRENDING_KEYWORD_BATCH_SIZE) {
         for (const group of perKeywordItems) {
           const batch = group.slice(offset, offset + TRENDING_KEYWORD_BATCH_SIZE);
           for (const item of batch) {
