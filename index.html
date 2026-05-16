@@ -706,7 +706,7 @@
         anchor.rel = 'noopener noreferrer';
         anchor.textContent = cleanUrl;
         content.appendChild(anchor);
-        appendInteractiveTokenText(content, trailingPunctuation);
+        if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         lastIndex = start + matchedUrl.length;
       }
       appendInteractiveTokenText(content, source.slice(lastIndex));
