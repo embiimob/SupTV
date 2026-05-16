@@ -1038,36 +1038,8 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: 42 }));
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: 34 }));
         li.appendChild(body);
-      }
-
-      if (Array.isArray(card.links) && card.links.length) {
-        const linksWrap = document.createElement('div');
-        linksWrap.className = 'message-card-links';
-        for (const url of card.links) {
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.target = '_blank';
-          anchor.rel = 'noopener noreferrer';
-          anchor.title = url;
-          anchor.textContent = formatLinkLabel(url, 44);
-          linksWrap.appendChild(anchor);
-        }
-        li.appendChild(linksWrap);
-      }
-
-      if (Array.isArray(card.keywords) && card.keywords.length) {
-        const keywordWrap = document.createElement('div');
-        keywordWrap.className = 'message-card-keywords';
-        for (const keyword of card.keywords) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = `#${keyword}`;
-          button.addEventListener('click', () => triggerKeywordSearch(keyword));
-          keywordWrap.appendChild(button);
-        }
-        li.appendChild(keywordWrap);
       }
 
       if (card.imageUrl) {
