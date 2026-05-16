@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SupTV — fullscreen-first infinite p2fk.io video stream with live social overlays." />
+  <meta name="theme-color" content="#02020a" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SupTV" />
+  <meta property="og:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta property="og:description" content="Search p2fk.io videos, go fullscreen, and ride a nonstop SupTV stream." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta name="twitter:description" content="Fullscreen-first p2fk.io stream with a retro-cool SupTV vibe." />
   <title>SupTV</title>
   <style>
     :root {
@@ -616,8 +625,17 @@
     let streamRetryCountByUrl = new Map();
     let activeStreamTimeoutId = null;
     let swipeTugResetTimeoutId = null;
+    let pseudoFullscreenActive = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+    const isFullscreenLikeMode = () => Boolean(document.fullscreenElement) || pseudoFullscreenActive;
+
+    function updateFullscreenButtonState() {
+      const active = isFullscreenLikeMode();
+      dom.fullscreenBtn.textContent = active ? '🗗' : '⛶';
+      dom.fullscreenBtn.title = active ? 'Exit Full Screen' : 'Full Screen';
+      dom.fullscreenBtn.setAttribute('aria-label', active ? 'Exit Full Screen' : 'Full Screen');
+    }
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
@@ -1608,22 +1626,24 @@
     }
 
     function showHudTemporarily() {
-      if (!document.fullscreenElement) return;
+      if (!isFullscreenLikeMode()) return;
       dom.app.classList.remove('hidden-ui');
       if (hudTimer) clearTimeout(hudTimer);
       hudTimer = setTimeout(() => {
-        if (document.fullscreenElement) dom.app.classList.add('hidden-ui');
+        if (isFullscreenLikeMode()) dom.app.classList.add('hidden-ui');
       }, HUD_IDLE_HIDE_MS);
     }
 
     function updateFullscreenUiState() {
-      const inFullscreen = Boolean(document.fullscreenElement);
-      dom.app.classList.toggle('fullscreen-mode', inFullscreen);
-      if (inFullscreen) {
+      const inFullscreenLike = isFullscreenLikeMode();
+      dom.app.classList.toggle('fullscreen-mode', inFullscreenLike);
+      updateFullscreenButtonState();
+      if (inFullscreenLike) {
         showHudTemporarily();
       } else {
         dom.app.classList.remove('hidden-ui');
         if (hudTimer) clearTimeout(hudTimer);
+        hudTimer = null;
       }
     }
 
@@ -1668,13 +1688,41 @@
       }
     }
 
-    function requestFullscreen() {
+    async function requestFullscreen() {
       const target = document.documentElement;
-      if (!document.fullscreenElement && target.requestFullscreen) {
-        target.requestFullscreen().catch(() => {
-          setStatus('Fullscreen is not available in this browser context');
-        });
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {});
+        return;
       }
+      if (pseudoFullscreenActive) {
+        pseudoFullscreenActive = false;
+        updateFullscreenUiState();
+        return;
+      }
+      try {
+        if (target.requestFullscreen) {
+          await target.requestFullscreen();
+          return;
+        }
+        if (target.webkitRequestFullscreen) {
+          target.webkitRequestFullscreen();
+          return;
+        }
+        if (dom.video.webkitEnterFullscreen) {
+          dom.video.webkitEnterFullscreen();
+          return;
+        }
+      } catch (error) {
+        console.warn('Native fullscreen request failed, using fallback mode', error);
+      }
+      pseudoFullscreenActive = true;
+      updateFullscreenUiState();
+      dom.app.classList.add('hidden-ui');
+      if (hudTimer) {
+        clearTimeout(hudTimer);
+        hudTimer = null;
+      }
+      setStatus('Fullscreen-style mode enabled (tap or move to show controls)');
     }
 
     async function downloadIndexHtml() {
@@ -1795,8 +1843,9 @@
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
-        if (!document.fullscreenElement) return;
+        if (!isFullscreenLikeMode()) return;
         if (!lastMousePointer) {
           lastMousePointer = { x: event.clientX, y: event.clientY };
           return;
@@ -1811,9 +1860,15 @@
       window.addEventListener('keydown', (event) => {
         if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
+        if (event.key === 'Escape' && pseudoFullscreenActive) {
+          pseudoFullscreenActive = false;
+          updateFullscreenUiState();
+          return;
+        }
         if (event.key === 'Escape') showHudTemporarily();
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      dom.app.addEventListener('touchstart', showHudTemporarily, { passive: true });
       const clearSwipeTug = (animate = true) => {
         if (swipeTugResetTimeoutId) {
           clearTimeout(swipeTugResetTimeoutId);
@@ -1878,6 +1933,7 @@
       }, { passive: true });
 
       loadSearch(initial);
+      updateFullscreenButtonState();
     }
 
     bootstrap();
