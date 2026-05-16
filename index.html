@@ -444,8 +444,9 @@
 
     #ticker {
       position: absolute;
+      left: 0;
       white-space: nowrap;
-      padding-left: 108%;
+      padding-left: 1.5rem;
       padding-right: 5rem;
       line-height: 3rem;
       color: #dbebff;
@@ -453,12 +454,8 @@
       font-size: 1rem;
       letter-spacing: .02em;
       text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
-      animation: crawl 68s linear infinite;
-    }
-
-    @keyframes crawl {
-      from { transform: translateX(0%); }
-      to { transform: translateX(-100%); }
+      transform: translate3d(100%, 0, 0);
+      will-change: transform;
     }
 
     @media (max-width: 920px) {
@@ -567,8 +564,10 @@
     const MAX_PLAYLIST_ITEMS = 50;
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
     const TRENDING_KEYWORD_LIMIT = 5;
+    const TRENDING_KEYWORD_BATCH_SIZE = 5;
     const TRENDING_SEARCH_QTY = 100;
     const PRELOAD_COUNT = 5;
+    const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const STREAM_RETRY_LIMIT = 1;
     const IPFS_GATEWAY_RETRY_LIMIT = 1;
     const ACTIVE_STREAM_TIMEOUT_MS = 12000;
@@ -631,6 +630,11 @@
     let activeStreamTimeoutId = null;
     let swipeTugResetTimeoutId = null;
     let pseudoFullscreenActive = false;
+    let tickerAnimationFrameId = null;
+    let tickerLastFrameTs = 0;
+    let tickerPositionPx = 0;
+    let tickerContentWidthPx = 0;
+    let tickerAnimationReady = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
@@ -1186,6 +1190,50 @@
       return index > 0 && index <= PRELOAD_COUNT ? 'downloading' : 'queued';
     }
 
+    function tickerViewportWidth() {
+      return dom.ticker.parentElement?.clientWidth || window.innerWidth || 0;
+    }
+
+    function applyTickerPosition() {
+      dom.ticker.style.transform = `translate3d(${Math.round(tickerPositionPx)}px, 0, 0)`;
+    }
+
+    function measureTicker({ preservePosition = true } = {}) {
+      const previousWidth = tickerContentWidthPx || dom.ticker.scrollWidth || 0;
+      tickerContentWidthPx = dom.ticker.scrollWidth || 0;
+      const viewportWidth = tickerViewportWidth();
+
+      if (!tickerAnimationReady) {
+        tickerPositionPx = viewportWidth;
+        tickerAnimationReady = true;
+        applyTickerPosition();
+        return;
+      }
+
+      if (!preservePosition) tickerPositionPx = viewportWidth;
+      if (tickerPositionPx <= -tickerContentWidthPx) tickerPositionPx = viewportWidth;
+      if (tickerContentWidthPx > previousWidth && tickerPositionPx > viewportWidth) tickerPositionPx = viewportWidth;
+      applyTickerPosition();
+    }
+
+    function tickTicker(timestamp) {
+      if (!tickerAnimationReady) measureTicker({ preservePosition: false });
+      if (!tickerLastFrameTs) tickerLastFrameTs = timestamp;
+      const elapsedSeconds = Math.max(0, (timestamp - tickerLastFrameTs) / 1000);
+      tickerLastFrameTs = timestamp;
+
+      tickerPositionPx -= TICKER_SCROLL_SPEED_PX_PER_SECOND * elapsedSeconds;
+      if (tickerPositionPx <= -tickerContentWidthPx) tickerPositionPx = tickerViewportWidth();
+      applyTickerPosition();
+      tickerAnimationFrameId = window.requestAnimationFrame(tickTicker);
+    }
+
+    function ensureTickerAnimation() {
+      if (tickerAnimationFrameId) return;
+      tickerLastFrameTs = 0;
+      tickerAnimationFrameId = window.requestAnimationFrame(tickTicker);
+    }
+
     function updateTicker(items = playQueue, keyword = currentKeyword) {
       const statusCards = items.slice(0, PRELOAD_COUNT + 1).map((item, idx) => {
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
@@ -1195,6 +1243,8 @@
       dom.ticker.textContent = statusCards.length
         ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
+      measureTicker();
+      ensureTickerAnimation();
     }
 
     function syncAudioUi() {
@@ -1569,12 +1619,25 @@
       const searchResults = await Promise.allSettled(
         keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
       );
-      const resultGroups = searchResults
-        .filter((result) => result.status === 'fulfilled')
-        .map((result) => result.value);
-      const messages = mergeUniqueMessagesByTxid(...resultGroups);
+      const keywordGroups = searchResults
+        .map((result) => (result.status === 'fulfilled' ? result.value : []));
+      const resultGroups = keywordGroups.filter((group) => group.length);
+      const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
       const addressLabels = await resolveAddressLabels(messages);
-      const items = dedupeItemsByTxid(parseItems(messages, addressLabels));
+      const perKeywordItems = keywordGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
+      const items = [];
+      const seenKeys = new Set();
+      for (let offset = 0; perKeywordItems.some((group) => offset < group.length); offset += TRENDING_KEYWORD_BATCH_SIZE) {
+        for (const group of perKeywordItems) {
+          const batch = group.slice(offset, offset + TRENDING_KEYWORD_BATCH_SIZE);
+          for (const item of batch) {
+            const dedupeKey = normalize(item.txid) || item.url;
+            if (!dedupeKey || seenKeys.has(dedupeKey)) continue;
+            seenKeys.add(dedupeKey);
+            items.push(item);
+          }
+        }
+      }
       if (!items.length) {
         throw new Error('no playable videos in trending results');
       }
@@ -1929,6 +1992,7 @@
         loadSearch(dom.query.value);
       });
 
+      window.addEventListener('resize', () => measureTicker());
       attachVideoListeners(dom.video);
       dom.audioBtn.addEventListener('click', toggleAudio);
       dom.downloadBtn.addEventListener('click', downloadIndexHtml);
