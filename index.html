@@ -45,7 +45,13 @@
       background: radial-gradient(circle at top right, #16233d, #050811 40%, #02020a 80%);
       border: 1px solid rgba(137, 166, 232, .16);
       box-shadow: inset 0 0 0 2px rgba(130, 167, 255, .06), inset 0 0 120px rgba(41, 95, 205, .15);
+      --swipe-tug-x: 0px;
+      transform: translate3d(var(--swipe-tug-x), 0, 0);
+      transition: transform .2s ease;
     }
+
+    #app.swipe-tugging { transition: none; }
+    #app.swipe-tug-release { transition: transform .18s ease-out; }
 
     #player {
       width: 100%;
@@ -451,6 +457,43 @@
       .brand span { display: none; }
       .waiting-overlay { right: .65rem; bottom: 3.25rem; }
     }
+
+    @media (max-width: 640px) {
+      .topbar {
+        flex-wrap: wrap;
+        gap: .45rem;
+        padding-top: calc(.62rem + env(safe-area-inset-top));
+        padding-right: calc(.62rem + env(safe-area-inset-right));
+        padding-left: calc(.62rem + env(safe-area-inset-left));
+        padding-bottom: .62rem;
+      }
+      .brand b { font-size: 1.05rem; }
+      .controls {
+        width: 100%;
+        min-width: 0;
+        gap: .35rem;
+      }
+      .controls input {
+        min-width: 0;
+        padding: .56rem .66rem;
+        font-size: .9rem;
+      }
+      .controls button {
+        min-width: 2.25rem;
+        padding: .56rem .64rem;
+        border-radius: .62rem;
+        font-size: .95rem;
+      }
+      .controls .audio-toggle { min-width: 2.55rem; }
+      .side-feed {
+        right: .62rem;
+        width: calc(100vw - 1.24rem);
+      }
+      .status {
+        left: .62rem;
+        max-width: calc(100vw - 1.24rem);
+      }
+    }
   </style>
 </head>
 <body>
@@ -522,8 +565,11 @@
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
-    const SWIPE_SKIP_MIN_X_PX = 70;
+    const SWIPE_SKIP_MIN_X_PX = 120;
     const SWIPE_SKIP_MAX_Y_PX = 80;
+    const SWIPE_TUG_MAX_X_PX = 44;
+    const SWIPE_TUG_START_X_PX = 12;
+    const MOBILE_CARD_IMAGE_MEDIA_QUERY = '(max-width: 920px), (hover: none) and (pointer: coarse)';
     const P2FK_BASE_URL = 'https://p2fk.io';
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
@@ -563,6 +609,7 @@
     const profileByUrnCache = new Map();
     let streamRetryCountByUrl = new Map();
     let activeStreamTimeoutId = null;
+    let swipeTugResetTimeoutId = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
@@ -572,8 +619,9 @@
     const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
-      return Boolean(target.closest('button, input, textarea, select, a, label'));
+      return Boolean(target.closest('button, input, textarea, select, a, label, .topbar, .side-feed, #messages'));
     };
+    const shouldRenderCardImages = () => !window.matchMedia(MOBILE_CARD_IMAGE_MEDIA_QUERY).matches;
     const formatUtcDate = (value) => {
       if (!value) return '';
       const date = new Date(value);
@@ -1156,7 +1204,7 @@
         li.appendChild(body);
       }
 
-      if (card.imageUrl) {
+      if (card.imageUrl && shouldRenderCardImages()) {
         const image = document.createElement('img');
         image.className = 'message-card-image';
         image.loading = 'lazy';
@@ -1755,23 +1803,66 @@
         if (event.key === 'Escape') showHudTemporarily();
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      const clearSwipeTug = (animate = true) => {
+        if (swipeTugResetTimeoutId) {
+          clearTimeout(swipeTugResetTimeoutId);
+          swipeTugResetTimeoutId = null;
+        }
+        dom.app.classList.remove('swipe-tugging');
+        if (animate) dom.app.classList.add('swipe-tug-release');
+        else dom.app.classList.remove('swipe-tug-release');
+        dom.app.style.setProperty('--swipe-tug-x', '0px');
+        if (animate) {
+          swipeTugResetTimeoutId = window.setTimeout(() => {
+            dom.app.classList.remove('swipe-tug-release');
+            swipeTugResetTimeoutId = null;
+          }, 220);
+        }
+      };
+      const applySwipeTug = (deltaX, deltaY, ignoreSwipe) => {
+        if (ignoreSwipe || deltaY > SWIPE_SKIP_MAX_Y_PX || deltaX >= 0) {
+          clearSwipeTug(false);
+          return;
+        }
+        const distance = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, (-deltaX) * 0.33));
+        if (distance < SWIPE_TUG_START_X_PX) {
+          clearSwipeTug(false);
+          return;
+        }
+        dom.app.classList.remove('swipe-tug-release');
+        dom.app.classList.add('swipe-tugging');
+        dom.app.style.setProperty('--swipe-tug-x', `${-distance}px`);
+      };
       dom.app.addEventListener('touchstart', (event) => {
         if (!event.changedTouches?.length) return;
         const touch = event.changedTouches[0];
+        clearSwipeTug(false);
         lastTouchPointer = {
           x: touch.clientX,
           y: touch.clientY,
           ignoreSwipe: isInteractiveTouchTarget(event.target)
         };
       }, { passive: true });
+      dom.app.addEventListener('touchmove', (event) => {
+        if (!event.changedTouches?.length || !lastTouchPointer) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - lastTouchPointer.x;
+        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        applySwipeTug(deltaX, deltaY, lastTouchPointer.ignoreSwipe);
+      }, { passive: true });
       dom.app.addEventListener('touchend', (event) => {
         if (!event.changedTouches?.length || !lastTouchPointer) return;
         const touch = event.changedTouches[0];
         const deltaX = touch.clientX - lastTouchPointer.x;
         const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        clearSwipeTug(true);
         if (!lastTouchPointer.ignoreSwipe && deltaX < -SWIPE_SKIP_MIN_X_PX && deltaY < SWIPE_SKIP_MAX_Y_PX) {
           trashCurrentVideo();
         }
+        lastTouchPointer = null;
+      }, { passive: true });
+      dom.app.addEventListener('touchcancel', () => {
+        clearSwipeTug(true);
         lastTouchPointer = null;
       }, { passive: true });
 
