@@ -132,15 +132,36 @@
       padding: .7rem .9rem .9rem;
       display: grid;
       gap: .45rem;
-      font-size: .9rem;
+      font-size: .86rem;
     }
 
     #messages li {
       background: rgba(18, 28, 52, .42);
-      padding: .42rem .52rem;
-      border-radius: .45rem;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      padding: .55rem .62rem;
+      border-radius: .55rem;
+      border: 1px solid rgba(126, 157, 222, .22);
+    }
+
+    .message-card-title {
+      font-size: .85rem;
+      font-weight: 700;
+      margin-bottom: .26rem;
+      line-height: 1.2;
+    }
+
+    .message-card-meta {
+      font-size: .72rem;
+      letter-spacing: .02em;
+      color: #b6c8f2;
+      margin-bottom: .2rem;
+      opacity: .9;
+    }
+
+    .message-card-body {
+      font-size: .8rem;
+      color: #dce8ff;
+      line-height: 1.25;
+      max-height: 3.1em;
       overflow: hidden;
     }
 
@@ -226,9 +247,9 @@
     const MESSAGE_UPDATE_INTERVAL_MS = 2100;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const USE_MAINNET = false;
-    const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogg|mov|avi|m3u8))/i;
+    const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
-    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogg|mov|avi|m3u8)(\?[^\s"']*)?)/i;
+    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
     let streamTimer = null;
     let playlist = [];
     let pointer = 0;
@@ -236,8 +257,14 @@
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
-    const toSafePath = (value) => normalize(value).split(/[\\/]+/).filter(Boolean).map((segment) => encodeURIComponent(segment)).join('/');
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
+    const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const formatUtcDate = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+    };
 
     function setStatus(text) {
       dom.status.textContent = text;
@@ -265,27 +292,37 @@
             const directUrl = directMatch[1];
             if (seen.has(directUrl)) return null;
             seen.add(directUrl);
-            const title = normalize(msg?.Subject) || normalize(msg?.subject) || 'Direct stream';
-            return { url: directUrl, title, description: messageText, tags: [] };
+            const title = cleanDisplayText(normalize(msg?.Subject) || normalize(msg?.subject) || 'Direct stream');
+            return {
+              url: directUrl,
+              title,
+              description: cleanDisplayText(messageText),
+              tags: [],
+              from: cleanDisplayText(msg?.FromAddress || msg?.fromAddress || ''),
+              createdAt: msg?.BlockDate || msg?.blockDate || '',
+              hash: ''
+            };
           }
 
           const ipfsMatch = messageText.match(IPFS_REGEX);
           if (!ipfsMatch) return null;
           const fileMatch = messageText.match(VIDEO_FILE_REGEX);
+          if (!fileMatch) return null;
           const hash = ipfsMatch[1];
-          const namedPath = normalize(ipfsMatch[2] || '');
-          const sourcePath = normalize(fileMatch?.[1] || namedPath);
+          const sourcePath = normalize(fileMatch[1] || '');
           const filename = stripPathParts(sourcePath);
-          const encodedPath = sourcePath ? `/${toSafePath(sourcePath)}` : '';
-          const url = `https://ipfs.io/ipfs/${hash}${encodedPath}`;
+          const url = `https://ipfs.io/ipfs/${hash}`;
           if (seen.has(url)) return null;
           seen.add(url);
 
           return {
             url,
-            title: filename || `IPFS ${hash.slice(0, 12)}`,
-            description: messageText,
-            tags: []
+            title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
+            description: cleanDisplayText(messageText),
+            tags: [],
+            from: cleanDisplayText(msg?.FromAddress || msg?.fromAddress || ''),
+            createdAt: msg?.BlockDate || msg?.blockDate || '',
+            hash
           };
         })
         .filter(Boolean);
@@ -298,10 +335,28 @@
         : `${tickerLabel(keyword)}No matching videos`;
     }
 
-    function addMessage(text) {
-      if (!text) return;
+    function addMessage(card) {
+      if (!card) return;
       const li = document.createElement('li');
-      li.textContent = text;
+      const title = document.createElement('div');
+      title.className = 'message-card-title';
+      title.textContent = cleanDisplayText(card.title || 'Live update');
+      li.appendChild(title);
+
+      if (card.meta) {
+        const meta = document.createElement('div');
+        meta.className = 'message-card-meta';
+        meta.textContent = cleanDisplayText(card.meta);
+        li.appendChild(meta);
+      }
+
+      if (card.body) {
+        const body = document.createElement('div');
+        body.className = 'message-card-body';
+        body.textContent = cleanDisplayText(card.body);
+        li.appendChild(body);
+      }
+
       dom.messages.prepend(li);
       while (dom.messages.children.length > 8) {
         dom.messages.removeChild(dom.messages.lastChild);
@@ -311,20 +366,26 @@
     function resetStreamMessages(items, keyword) {
       streamTextPool = [];
       for (const item of items.slice(0, 30)) {
-        streamTextPool.push(item.title);
-        if (item.description) streamTextPool.push(item.description);
-        for (const tag of item.tags || []) streamTextPool.push(`#${tag}`);
+        const creator = item.from ? `${item.from.slice(0, 12)}…` : 'p2fk';
+        const postedAt = formatUtcDate(item.createdAt);
+        const hashTag = item.hash ? ` · ${item.hash.slice(0, 12)}…` : '';
+        streamTextPool.push({
+          title: item.title,
+          meta: `${creator}${postedAt ? ` · ${postedAt}` : ''}${hashTag}`,
+          body: item.description
+        });
       }
       if (!streamTextPool.length) {
-        streamTextPool.push(`No live updates for "${keyword}"`);
+        streamTextPool.push({ title: 'No live updates', meta: keyword, body: `No live updates for "${keyword}"` });
       }
 
       dom.messages.innerHTML = '';
-      addMessage(`Searching for "${keyword}"`);
+      addMessage({ title: `Keyword: ${keyword}`, meta: 'p2fk channel', body: 'Streaming freshest matching video messages' });
+      for (const card of streamTextPool.slice(0, 3)) addMessage(card);
 
       if (streamTimer) clearInterval(streamTimer);
       streamTimer = setInterval(() => {
-        const next = streamTextPool[Math.floor(Math.random() * streamTextPool.length)];
+        const next = streamTextPool[Math.floor(Math.random() * streamTextPool.length)] || null;
         addMessage(next);
       }, MESSAGE_UPDATE_INTERVAL_MS);
     }
@@ -420,7 +481,7 @@
       dom.video.addEventListener('ended', nextVideo);
       dom.video.addEventListener('error', () => {
         console.warn('Video playback error, skipping to next source');
-        addMessage('Video playback issue detected; trying next video');
+        addMessage({ title: 'Playback warning', meta: 'player', body: 'Video playback issue detected; trying next video' });
         nextVideo();
       });
       dom.video.addEventListener('click', () => dom.video.play().catch(() => {}));
