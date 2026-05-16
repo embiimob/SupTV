@@ -220,7 +220,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="submit">Play</button>
-        <button type="button" id="fullscreenBtn">Full Screen</button>
+        <button type="button" id="fullscreenBtn" aria-keyshortcuts="f">Full Screen</button>
       </form>
     </header>
 
@@ -246,11 +246,13 @@
 
     const MESSAGE_UPDATE_INTERVAL_MS = 2100;
     const P2FK_BASE_URL = 'https://p2fk.io';
+    const IPFS_GATEWAY_URL = 'https://ipfs.io/ipfs/';
     const USE_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
     let streamTimer = null;
+    let streamQueue = [];
     let playlist = [];
     let pointer = 0;
     let streamTextPool = [];
@@ -282,6 +284,11 @@
 
     function parseItems(messages) {
       const seen = new Set();
+      const isValidIpfsVideoMessage = (messageText) => {
+        const ipfsMatch = messageText.match(IPFS_REGEX);
+        const fileMatch = messageText.match(VIDEO_FILE_REGEX);
+        return { ipfsMatch, fileMatch, valid: Boolean(ipfsMatch && fileMatch) };
+      };
       return messages
         .map((msg) => {
           const messageText = normalize(msg?.Message || msg?.message || msg?.text);
@@ -304,14 +311,12 @@
             };
           }
 
-          const ipfsMatch = messageText.match(IPFS_REGEX);
-          if (!ipfsMatch) return null;
-          const fileMatch = messageText.match(VIDEO_FILE_REGEX);
-          if (!fileMatch) return null;
+          const { ipfsMatch, fileMatch, valid } = isValidIpfsVideoMessage(messageText);
+          if (!valid) return null;
           const hash = ipfsMatch[1];
           const sourcePath = normalize(fileMatch[1] || '');
-          const filename = stripPathParts(sourcePath);
-          const url = `https://ipfs.io/ipfs/${hash}`;
+          const filename = stripPathParts(sourcePath).trim();
+          const url = `${IPFS_GATEWAY_URL}${hash}`;
           if (seen.has(url)) return null;
           seen.add(url);
 
@@ -382,10 +387,20 @@
       dom.messages.innerHTML = '';
       addMessage({ title: `Keyword: ${keyword}`, meta: 'p2fk channel', body: 'Streaming freshest matching video messages' });
       for (const card of streamTextPool.slice(0, 3)) addMessage(card);
+      streamQueue = streamTextPool
+        .map((card) => ({ card, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map((entry) => entry.card);
 
       if (streamTimer) clearInterval(streamTimer);
       streamTimer = setInterval(() => {
-        const next = streamTextPool[Math.floor(Math.random() * streamTextPool.length)] || null;
+        if (!streamQueue.length) {
+          streamQueue = streamTextPool
+            .map((card) => ({ card, sort: Math.random() }))
+            .sort((a, b) => a.sort - b.sort)
+            .map((entry) => entry.card);
+        }
+        const next = streamQueue.shift() || null;
         addMessage(next);
       }, MESSAGE_UPDATE_INTERVAL_MS);
     }
