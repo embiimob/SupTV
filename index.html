@@ -416,7 +416,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <div class="brand"><b>SupTV</b><span>Uncensored stream</span></div>
+      <div class="brand"><b>SupTV</b><span>uncensored</span></div>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -466,7 +466,7 @@
 
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
-    const PRELOAD_COUNT = 3;
+    const PRELOAD_COUNT = 5;
     const MESSAGE_ROTATION_INTERVAL_MS = 10500;
     const HUD_IDLE_HIDE_MS = 2800;
     const MOUSE_SHOW_DISTANCE_PX = 48;
@@ -481,6 +481,8 @@
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
     let scheduledMessageTimeouts = [];
+    let queuedMessages = [];
+    let activeMessageTimeoutId = null;
     let hudTimer = null;
     let playQueue = [];
     let currentEntry = null;
@@ -715,9 +717,7 @@
       syncAudioUi();
     }
 
-    function addMessage(card) {
-      if (!card) return;
-      dom.messages.innerHTML = '';
+    function renderMessageCard(card) {
       const li = document.createElement('li');
       const title = document.createElement('div');
       title.className = 'message-card-title';
@@ -786,16 +786,36 @@
           li.appendChild(image);
         }
       }
+      return li;
+    }
 
+    function flushNextQueuedMessage() {
+      if (activeMessageTimeoutId || !queuedMessages.length) return;
+      const card = queuedMessages.shift();
+      const li = renderMessageCard(card);
       dom.messages.prepend(li);
-      window.setTimeout(() => {
+      activeMessageTimeoutId = window.setTimeout(() => {
         if (li.parentElement === dom.messages) dom.messages.removeChild(li);
+        activeMessageTimeoutId = null;
+        flushNextQueuedMessage();
       }, MESSAGE_ROTATION_INTERVAL_MS);
+    }
+
+    function addMessage(card) {
+      if (!card) return;
+      queuedMessages.push(card);
+      flushNextQueuedMessage();
     }
 
     function clearScheduledMessages() {
       for (const timeoutId of scheduledMessageTimeouts) clearTimeout(timeoutId);
       scheduledMessageTimeouts = [];
+      queuedMessages = [];
+      if (activeMessageTimeoutId) {
+        clearTimeout(activeMessageTimeoutId);
+        activeMessageTimeoutId = null;
+      }
+      dom.messages.innerHTML = '';
     }
 
     function showWaiting(message) {
