@@ -559,8 +559,8 @@
     let lastTouchPointer = null;
     let lastMousePointer = null;
     let currentKeyword = DEFAULT_KEYWORD;
-    const keywordByAddressCache = new Map();
     const profileByAddressCache = new Map();
+    const profileByUrnCache = new Map();
     let streamRetryCountByUrl = new Map();
     let activeStreamTimeoutId = null;
 
@@ -643,6 +643,16 @@
       return Number.isNaN(time) ? Number.NaN : time;
     };
     const unwrapQuotedText = (value) => normalize(value).replace(/^"|"$/g, '');
+    const splitInlineIpfsSuffix = (value) => {
+      const text = normalize(value);
+      if (!text) return { primary: '', suffix: '' };
+      const inlineIpfsIndex = text.search(/IPFS:(?:[a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})/i);
+      if (inlineIpfsIndex <= 0) return { primary: text, suffix: '' };
+      return {
+        primary: text.slice(0, inlineIpfsIndex),
+        suffix: text.slice(inlineIpfsIndex)
+      };
+    };
     const formatLinkLabel = (value, max = 42) => {
       const text = cleanDisplayText(value || '');
       if (!text) return '';
@@ -654,6 +664,56 @@
         display = text.replace(/^https?:\/\//i, '');
       }
       return display.length > max ? `${display.slice(0, max - 1)}…` : display;
+    };
+    const rootAddressCandidate = (root) => normalize(
+      root?.FromAddress
+      || root?.fromAddress
+      || root?.['From Address']
+      || root?.['from address']
+      || root?.['Signed By']
+      || root?.SignedBy
+      || ''
+    );
+    const normalizeAddressForCompare = (value) => cleanDisplayText(value || '').trim();
+    const sameAddressValue = (a, b) => {
+      const left = normalizeAddressForCompare(a);
+      const right = normalizeAddressForCompare(b);
+      if (!left || !right) return false;
+      if (left === right) return true;
+      if (left.startsWith('0x') && right.startsWith('0x')) return left.toLowerCase() === right.toLowerCase();
+      return false;
+    };
+    const extractProfileUrn = (profile) => cleanDisplayText(profile?.urn || profile?.URN || profile?.Urn || profile?.profileURN || profile?.ProfileURN || '');
+    const normalizeCreatorValue = (value) => {
+      if (!value) return '';
+      if (typeof value === 'string') return normalizeAddressForCompare(value);
+      if (typeof value === 'object') {
+        return normalizeAddressForCompare(
+          value.address
+          || value.Address
+          || value.creatorId
+          || value.CreatorId
+          || value.publicAddress
+          || value.PublicAddress
+          || ''
+        );
+      }
+      return '';
+    };
+    const extractCreatorAddresses = (profile) => {
+      if (!profile || typeof profile !== 'object') return [];
+      const creators = profile.Creators || profile.creators || profile.CreatorAddresses || profile.creatorAddresses || [];
+      const normalizedCreators = Array.isArray(creators)
+        ? creators.map((creator) => normalizeCreatorValue(creator)).filter(Boolean)
+        : [];
+      if (normalizedCreators.length) return normalizedCreators;
+      const creatorId = normalizeCreatorValue(profile.CreatorId || profile.creatorId || profile.Creator || profile.creator || profile.PublicAddress || profile.publicAddress || '');
+      return creatorId ? [creatorId] : [];
+    };
+    const profileHasCreatorMatch = (profile, address) => {
+      const creatorAddresses = extractCreatorAddresses(profile);
+      if (!creatorAddresses.length) return false;
+      return creatorAddresses.some((creatorAddress) => sameAddressValue(creatorAddress, address));
     };
     const profileDisplayName = (profile) => {
       if (!profile || typeof profile !== 'object') return '';
@@ -691,7 +751,10 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
-      const unique = [...new Set(matches.map((link) => link.replace(/[),.;]+$/, '')))];
+      const unique = [...new Set(matches
+        .map((link) => splitInlineIpfsSuffix(link).primary || link)
+        .map((link) => link.replace(/[),.;]+$/, ''))
+        .filter(Boolean))];
       return unique.slice(0, 4);
     };
     const extractKeywords = (messageText, subjectText) => {
@@ -751,8 +814,15 @@
         const start = match.index ?? 0;
         appendInteractiveTokenText(content, source.slice(lastIndex, start));
         const matchedUrl = match[0];
-        const cleanUrl = matchedUrl.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
-        const trailingPunctuation = matchedUrl.slice(cleanUrl.length);
+        const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
+        const candidateUrl = matchedPrimaryUrl || matchedUrl;
+        const cleanUrl = candidateUrl.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+        if (!cleanUrl) {
+          appendInteractiveTokenText(content, matchedUrl);
+          lastIndex = start + matchedUrl.length;
+          continue;
+        }
+        const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
         const anchor = document.createElement('a');
         anchor.href = cleanUrl;
         anchor.target = '_blank';
@@ -760,6 +830,7 @@
         anchor.title = cleanUrl;
         anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
         content.appendChild(anchor);
+        if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
         if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         lastIndex = start + matchedUrl.length;
       }
@@ -795,7 +866,7 @@
     }
 
     function rootFromAddress(root) {
-      return cleanDisplayText(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '');
+      return cleanDisplayText(rootAddressCandidate(root));
     }
 
     function displayFromAddress(root, addressLabels = new Map()) {
@@ -817,24 +888,6 @@
       return toTimestamp(messageBlockDate(payload));
     }
 
-    async function getKeywordByPublicAddress(address) {
-      const cleanAddress = cleanDisplayText(address || '');
-      if (!cleanAddress) return '';
-      if (keywordByAddressCache.has(cleanAddress)) return keywordByAddressCache.get(cleanAddress);
-      const lookup = (async () => {
-        try {
-          const endpoint = `${P2FK_BASE_URL}/GetKeywordByPublicAddress/${encodeURIComponent(cleanAddress)}?mainnet=${USE_P2FK_MAINNET}`;
-          const response = await fetch(endpoint);
-          if (!response.ok) return '';
-          return cleanDisplayText(unwrapQuotedText(await response.text()));
-        } catch {
-          return '';
-        }
-      })();
-      keywordByAddressCache.set(cleanAddress, lookup);
-      return lookup;
-    }
-
     async function getProfileByAddress(address) {
       const cleanAddress = cleanDisplayText(address || '');
       if (!cleanAddress) return null;
@@ -853,13 +906,36 @@
       return lookup;
     }
 
+    async function getProfileByURN(urn) {
+      const cleanUrn = cleanDisplayText(unwrapQuotedText(urn || ''));
+      if (!cleanUrn) return null;
+      if (profileByUrnCache.has(cleanUrn)) return profileByUrnCache.get(cleanUrn);
+      const lookup = (async () => {
+        try {
+          const endpoint = `${P2FK_BASE_URL}/GetProfileByURN/${encodeURIComponent(cleanUrn)}?mainnet=${USE_P2FK_MAINNET}`;
+          const response = await fetch(endpoint);
+          if (!response.ok) return null;
+          return await response.json();
+        } catch {
+          return null;
+        }
+      })();
+      profileByUrnCache.set(cleanUrn, lookup);
+      return lookup;
+    }
+
     async function resolveAddressDisplay(address) {
       const cleanAddress = cleanDisplayText(address || '');
       if (!cleanAddress) return '';
-      const keyword = await getKeywordByPublicAddress(cleanAddress);
-      if (keyword) return keyword;
-      const profile = await getProfileByAddress(cleanAddress);
-      return profileDisplayName(profile) || cleanAddress;
+      const addressProfile = await getProfileByAddress(cleanAddress);
+      const profileUrn = extractProfileUrn(addressProfile);
+      if (profileUrn) {
+        const validatedProfile = await getProfileByURN(profileUrn);
+        if (validatedProfile && profileHasCreatorMatch(validatedProfile, cleanAddress)) {
+          return extractProfileUrn(validatedProfile) || profileDisplayName(validatedProfile) || profileUrn;
+        }
+      }
+      return cleanAddress;
     }
 
     async function resolveAddressLabels(messages) {
@@ -889,7 +965,7 @@
           continue;
         }
         const root = unwrapRootPayload(message) || {};
-        const fallbackKey = `${normalize(root?.['Signed By'] || root?.SignedBy || root?.FromAddress || root?.fromAddress || '')}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
+        const fallbackKey = `${normalize(rootAddressCandidate(root))}|${normalizeRootMsg(root)}|${normalize(messageBlockDate(root))}`;
         if (seenFallback.has(fallbackKey)) continue;
         seenFallback.add(fallbackKey);
         output.push(message);
