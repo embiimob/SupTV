@@ -640,6 +640,7 @@
     let swipeTugResetTimeoutId = null;
     let pseudoFullscreenActive = false;
     let trendingResultsCache = null;
+    let trendingBackgroundFetchId = 0;
     let tickerAnimationFrameId = null;
     let tickerLastFrameTs = 0;
     let tickerPositionPx = 0;
@@ -1673,49 +1674,61 @@
         return trendingResultsCache;
       }
 
-      // Fetch up to TRENDING_KEYWORD_LIMIT trending keywords, then fetch 200 raw rows per
-      // keyword in a single request each. Results are cached for the session so logo-clicks
-      // and queue refills never re-fetch.
       const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
 
-      const searchResults = await Promise.allSettled(
-        keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
-      );
-      const keywordGroups = searchResults
-        .map((result) => (result.status === 'fulfilled' ? asArray(result.value) : []));
-
-      const resultGroups = keywordGroups.filter((group) => group.length);
-      const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
-      const addressLabels = await resolveAddressLabels(messages);
-
-      // Parse all items per keyword — no per-keyword cap; round-robin gives natural interleaving.
-      const perKeywordItems = keywordGroups.map((group) =>
-        dedupeItemsByTxid(parseItems(group, addressLabels))
+      // Start ALL keyword fetches in parallel immediately so they run concurrently.
+      // We await only the first one here so playback can begin without waiting for all 20.
+      const keywordFetches = keywords.map((kw) =>
+        getKnownRootsBySearchString(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => [])
       );
 
-      let items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
-
-      // Fallback: if no playable items found from trending keywords, use the top keyword alone.
-      if (!items.length && keywords.length) {
-        const fallbackMessages = await getKnownRootsBySearchString(keywords[0], 0, TRENDING_SEARCH_QTY)
-          .then(asArray).catch(() => []);
-        const fallbackItems = dedupeItemsByTxid(parseItems(fallbackMessages, addressLabels));
-        if (fallbackItems.length) {
-          items = fallbackItems;
-        }
-      }
-
-      if (!items.length) {
-        throw new Error('no playable videos in trending results');
-      }
+      const firstRaw = await keywordFetches[0];
+      const firstLabels = await resolveAddressLabels(firstRaw);
+      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels));
 
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
         : 'trending';
 
-      const result = { items, messages, addressLabels, keywords, displayKeyword };
-      trendingResultsCache = result;
-      return result;
+      // Publish the partial result immediately so the cache is warm for logo-clicks
+      // that arrive before the full background phase finishes.
+      const partialResult = { items: firstItems, messages: firstRaw, addressLabels: firstLabels, keywords, displayKeyword };
+      trendingResultsCache = partialResult;
+
+      // Background: once all keyword fetches finish, build the full round-robin queue
+      // and extend playQueue in-place so currently-playing sessions see more content.
+      const bgFetchId = ++trendingBackgroundFetchId;
+      Promise.allSettled(keywordFetches).then(async (settled) => {
+        if (bgFetchId !== trendingBackgroundFetchId) return; // superseded by a newer search
+        const allGroups = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
+        const nonEmptyGroups = allGroups.filter((g) => g.length);
+        if (!nonEmptyGroups.length) return;
+
+        const allMessages = mergeUniqueMessagesByTxid(...nonEmptyGroups);
+        const allLabels = await resolveAddressLabels(allMessages);
+        if (bgFetchId !== trendingBackgroundFetchId) return;
+
+        const perKeywordItems = allGroups.map((group) => dedupeItemsByTxid(parseItems(group, allLabels)));
+        let allItems = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+        if (!allItems.length) allItems = firstItems;
+
+        // Extend the active playQueue with items not yet queued (preserves play position).
+        const existingUrls = new Set(playQueue.map((i) => i.url));
+        const newItems = allItems.filter((i) => !existingUrls.has(i.url));
+        const headroom = TRENDING_MAX_PLAYLIST_ITEMS - playQueue.length;
+        const wasEmpty = !playQueue.length;
+        if (newItems.length && headroom > 0) {
+          playQueue.push(...newItems.slice(0, headroom));
+          searchResultTotal = playQueue.length;
+          updateTicker(playQueue, currentKeyword);
+        }
+        // If the initial quick-start had no items, kick off playback now that we have some.
+        if (wasEmpty && playQueue.length) playCurrent();
+
+        trendingResultsCache = { items: allItems, messages: allMessages, addressLabels: allLabels, keywords, displayKeyword };
+      }).catch(() => {}); // Background errors don't affect already-running playback
+
+      return partialResult;
     }
 
     function playCurrent() {
@@ -1847,7 +1860,10 @@
       const isTrendingDefault = !cleanedInput;
       // Clear the trending cache when the user performs an explicit keyword search so
       // returning to trending later re-fetches fresh results.
-      if (!isTrendingDefault) trendingResultsCache = null;
+      if (!isTrendingDefault) {
+        trendingResultsCache = null;
+        trendingBackgroundFetchId++; // cancel any in-progress trending background fetch
+      }
       let displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
       currentKeyword = displayKeyword;
       clearScheduledMessages();
