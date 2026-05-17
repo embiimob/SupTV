@@ -574,6 +574,7 @@
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
+    const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
@@ -1582,6 +1583,20 @@
       return asArray(payload);
     }
 
+    async function getKnownRootsBySearchStringWithTimeout(searchString, skip = 0, qty = 200, timeoutMs = TRENDING_KEYWORD_FETCH_TIMEOUT_MS) {
+      let timeoutId = null;
+      try {
+        return await Promise.race([
+          getKnownRootsBySearchString(searchString, skip, qty),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error(`search lookup timeout (${timeoutMs}ms)`)), timeoutMs);
+          })
+        ]);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    }
+
     async function getKeywordChannelMessages(keyword) {
       const address = await getPublicAddressByKeyword(keyword);
       return getPublicMessagesByAddress(address, 0, 200);
@@ -1679,7 +1694,7 @@
       // Start ALL keyword fetches in parallel immediately so they run concurrently.
       // We await only the first one here so playback can begin without waiting for all 20.
       const keywordFetches = keywords.map((kw) =>
-        getKnownRootsBySearchString(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => [])
+        getKnownRootsBySearchStringWithTimeout(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => [])
       );
 
       const firstRaw = await keywordFetches[0];
