@@ -1699,7 +1699,7 @@
       // and extend playQueue in-place so currently-playing sessions see more content.
       const bgFetchId = ++trendingBackgroundFetchId;
       Promise.allSettled(keywordFetches).then(async (settled) => {
-        if (bgFetchId !== trendingBackgroundFetchId) return; // superseded by a newer search
+        if (bgFetchId !== trendingBackgroundFetchId) return; // superseded or cancelled by explicit search
         const allGroups = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
         const nonEmptyGroups = allGroups.filter((g) => g.length);
         if (!nonEmptyGroups.length) return;
@@ -1722,7 +1722,8 @@
           searchResultTotal = playQueue.length;
           updateTicker(playQueue, currentKeyword);
         }
-        // If the initial quick-start had no items, kick off playback now that we have some.
+        // Edge case: if the first keyword returned no items, playback stalled at off-air.
+        // Restart it now that the background fetch has found playable content.
         if (wasEmpty && playQueue.length) playCurrent();
 
         trendingResultsCache = { items: allItems, messages: allMessages, addressLabels: allLabels, keywords, displayKeyword };
