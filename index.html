@@ -1589,7 +1589,7 @@
     async function queryP2FK(keyword) {
       const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
         getKeywordChannelMessages(keyword),
-        getKnownRootsBySearchString(keyword, 0, STANDARD_SEARCH_QTY)
+        getKnownRootsSearchWindow(keyword, STANDARD_SEARCH_QTY)
       ]);
       const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
       const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
@@ -1632,6 +1632,24 @@
         console.warn('Unable to load trending searches; falling back to default keyword', error);
         return [DEFAULT_KEYWORD];
       }
+    }
+
+
+    async function getKnownRootsSearchWindow(searchString, maxSearchQty = STANDARD_SEARCH_QTY) {
+      const STANDARD_SEARCH_PAGE_SIZE = 25;
+      const messages = [];
+      let skip = 0;
+      while (skip < maxSearchQty) {
+        const remaining = maxSearchQty - skip;
+        const qty = Math.min(STANDARD_SEARCH_PAGE_SIZE, remaining);
+        const page = await getKnownRootsBySearchString(searchString, skip, qty);
+        const pageRows = asArray(page);
+        if (!pageRows.length) break;
+        messages.push(...pageRows);
+        skip += pageRows.length;
+        if (pageRows.length < qty) break;
+      }
+      return messages;
     }
 
     function batchItemsRoundRobin(perKeywordItems, batchSize = TRENDING_KEYWORD_BATCH_SIZE) {

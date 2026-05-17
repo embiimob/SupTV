@@ -13,8 +13,7 @@ It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qt
 It selects up to the top 20 search strings, pulls up to 200 records for each search in a single request, then builds the queue in round-robin batches of 5 videos per search string (cycling through all keywords until all results are exhausted, up to 500 total).
 Results are cached for the session so clicking the SupTV logo to return to trending replays instantly without re-fetching.
 Playback then starts immediately.
-Standard keyword searches fetch up to 200 results in a single request for better discovery.
-- `STANDARD_SEARCH_QTY` (default: `200`) → change this to adjust the standard keyword search fetch size
+Standard keyword searches page through up to 200 search records (25 per request) for better discovery and reliability.
 If the trending API is empty/unavailable, it falls back to `mp4` as the default.
 The search field starts empty; submitting your own query still runs a normal keyword search, while submitting empty keeps the trending-default behavior.
 Playback uses a larger queue for trending mode (up to 500 results) and advances until exhausted, then shows an off-air screen.
