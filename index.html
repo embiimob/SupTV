@@ -639,6 +639,7 @@
     const profileByUrnCache = new Map();
     let streamRetryCountByUrl = new Map();
     let activeStreamTimeoutId = null;
+    let loadSearchRequestId = 0;
     let swipeTugResetTimeoutId = null;
     let pseudoFullscreenActive = false;
     let trendingResultsCache = null;
@@ -1918,7 +1919,7 @@
       addMessage({
         title: 'Video skipped',
         meta: 'skip',
-        body: `Skipped "${current.title}" for this session`,
+        body: `Skipped "${current.title}" until the next search`,
         imageUrl: ''
       });
       if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
@@ -1950,9 +1951,11 @@
       }
     }
 
-    async function loadSearch(keyword) {
+    async function loadSearch(keyword, { resetSessionSkips = false } = {}) {
+      const requestId = ++loadSearchRequestId;
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
+      if (resetSessionSkips) trashedVideoUrls = new Set();
       // Clear the trending cache when the user performs an explicit keyword search so
       // returning to trending later re-fetches fresh results.
       if (!isTrendingDefault) {
@@ -1976,6 +1979,7 @@
         const result = isTrendingDefault
           ? await queryTrendingP2FK()
           : await queryP2FK(cleanedInput);
+        if (requestId !== loadSearchRequestId) return;
         if (isTrendingDefault && result?.displayKeyword) {
           displayKeyword = result.displayKeyword;
           currentKeyword = displayKeyword;
@@ -1995,6 +1999,7 @@
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
+        if (requestId !== loadSearchRequestId) return;
         searchResultTotal = 0;
         videoStatusByUrl = new Map();
         streamRetryCountByUrl = new Map();
@@ -2168,7 +2173,7 @@
 
       dom.searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        loadSearch(dom.query.value);
+        loadSearch(dom.query.value, { resetSessionSkips: true });
       });
 
       window.addEventListener('resize', () => measureTicker());
