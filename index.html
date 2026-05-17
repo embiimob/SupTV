@@ -99,6 +99,12 @@
       font-weight: 700;
       letter-spacing: .02em;
       white-space: nowrap;
+      background: none;
+      border: none;
+      color: inherit;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
     }
 
     .brand b { font-size: 1.15rem; }
@@ -509,7 +515,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <div class="brand"><b>SupTV</b><span>uncensored</span></div>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV</b><span>uncensored</span></button>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -553,6 +559,7 @@
       downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
+      brandBtn: document.getElementById('brandBtn'),
       app: document.getElementById('app'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
@@ -563,9 +570,12 @@
     const DEFAULT_KEYWORD = 'mp4';
     const MAX_PLAYLIST_ITEMS = 50;
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
-    const TRENDING_KEYWORD_LIMIT = 5;
+    const TRENDING_KEYWORD_LIMIT = 20;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
-    const TRENDING_SEARCH_QTY = 100;
+    const STANDARD_SEARCH_QTY = 200;
+    const TRENDING_SEARCH_QTY = 200;
+    const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
+    const TRENDING_KEYWORD_FETCH_CONCURRENCY = 4;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
@@ -590,7 +600,7 @@
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
-    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_SEARCH_QTY}`;
+    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_KEYWORD_LIMIT}`;
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -599,13 +609,13 @@
     ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
-    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+))?/i;
-    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s"']*)?)/i;
-    const IMAGE_URL_REGEX = /(https?:\/\/[^\s"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s"']*)?)/i;
+    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
+    const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
+    const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
     const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
-    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
     let scheduledMessageTimeouts = [];
@@ -629,8 +639,11 @@
     const profileByUrnCache = new Map();
     let streamRetryCountByUrl = new Map();
     let activeStreamTimeoutId = null;
+    let loadSearchRequestId = 0;
     let swipeTugResetTimeoutId = null;
     let pseudoFullscreenActive = false;
+    let trendingResultsCache = null;
+    let trendingBackgroundFetchId = 0;
     let tickerAnimationFrameId = null;
     let tickerLastFrameTs = 0;
     let tickerPositionPx = 0;
@@ -638,6 +651,15 @@
     let tickerAnimationReady = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+    const decodeHtmlEntities = (text) => {
+      if (typeof text !== 'string') return '';
+      return text
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#0?39;|&apos;/gi, "'")
+        .replace(/&amp;/gi, '&');
+    };
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
 
@@ -648,10 +670,15 @@
       dom.fullscreenBtn.setAttribute('aria-label', active ? 'Exit Full Screen' : 'Full Screen');
     }
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
+    const createDeferred = () => {
+      let resolve = () => {};
+      const promise = new Promise((res) => { resolve = res; });
+      return { promise, resolve };
+    };
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
-    const cleanDisplayText = (value) => normalize(value).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const cleanDisplayText = (value) => decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
       return Boolean(target.closest(INTERACTIVE_TOUCH_SELECTORS));
@@ -745,6 +772,7 @@
       let text = normalize(value);
       if (!text) return '';
       text = text.replace(URL_TRAILING_PUNCTUATION_REGEX, '');
+      text = text.replace(/(?:(?:&(?:amp;)?(?:gt|lt);?)|[<>])+$/gi, '');
       while (text.endsWith(')')) {
         const openCount = (text.match(/\(/g) || []).length;
         const closeCount = (text.match(/\)/g) || []).length;
@@ -961,8 +989,8 @@
 
     function normalizeRootMsg(root) {
       const raw = root?.Message ?? root?.message ?? root?.text;
-      if (Array.isArray(raw)) return raw.join('\n').trim();
-      return normalize(raw);
+      const joined = Array.isArray(raw) ? raw.join('\n').trim() : normalize(raw);
+      return decodeHtmlEntities(joined);
     }
 
     function rootFromAddress(root) {
@@ -1105,7 +1133,8 @@
 
           const directMatch = messageText.match(DIRECT_VIDEO_REGEX);
           if (directMatch) {
-            const directUrl = directMatch[1];
+            const directUrl = stripTrailingUrlPunctuation(directMatch[1]);
+            if (!directUrl) return null;
             if (seen.has(directUrl)) return null;
             seen.add(directUrl);
             const title = cleanDisplayText(normalize(root?.Subject) || normalize(root?.subject) || 'Direct stream');
@@ -1239,7 +1268,12 @@
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
         return `${marker} ${shortTitle(item.title, 28)} • ${statusForItem(item, idx).toUpperCase()}`;
       });
-      const summary = `FOUND ${searchResultTotal} • ACTIVE ${items.length} • ${keyword.toUpperCase()}`;
+      const probeWindow = items.slice(0, PRELOAD_COUNT + 1);
+      const probingCount = probeWindow.reduce((count, item, idx) => {
+        const status = statusForItem(item, idx);
+        return status === 'playing' || status === 'downloading' || status === 'ready' ? count + 1 : count;
+      }, 0);
+      const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
       dom.ticker.textContent = statusCards.length
         ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
@@ -1561,15 +1595,40 @@
       return asArray(payload);
     }
 
+    async function getKnownRootsBySearchStringWithTimeout(searchString, skip = 0, qty = 200, timeoutMs = TRENDING_KEYWORD_FETCH_TIMEOUT_MS) {
+      let timeoutId = null;
+      try {
+        return await Promise.race([
+          getKnownRootsBySearchString(searchString, skip, qty),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error(`search lookup timeout (${timeoutMs}ms)`)), timeoutMs);
+          })
+        ]);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    }
+
     async function getKeywordChannelMessages(keyword) {
       const address = await getPublicAddressByKeyword(keyword);
       return getPublicMessagesByAddress(address, 0, 200);
     }
 
+    async function fetchTrendingKeywordMessages(keyword) {
+      const [searchRaw, channelRaw] = await Promise.all([
+        getKnownRootsBySearchStringWithTimeout(keyword, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
+        Promise.race([
+          getKeywordChannelMessages(keyword),
+          new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
+        ]).catch(() => [])
+      ]);
+      return mergeUniqueMessagesByTxid(channelRaw, searchRaw);
+    }
+
     async function queryP2FK(keyword) {
       const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
         getKeywordChannelMessages(keyword),
-        getKnownRootsBySearchString(keyword, 0, 200)
+        getKnownRootsSearchWindow(keyword, STANDARD_SEARCH_QTY)
       ]);
       const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
       const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
@@ -1614,49 +1673,158 @@
       }
     }
 
+
+    async function getKnownRootsSearchWindow(searchString, maxSearchQty = STANDARD_SEARCH_QTY) {
+      const STANDARD_SEARCH_PAGE_SIZE = 25;
+      const messages = [];
+      let skip = 0;
+      while (skip < maxSearchQty) {
+        const remaining = maxSearchQty - skip;
+        const qty = Math.min(STANDARD_SEARCH_PAGE_SIZE, remaining);
+        const page = await getKnownRootsBySearchString(searchString, skip, qty);
+        const pageRows = asArray(page);
+        if (!pageRows.length) break;
+        messages.push(...pageRows);
+        skip += pageRows.length;
+        if (pageRows.length < qty) break;
+      }
+      return messages;
+    }
+
     function batchItemsRoundRobin(perKeywordItems, batchSize = TRENDING_KEYWORD_BATCH_SIZE) {
-      const orderedItems = [];
-      const seenKeys = new Set();
+      // Build the interleaved list WITHOUT cross-keyword dedup first.
+      // Taking batchSize items from each group per round guarantees each keyword's slot
+      // is filled even when keyword groups share content. A final dedup pass then removes
+      // duplicate items while preserving the first (correct round-robin) occurrence.
+      const interleavedItems = [];
       const maxGroupLength = perKeywordItems.reduce((max, group) => Math.max(max, group.length), 0);
       for (let offset = 0; offset < maxGroupLength; offset += batchSize) {
         for (const group of perKeywordItems) {
           const batch = group.slice(offset, offset + batchSize);
-          for (const item of batch) {
-            const dedupeKey = normalize(item.txid) || item.url;
-            if (!dedupeKey || seenKeys.has(dedupeKey)) continue;
-            seenKeys.add(dedupeKey);
-            orderedItems.push(item);
-          }
+          interleavedItems.push(...batch);
         }
       }
-      return orderedItems;
+      return dedupeItemsByTxid(interleavedItems);
     }
 
     async function queryTrendingP2FK() {
-      const keywords = await getTrendingKeywords();
-      const searchResults = await Promise.allSettled(
-        keywords.map((keyword) => getKnownRootsBySearchString(keyword, 0, TRENDING_SEARCH_QTY))
-      );
-      const keywordGroups = searchResults
-        .map((result) => (result.status === 'fulfilled' ? result.value : []));
-      const resultGroups = keywordGroups.filter((group) => group.length);
-      const messages = resultGroups.length ? mergeUniqueMessagesByTxid(...resultGroups) : [];
-      const addressLabels = await resolveAddressLabels(messages);
-      const perKeywordItems = keywordGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
-      const items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
-      if (!items.length) {
-        throw new Error('no playable videos in trending results');
+      if (trendingResultsCache) {
+        return trendingResultsCache;
       }
+
+      const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
+
+      // Start keyword fetches with bounded concurrency to avoid throttling p2fk.io bursts.
+      // Each fetch still combines keyword-channel + text-search sources.
+      // We resolve promises by keyword index so the progressive/final phases keep stable ordering.
+      const deferred = keywords.map(() => createDeferred());
+      const keywordFetches = deferred.map((d) => d.promise);
+      const maxConcurrentFetches = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
+      let nextKeywordIdx = 0;
+      const runKeywordWorker = async () => {
+        while (nextKeywordIdx < keywords.length) {
+          const idx = nextKeywordIdx++;
+          const raw = await fetchTrendingKeywordMessages(keywords[idx]).catch(() => []);
+          deferred[idx].resolve(raw);
+        }
+      };
+      // Fire workers in background; keywordFetches promises resolve as workers finish each index.
+      const keywordWorkers = Array.from({ length: maxConcurrentFetches }, runKeywordWorker);
+      keywordWorkers.forEach((workerPromise) => workerPromise.catch(() => {}));
+
+      const firstRaw = await keywordFetches[0];
+      const firstLabels = await resolveAddressLabels(firstRaw);
+      // Only queue the first TRENDING_KEYWORD_BATCH_SIZE items from kw1 so the progressive
+      // phase below can interleave other keywords' content before those finish playing.
+      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels)).slice(0, TRENDING_KEYWORD_BATCH_SIZE);
+
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
         : 'trending';
-      return {
-        items,
-        messages,
-        addressLabels,
-        keywords,
-        displayKeyword
-      };
+
+      // Publish the partial result immediately so the cache is warm for logo-clicks
+      // that arrive before the full background phase finishes.
+      const partialResult = { items: firstItems, messages: firstRaw, addressLabels: firstLabels, keywords, displayKeyword };
+      trendingResultsCache = partialResult;
+
+      const bgFetchId = ++trendingBackgroundFetchId;
+
+      // Progressive phase: as each keyword (kw2..kwN) resolves — they're already running
+      // in parallel with kw1 — immediately append its first TRENDING_KEYWORD_BATCH_SIZE items.
+      // Address labels are skipped here (cosmetic only) so there's zero extra network latency.
+      // This ensures the queue grows with mixed content well before all keywords finish.
+      keywordFetches.slice(1).forEach((fetchPromise) => {
+        fetchPromise.then((raw) => {
+          if (bgFetchId !== trendingBackgroundFetchId) return;
+          if (!raw.length) return;
+          // Parse without resolving address labels — labels are cosmetic (the "from" field)
+          // and would require extra network requests. The final phase resolves them properly.
+          const items = dedupeItemsByTxid(parseItems(raw, new Map()));
+          const batch = items.slice(0, TRENDING_KEYWORD_BATCH_SIZE);
+          if (!batch.length) return;
+          // Keep a canonical progressive result list so items discovered before loadSearch
+          // initializes playQueue are not lost when playQueue is assigned from result.items.
+          const cachedItems = partialResult.items;
+          const cachedUrls = new Set(cachedItems.map((i) => i.url));
+          const cacheHeadroom = TRENDING_MAX_PLAYLIST_ITEMS - cachedItems.length;
+          if (cacheHeadroom > 0) {
+            const toCache = batch.filter((i) => !cachedUrls.has(i.url)).slice(0, cacheHeadroom);
+            if (toCache.length) cachedItems.push(...toCache);
+          }
+
+          const existingQueueUrls = new Set(playQueue.map((i) => i.url));
+          const toAdd = batch.filter((i) => !existingQueueUrls.has(i.url));
+          const headroom = TRENDING_MAX_PLAYLIST_ITEMS - playQueue.length;
+          const wasEmpty = !playQueue.length;
+          if (toAdd.length && headroom > 0) {
+            playQueue.push(...toAdd.slice(0, headroom));
+            searchResultTotal = Math.max(searchResultTotal, partialResult.items.length, playQueue.length);
+            updateTicker(playQueue, currentKeyword);
+          }
+          if (wasEmpty && playQueue.length) playCurrent();
+        }).catch(() => {});
+      });
+
+      // Final phase: once ALL keyword fetches finish, rebuild the complete round-robin queue
+      // with properly resolved address labels and replace the pending queue tail so the
+      // viewer cycles through all keywords TRENDING_KEYWORD_BATCH_SIZE videos at a time.
+      Promise.allSettled(keywordFetches).then(async (settled) => {
+        if (bgFetchId !== trendingBackgroundFetchId) return; // superseded or cancelled by explicit search
+        const allGroups = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
+        const nonEmptyGroups = allGroups.filter((g) => g.length);
+        if (!nonEmptyGroups.length) return;
+
+        const allMessages = mergeUniqueMessagesByTxid(...nonEmptyGroups);
+        const allLabels = await resolveAddressLabels(allMessages);
+        if (bgFetchId !== trendingBackgroundFetchId) return;
+
+        const perKeywordItems = allGroups.map((group) => dedupeItemsByTxid(parseItems(group, allLabels)));
+        let allItems = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+        if (!allItems.length) allItems = firstItems;
+
+        // Reorder the active playQueue to use the full round-robin sequence.
+        // Keep playQueue[0] (currently playing) in place; replace the pending tail so
+        // the viewer sees TRENDING_KEYWORD_BATCH_SIZE videos per keyword before switching.
+        const current = playQueue[0];
+        const currentUrl = current?.url;
+        const wasEmpty = !current;
+
+        // Rotate allItems to start just after the currently-playing entry so playback
+        // continues naturally through the round-robin sequence.
+        const currentIdxInAll = allItems.findIndex((i) => i.url === currentUrl);
+        const startOffset = currentIdxInAll >= 0 ? currentIdxInAll + 1 : 0;
+        const rotated = [...allItems.slice(startOffset), ...allItems.slice(0, startOffset)]
+          .filter((i) => i.url !== currentUrl);
+        const maxTail = TRENDING_MAX_PLAYLIST_ITEMS - (current ? 1 : 0);
+        playQueue = current ? [current, ...rotated.slice(0, maxTail)] : rotated.slice(0, TRENDING_MAX_PLAYLIST_ITEMS);
+        searchResultTotal = playQueue.length;
+        updateTicker(playQueue, currentKeyword);
+        if (wasEmpty && playQueue.length) playCurrent();
+
+        trendingResultsCache = { items: allItems, messages: allMessages, addressLabels: allLabels, keywords, displayKeyword };
+      }).catch(() => {}); // Background errors don't affect already-running playback
+
+      return partialResult;
     }
 
     function playCurrent() {
@@ -1751,7 +1919,7 @@
       addMessage({
         title: 'Video skipped',
         meta: 'skip',
-        body: `Skipped "${current.title}" for this session`,
+        body: `Skipped "${current.title}" until you submit another keyword search`,
         imageUrl: ''
       });
       if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
@@ -1783,9 +1951,17 @@
       }
     }
 
-    async function loadSearch(keyword) {
+    async function loadSearch(keyword, { resetSessionSkips = false } = {}) {
+      const requestId = ++loadSearchRequestId;
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
+      if (resetSessionSkips) trashedVideoUrls = new Set();
+      // Clear the trending cache when the user performs an explicit keyword search so
+      // returning to trending later re-fetches fresh results.
+      if (!isTrendingDefault) {
+        trendingResultsCache = null;
+        trendingBackgroundFetchId++; // cancel any in-progress trending background fetch
+      }
       let displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
       currentKeyword = displayKeyword;
       clearScheduledMessages();
@@ -1803,6 +1979,7 @@
         const result = isTrendingDefault
           ? await queryTrendingP2FK()
           : await queryP2FK(cleanedInput);
+        if (requestId !== loadSearchRequestId) return;
         if (isTrendingDefault && result?.displayKeyword) {
           displayKeyword = result.displayKeyword;
           currentKeyword = displayKeyword;
@@ -1822,6 +1999,7 @@
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
         playCurrent();
       } catch (error) {
+        if (requestId !== loadSearchRequestId) return;
         searchResultTotal = 0;
         videoStatusByUrl = new Map();
         streamRetryCountByUrl = new Map();
@@ -1995,7 +2173,7 @@
 
       dom.searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        loadSearch(dom.query.value);
+        loadSearch(dom.query.value, { resetSessionSkips: true });
       });
 
       window.addEventListener('resize', () => measureTicker());
@@ -2004,6 +2182,10 @@
       dom.downloadBtn.addEventListener('click', downloadIndexHtml);
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
+      dom.brandBtn.addEventListener('click', () => {
+        dom.query.value = '';
+        loadSearch('');
+      });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
