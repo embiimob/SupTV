@@ -1684,9 +1684,10 @@
 
       const firstRaw = await keywordFetches[0];
       const firstLabels = await resolveAddressLabels(firstRaw);
-      // Limit the fast-start batch to TRENDING_KEYWORD_BATCH_SIZE so we don't play 200 videos
-      // from a single keyword before the background phase adds content from other keywords.
-      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels)).slice(0, TRENDING_KEYWORD_BATCH_SIZE);
+      // Keep all of the first keyword's items so the initial queue is large enough to cover
+      // the time the background phase needs to fetch all other keywords.  The background phase
+      // will reorder the pending queue into proper round-robin order when it finishes.
+      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels));
 
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
@@ -1714,16 +1715,24 @@
         let allItems = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
         if (!allItems.length) allItems = firstItems;
 
-        // Extend the active playQueue with items not yet queued (preserves play position).
-        const existingUrls = new Set(playQueue.map((i) => i.url));
-        const newItems = allItems.filter((i) => !existingUrls.has(i.url));
-        const headroom = TRENDING_MAX_PLAYLIST_ITEMS - playQueue.length;
-        const wasEmpty = !playQueue.length;
-        if (newItems.length && headroom > 0) {
-          playQueue.push(...newItems.slice(0, headroom));
-          searchResultTotal = playQueue.length;
-          updateTicker(playQueue, currentKeyword);
-        }
+        // Reorder the active playQueue to use the full round-robin sequence.
+        // Keep playQueue[0] (currently playing) in place; replace the pending tail so
+        // the viewer sees TRENDING_KEYWORD_BATCH_SIZE videos per keyword before switching,
+        // rather than exhausting one keyword's results before moving on.
+        const current = playQueue[0];
+        const currentUrl = current?.url;
+        const wasEmpty = !current;
+
+        // Rotate allItems to start just after the currently-playing entry so playback
+        // continues naturally through the round-robin sequence.
+        const currentIdxInAll = allItems.findIndex((i) => i.url === currentUrl);
+        const startOffset = currentIdxInAll >= 0 ? currentIdxInAll + 1 : 0;
+        const rotated = [...allItems.slice(startOffset), ...allItems.slice(0, startOffset)]
+          .filter((i) => i.url !== currentUrl);
+        const maxTail = TRENDING_MAX_PLAYLIST_ITEMS - (current ? 1 : 0);
+        playQueue = current ? [current, ...rotated.slice(0, maxTail)] : rotated.slice(0, TRENDING_MAX_PLAYLIST_ITEMS);
+        searchResultTotal = playQueue.length;
+        updateTicker(playQueue, currentKeyword);
         // Edge case: if the first keyword returned no items, playback stalled at off-air.
         // Restart it now that the background fetch has found playable content.
         if (wasEmpty && playQueue.length) playCurrent();
