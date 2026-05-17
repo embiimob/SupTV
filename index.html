@@ -1698,7 +1698,10 @@
       const keywordFetches = keywords.map((kw) =>
         Promise.all([
           getKnownRootsBySearchStringWithTimeout(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
-          getKeywordChannelMessages(kw).catch(() => [])
+          Promise.race([
+            getKeywordChannelMessages(kw),
+            new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
+          ]).catch(() => [])
         ]).then(([searchRaw, channelRaw]) => mergeUniqueMessagesByTxid(channelRaw, searchRaw))
       );
 
