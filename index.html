@@ -669,6 +669,11 @@
       dom.fullscreenBtn.setAttribute('aria-label', active ? 'Exit Full Screen' : 'Full Screen');
     }
     const stripPathParts = (value) => normalize(value).split(/[\\/]/).pop() || '';
+    const createDeferred = () => {
+      let resolve = () => {};
+      const promise = new Promise((res) => { resolve = res; });
+      return { promise, resolve };
+    };
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
@@ -1711,13 +1716,9 @@
       // Start keyword fetches with bounded concurrency to avoid throttling p2fk.io bursts.
       // Each fetch still combines keyword-channel + text-search sources.
       // We resolve promises by keyword index so the progressive/final phases keep stable ordering.
-      const deferred = keywords.map(() => {
-        let resolve = () => {};
-        const promise = new Promise((res) => { resolve = res; });
-        return { promise, resolve };
-      });
+      const deferred = keywords.map(() => createDeferred());
       const keywordFetches = deferred.map((d) => d.promise);
-      const maxConcurrent = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
+      const maxConcurrentFetches = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
       let nextKeywordIdx = 0;
       const runKeywordWorker = async () => {
         while (nextKeywordIdx < keywords.length) {
@@ -1726,7 +1727,9 @@
           deferred[idx].resolve(raw);
         }
       };
-      Array.from({ length: maxConcurrent }, runKeywordWorker);
+      // Fire workers in background; keywordFetches promises resolve as workers finish each index.
+      const keywordWorkers = Array.from({ length: maxConcurrentFetches }, runKeywordWorker);
+      keywordWorkers.forEach((workerPromise) => workerPromise.catch(() => {}));
 
       const firstRaw = await keywordFetches[0];
       const firstLabels = await resolveAddressLabels(firstRaw);
