@@ -1712,13 +1712,23 @@
           const items = dedupeItemsByTxid(parseItems(raw, new Map()));
           const batch = items.slice(0, TRENDING_KEYWORD_BATCH_SIZE);
           if (!batch.length) return;
-          const existingUrls = new Set(playQueue.map((i) => i.url));
-          const toAdd = batch.filter((i) => !existingUrls.has(i.url));
+          // Keep a canonical progressive result list so items discovered before loadSearch
+          // initializes playQueue are not lost when playQueue is assigned from result.items.
+          const cachedItems = partialResult.items;
+          const cachedUrls = new Set(cachedItems.map((i) => i.url));
+          const cacheHeadroom = TRENDING_MAX_PLAYLIST_ITEMS - cachedItems.length;
+          if (cacheHeadroom > 0) {
+            const toCache = batch.filter((i) => !cachedUrls.has(i.url)).slice(0, cacheHeadroom);
+            if (toCache.length) cachedItems.push(...toCache);
+          }
+
+          const existingQueueUrls = new Set(playQueue.map((i) => i.url));
+          const toAdd = batch.filter((i) => !existingQueueUrls.has(i.url));
           const headroom = TRENDING_MAX_PLAYLIST_ITEMS - playQueue.length;
           const wasEmpty = !playQueue.length;
           if (toAdd.length && headroom > 0) {
             playQueue.push(...toAdd.slice(0, headroom));
-            searchResultTotal = playQueue.length;
+            searchResultTotal = Math.max(searchResultTotal, partialResult.items.length, playQueue.length);
             updateTicker(playQueue, currentKeyword);
           }
           if (wasEmpty && playQueue.length) playCurrent();
