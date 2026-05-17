@@ -1692,9 +1692,14 @@
       const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
 
       // Start ALL keyword fetches in parallel immediately so they run concurrently.
+      // Each fetch combines the keyword's P2FK channel messages (primary source of video posts)
+      // with a general keyword text search, mirroring what queryP2FK does for standard search.
       // We await only the first one here so playback can begin without waiting for all 20.
       const keywordFetches = keywords.map((kw) =>
-        getKnownRootsBySearchStringWithTimeout(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => [])
+        Promise.all([
+          getKnownRootsBySearchStringWithTimeout(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
+          getKeywordChannelMessages(kw).catch(() => [])
+        ]).then(([searchRaw, channelRaw]) => mergeUniqueMessagesByTxid(channelRaw, searchRaw))
       );
 
       const firstRaw = await keywordFetches[0];
