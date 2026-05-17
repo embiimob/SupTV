@@ -10,7 +10,7 @@ Play the most recent Sup!? video by search string.
 
 Open `index.html` from the repository root in a browser to launch the fullscreen-capable SupTV player.
 It auto-loads trending searches from `https://p2fk.io/GetTrendingRootSearches?qty=20` (where `20` matches `TRENDING_KEYWORD_LIMIT` in `index.html`).
-It selects up to the top 20 search strings, kicks off all 20 keyword fetches in parallel, and starts playing as soon as the **first** keyword's results are ready (fast-start). The remaining keyword results are merged into the play queue in the background using round-robin batches of 5 videos per search string (cycling through all keywords until all results are exhausted, up to 500 total).
+It selects up to the top 20 search strings, starts bounded-concurrency keyword fetches (default: 4 in flight), and starts playing as soon as the **first** keyword's results are ready (fast-start). The remaining keyword results are merged into the play queue in the background using round-robin batches of 5 videos per search string (cycling through all keywords until all results are exhausted, up to 500 total).
 Results are cached for the session so clicking the SupTV logo to return to trending replays instantly without re-fetching.
 Playback then starts immediately.
 Standard keyword searches page through up to 200 search records (25 per request) for better discovery and reliability.

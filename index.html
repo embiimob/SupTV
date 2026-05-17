@@ -575,6 +575,7 @@
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
     const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
+    const TRENDING_KEYWORD_FETCH_CONCURRENCY = 4;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
@@ -1261,7 +1262,12 @@
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
         return `${marker} ${shortTitle(item.title, 28)} • ${statusForItem(item, idx).toUpperCase()}`;
       });
-      const summary = `FOUND ${searchResultTotal} • ACTIVE ${items.length} • ${keyword.toUpperCase()}`;
+      const probeWindow = items.slice(0, PRELOAD_COUNT + 1);
+      const probingCount = probeWindow.reduce((count, item, idx) => {
+        const status = statusForItem(item, idx);
+        return status === 'playing' || status === 'downloading' || status === 'ready' ? count + 1 : count;
+      }, 0);
+      const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
       dom.ticker.textContent = statusCards.length
         ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
         : `${tickerLabel(keyword)}${summary} • No matching videos`;
@@ -1602,6 +1608,17 @@
       return getPublicMessagesByAddress(address, 0, 200);
     }
 
+    async function fetchTrendingKeywordMessages(keyword) {
+      const [searchRaw, channelRaw] = await Promise.all([
+        getKnownRootsBySearchStringWithTimeout(keyword, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
+        Promise.race([
+          getKeywordChannelMessages(keyword),
+          new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
+        ]).catch(() => [])
+      ]);
+      return mergeUniqueMessagesByTxid(channelRaw, searchRaw);
+    }
+
     async function queryP2FK(keyword) {
       const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
         getKeywordChannelMessages(keyword),
@@ -1691,19 +1708,25 @@
 
       const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
 
-      // Start ALL keyword fetches in parallel immediately so they run concurrently.
-      // Each fetch combines the keyword's P2FK channel messages (primary source of video posts)
-      // with a general keyword text search, mirroring what queryP2FK does for standard search.
-      // We await only the first one here so playback can begin without waiting for all 20.
-      const keywordFetches = keywords.map((kw) =>
-        Promise.all([
-          getKnownRootsBySearchStringWithTimeout(kw, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
-          Promise.race([
-            getKeywordChannelMessages(kw),
-            new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
-          ]).catch(() => [])
-        ]).then(([searchRaw, channelRaw]) => mergeUniqueMessagesByTxid(channelRaw, searchRaw))
-      );
+      // Start keyword fetches with bounded concurrency to avoid throttling p2fk.io bursts.
+      // Each fetch still combines keyword-channel + text-search sources.
+      // We resolve promises by keyword index so the progressive/final phases keep stable ordering.
+      const deferred = keywords.map(() => {
+        let resolve = () => {};
+        const promise = new Promise((res) => { resolve = res; });
+        return { promise, resolve };
+      });
+      const keywordFetches = deferred.map((d) => d.promise);
+      const maxConcurrent = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
+      let nextKeywordIdx = 0;
+      const runKeywordWorker = async () => {
+        while (nextKeywordIdx < keywords.length) {
+          const idx = nextKeywordIdx++;
+          const raw = await fetchTrendingKeywordMessages(keywords[idx]).catch(() => []);
+          deferred[idx].resolve(raw);
+        }
+      };
+      Array.from({ length: maxConcurrent }, runKeywordWorker);
 
       const firstRaw = await keywordFetches[0];
       const firstLabels = await resolveAddressLabels(firstRaw);
