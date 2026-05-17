@@ -1684,7 +1684,9 @@
 
       const firstRaw = await keywordFetches[0];
       const firstLabels = await resolveAddressLabels(firstRaw);
-      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels));
+      // Limit the fast-start batch to TRENDING_KEYWORD_BATCH_SIZE so we don't play 200 videos
+      // from a single keyword before the background phase adds content from other keywords.
+      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels)).slice(0, TRENDING_KEYWORD_BATCH_SIZE);
 
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
