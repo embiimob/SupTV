@@ -448,6 +448,12 @@
       transition: opacity .25s ease;
       z-index: 7;
       cursor: pointer;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+      width: 100%;
+      text-align: left;
+      padding: 0;
     }
 
     #ticker {
@@ -712,7 +718,7 @@
     </section>
 
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
-    <div class="ticker-wrap" id="tickerWrap" role="button" tabindex="0" aria-expanded="false" aria-label="Show queued videos and trending searches"><div id="ticker"></div></div>
+    <button type="button" class="ticker-wrap" id="tickerWrap" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
 
   <script>
@@ -1469,7 +1475,7 @@
       }, 0);
       const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
       const trendingText = normalize(keyword).toLowerCase() === 'trending' && trendingStatsRows.length
-        ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${row.term} (${formatMetricCount(row.views)} views)`).join(' • ')}`
+        ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${cleanDisplayText(row?.term || '') || 'unknown'} (${formatMetricCount(row?.views)} views)`).join(' • ')}`
         : '';
       dom.ticker.textContent = statusCards.length
         ? `${tickerLabel(keyword)}${summary}${trendingText ? `${TICKER_SECTION_SEPARATOR}${trendingText}` : ''}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
@@ -1495,7 +1501,7 @@
         dom.bannerQueueEmpty.style.display = 'none';
         visibleItems.forEach((item, idx) => {
           const li = document.createElement('li');
-          li.textContent = cleanDisplayText(item?.title || `Queued video ${idx + 1}`);
+          li.textContent = cleanDisplayText(item?.title || 'Queued video');
           const meta = document.createElement('span');
           meta.className = 'banner-queue-item-meta';
           meta.textContent = `#${idx + 1} • ${statusForItem(item, idx).toUpperCase()}`;
@@ -2504,7 +2510,6 @@
       document.addEventListener('click', (event) => {
         if (!bannerMenuOpen) return;
         const target = event.target;
-        if (!(target instanceof Node)) return;
         if (dom.bannerMenu.contains(target) || dom.tickerWrap.contains(target)) return;
         closeBannerMenu();
       });
