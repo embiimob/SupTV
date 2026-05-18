@@ -384,6 +384,7 @@
 
     .hidden-ui .topbar,
     .hidden-ui .ticker-wrap,
+    .hidden-ui .banner-menu,
     .hidden-ui .status,
     .hidden-ui .side-feed,
     .hidden-ui .waiting-overlay {
@@ -440,21 +441,32 @@
       right: 0;
       bottom: 0;
       height: 3rem;
+      display: block;
       border-top: 1px solid rgba(131, 152, 206, .3);
       background: rgba(4, 8, 20, .85);
       overflow: hidden;
-      pointer-events: none;
+      pointer-events: auto;
       transition: opacity .25s ease;
       z-index: 7;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      text-align: left;
+      padding: 0;
+      appearance: none;
+      -webkit-appearance: none;
     }
 
     #ticker {
       position: absolute;
+      top: 0;
       left: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
       white-space: nowrap;
       padding-left: 1.5rem;
       padding-right: 5rem;
-      line-height: 3rem;
       color: #dbebff;
       font-weight: 600;
       font-size: 1rem;
@@ -462,6 +474,142 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
       transform: translate3d(100%, 0, 0);
       will-change: transform;
+      pointer-events: none;
+    }
+
+    .banner-menu {
+      position: absolute;
+      left: 1rem;
+      right: 1rem;
+      bottom: 3.4rem;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate3d(0, 14px, 0);
+      transition: opacity .22s ease, transform .22s ease;
+      z-index: 9;
+    }
+
+    .banner-menu.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .banner-menu-panel {
+      border: 1px solid rgba(122, 149, 216, .35);
+      border-radius: .82rem;
+      background: rgba(8, 14, 28, .94);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, .44);
+      overflow: hidden;
+      max-height: min(62vh, 560px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .banner-menu-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: .8rem;
+      padding: .8rem;
+      min-height: 0;
+    }
+
+    .banner-menu-section {
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .68rem;
+      background: rgba(9, 14, 27, .72);
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .banner-menu-section h3 {
+      margin: 0;
+      padding: .62rem .68rem .55rem;
+      font-size: .8rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #c9ddff;
+      border-bottom: 1px solid rgba(122, 149, 216, .18);
+    }
+
+    .banner-queue-list {
+      margin: 0;
+      padding: .5rem .9rem .72rem 1.7rem;
+      overflow-y: auto;
+      list-style: decimal;
+      display: grid;
+      gap: .34rem;
+      min-height: 0;
+      scrollbar-width: thin;
+    }
+
+    .banner-queue-list li {
+      font-size: .78rem;
+      color: #dcebff;
+      line-height: 1.26;
+      overflow-wrap: anywhere;
+    }
+
+    .banner-queue-item-meta {
+      display: block;
+      margin-top: .1rem;
+      font-size: .67rem;
+      color: #aac5ee;
+      opacity: .9;
+    }
+
+    .banner-menu-empty {
+      margin: 0;
+      padding: .72rem .8rem;
+      font-size: .75rem;
+      color: #b8ccef;
+    }
+
+    .banner-menu-footer {
+      border-top: 1px solid rgba(122, 149, 216, .18);
+      padding: .55rem .65rem .62rem;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .banner-more-btn {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #cfe6ff;
+      border-radius: 999px;
+      padding: .2rem .66rem;
+      font-size: .73rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .banner-trending-list {
+      padding: .56rem .62rem .66rem;
+      overflow-y: auto;
+      display: grid;
+      gap: .34rem;
+      min-height: 0;
+      scrollbar-width: thin;
+    }
+
+    .banner-trending-btn {
+      border: 1px solid rgba(128, 163, 234, .35);
+      background: rgba(10, 18, 36, .82);
+      color: #d7e9ff;
+      border-radius: .62rem;
+      padding: .44rem .5rem;
+      font-size: .74rem;
+      text-align: left;
+      cursor: pointer;
+      line-height: 1.24;
+    }
+
+    .banner-trending-btn strong {
+      display: block;
+      font-size: .78rem;
+      margin-bottom: .08rem;
     }
 
     @media (max-width: 920px) {
@@ -469,6 +617,16 @@
       .controls { width: min(72vw, 560px); }
       .brand span { display: none; }
       .waiting-overlay { right: .65rem; bottom: 3.25rem; }
+      .banner-menu {
+        left: .65rem;
+        right: .65rem;
+      }
+      .banner-menu-grid {
+        grid-template-columns: 1fr;
+      }
+      .banner-menu-panel {
+        max-height: min(68vh, 600px);
+      }
     }
 
     @media (max-width: 640px) {
@@ -543,8 +701,28 @@
       </div>
     </section>
 
+    <section class="banner-menu" id="bannerMenu" aria-hidden="true">
+      <div class="banner-menu-panel" role="dialog" aria-label="Queue and trending searches">
+        <div class="banner-menu-grid">
+          <section class="banner-menu-section">
+            <h3>Queue</h3>
+            <ol class="banner-queue-list" id="bannerQueueList"></ol>
+            <p class="banner-menu-empty" id="bannerQueueEmpty">No queued videos right now.</p>
+            <div class="banner-menu-footer">
+              <button type="button" class="banner-more-btn" id="bannerQueueMoreBtn">Show 20 more</button>
+            </div>
+          </section>
+          <section class="banner-menu-section">
+            <h3>Top Trending Searches</h3>
+            <div class="banner-trending-list" id="bannerTrendingList"></div>
+            <p class="banner-menu-empty" id="bannerTrendingEmpty"></p>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
-    <div class="ticker-wrap"><div id="ticker"></div></div>
+    <button type="button" class="ticker-wrap" id="tickerWrap" aria-controls="bannerMenu" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
 
   <script>
@@ -561,6 +739,13 @@
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       brandBtn: document.getElementById('brandBtn'),
       app: document.getElementById('app'),
+      tickerWrap: document.getElementById('tickerWrap'),
+      bannerMenu: document.getElementById('bannerMenu'),
+      bannerQueueList: document.getElementById('bannerQueueList'),
+      bannerQueueEmpty: document.getElementById('bannerQueueEmpty'),
+      bannerQueueMoreBtn: document.getElementById('bannerQueueMoreBtn'),
+      bannerTrendingList: document.getElementById('bannerTrendingList'),
+      bannerTrendingEmpty: document.getElementById('bannerTrendingEmpty'),
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
       waitingText: document.getElementById('waitingText'),
@@ -572,6 +757,14 @@
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
     const TRENDING_KEYWORD_LIMIT = 20;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
+    const TRENDING_DEFAULT_FALLBACK_BATCH_SIZE = 20;
+    const TRENDING_LOOP_REFILL_THRESHOLD = 6;
+    const BANNER_QUEUE_PAGE_SIZE = 20;
+    const BANNER_TOP_TRENDING_SIZE = TRENDING_KEYWORD_LIMIT;
+    const TICKER_TRENDING_STATS_SIZE = 5;
+    const TRENDING_EMPTY_MESSAGE = 'Nothing is currently trending.';
+    const TRENDING_VIEW_METRIC_KEYS = ['lastResultCount', 'averageResultCount', 'maxResultCount', 'viewTotal', 'views', 'totalViews', 'viewCount', 'LastResultCount', 'AverageResultCount', 'MaxResultCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount'];
+    const TRENDING_SEARCH_METRIC_KEYS = ['successfulSearchCount', 'searchTotal', 'searchCount', 'count', 'total', 'SuccessfulSearchCount', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
     const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
@@ -625,6 +818,7 @@
     let playQueue = [];
     let currentEntry = null;
     let searchResultTotal = 0;
+    let isTrendingStationMode = false;
     let streamCardPool = [];
     let socialTimeline = [];
     let shownSocialCardKeys = new Set();
@@ -644,11 +838,16 @@
     let pseudoFullscreenActive = false;
     let trendingResultsCache = null;
     let trendingBackgroundFetchId = 0;
+    let activeTrendingBuildPromise = Promise.resolve();
+    let trendingLoopRefillPromise = null;
     let tickerAnimationFrameId = null;
     let tickerLastFrameTs = 0;
     let tickerPositionPx = 0;
     let tickerContentWidthPx = 0;
     let tickerAnimationReady = false;
+    let trendingStatsRows = [];
+    let bannerMenuOpen = false;
+    let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -679,6 +878,19 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value) => decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
+    const parseMetricNumber = (value) => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const parsed = Number(value.replace(/[,\s]/g, ''));
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return Number.NaN;
+    };
+    const formatMetricCount = (value) => {
+      if (!Number.isFinite(value) || value < 0) return '0';
+      return Math.round(value).toLocaleString('en-US');
+    };
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
       return Boolean(target.closest(INTERACTIVE_TOUCH_SELECTORS));
@@ -1274,11 +1486,109 @@
         return status === 'playing' || status === 'downloading' || status === 'ready' ? count + 1 : count;
       }, 0);
       const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
+      const trendingText = normalize(keyword).toLowerCase() === 'trending' && trendingStatsRows.length
+        ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${cleanDisplayText(row?.term || '') || 'unknown'} (${formatMetricCount(row?.views)} views)`).join(' • ')}`
+        : '';
       dom.ticker.textContent = statusCards.length
-        ? `${tickerLabel(keyword)}${summary}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
-        : `${tickerLabel(keyword)}${summary} • No matching videos`;
+        ? `${tickerLabel(keyword)}${summary}${trendingText ? `${TICKER_SECTION_SEPARATOR}${trendingText}` : ''}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
+        : `${tickerLabel(keyword)}${summary}${trendingText ? `${TICKER_SECTION_SEPARATOR}${trendingText}` : ''} • No matching videos`;
       measureTicker();
       ensureTickerAnimation();
+      renderBannerQueue();
+    }
+
+    function closeBannerMenu() {
+      bannerMenuOpen = false;
+      dom.bannerMenu.classList.remove('visible');
+      dom.bannerMenu.setAttribute('aria-hidden', 'true');
+      dom.tickerWrap.setAttribute('aria-expanded', 'false');
+      dom.tickerWrap.setAttribute('aria-label', 'Show queued videos and trending searches');
+      document.removeEventListener('click', onDocumentClickCloseBanner);
+    }
+
+    function renderBannerQueue() {
+      const visibleItems = playQueue.slice(0, bannerQueueVisibleCount);
+      dom.bannerQueueList.replaceChildren();
+      if (!visibleItems.length) {
+        dom.bannerQueueEmpty.style.display = '';
+      } else {
+        dom.bannerQueueEmpty.style.display = 'none';
+        visibleItems.forEach((item, queueIndex) => {
+          const li = document.createElement('li');
+          li.textContent = cleanDisplayText(item?.title || 'Queued video');
+          const meta = document.createElement('span');
+          meta.className = 'banner-queue-item-meta';
+          meta.textContent = `#${queueIndex + 1} • ${statusForItem(item, queueIndex).toUpperCase()}`;
+          li.appendChild(meta);
+          dom.bannerQueueList.appendChild(li);
+        });
+      }
+      const remaining = Math.max(0, playQueue.length - bannerQueueVisibleCount);
+      if (remaining > 0) {
+        dom.bannerQueueMoreBtn.style.display = '';
+        dom.bannerQueueMoreBtn.textContent = `Show ${Math.min(BANNER_QUEUE_PAGE_SIZE, remaining)} more`;
+      } else {
+        dom.bannerQueueMoreBtn.style.display = 'none';
+      }
+    }
+
+    function renderBannerTrendingSearches() {
+      dom.bannerTrendingList.replaceChildren();
+      const topRows = trendingStatsRows.slice(0, BANNER_TOP_TRENDING_SIZE);
+      if (!topRows.length) {
+        dom.bannerTrendingEmpty.textContent = TRENDING_EMPTY_MESSAGE;
+        dom.bannerTrendingEmpty.style.display = '';
+        return;
+      }
+      dom.bannerTrendingEmpty.style.display = 'none';
+      topRows.forEach((row, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'banner-trending-btn';
+        const term = cleanDisplayText(row.term);
+        const title = document.createElement('strong');
+        title.textContent = `${idx + 1}. ${term}`;
+        const statsText = document.createTextNode(`${formatMetricCount(row.searches)} searches • ${formatMetricCount(row.views)} views`);
+        btn.appendChild(title);
+        btn.appendChild(statsText);
+        btn.addEventListener('click', () => {
+          runSearch(term, { resetSessionSkips: true, setInput: true });
+        });
+        dom.bannerTrendingList.appendChild(btn);
+      });
+    }
+
+    function openBannerMenu() {
+      bannerMenuOpen = true;
+      bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
+      renderBannerQueue();
+      renderBannerTrendingSearches();
+      dom.bannerMenu.classList.add('visible');
+      dom.bannerMenu.setAttribute('aria-hidden', 'false');
+      dom.tickerWrap.setAttribute('aria-expanded', 'true');
+      dom.tickerWrap.setAttribute('aria-label', 'Hide queued videos and trending searches');
+      document.addEventListener('click', onDocumentClickCloseBanner);
+    }
+
+    function toggleBannerMenu() {
+      if (bannerMenuOpen) closeBannerMenu();
+      else openBannerMenu();
+    }
+
+    function runSearch(keyword, { resetSessionSkips = true, setInput = true } = {}) {
+      // Keep resetSessionSkips true by default so direct user-triggered searches
+      // match existing explicit-search behavior and clear session skip state.
+      const searchKeyword = normalize(keyword);
+      if (setInput) dom.query.value = searchKeyword;
+      closeBannerMenu();
+      loadSearch(searchKeyword, { resetSessionSkips });
+    }
+
+    function onDocumentClickCloseBanner(event) {
+      if (!bannerMenuOpen) return;
+      const target = event.target;
+      if (dom.bannerMenu.contains(target) || dom.tickerWrap.contains(target)) return;
+      closeBannerMenu();
     }
 
     function syncAudioUi() {
@@ -1654,21 +1964,48 @@
     async function getTrendingKeywords(limit = TRENDING_KEYWORD_LIMIT) {
       try {
         const response = await fetch(TRENDING_SEARCHES_ENDPOINT, { cache: 'no-store' });
-        if (!response.ok) return [DEFAULT_KEYWORD];
+        if (!response.ok) {
+          trendingStatsRows = [];
+          renderBannerTrendingSearches();
+          return [DEFAULT_KEYWORD];
+        }
         const payload = await response.json();
         const rows = asArray(payload);
         const unique = [];
         const seen = new Set();
+        const statsByKeyword = new Map();
+        const readMetric = (row, keys) => {
+          for (const key of keys) {
+            const raw = row?.[key];
+            const value = parseMetricNumber(raw);
+            if (Number.isFinite(value)) return value;
+          }
+          return Number.NaN;
+        };
         for (const row of rows) {
           const candidate = extractSearchString(row);
-          if (!candidate || seen.has(candidate)) continue;
-          seen.add(candidate);
+          const candidateKey = normalizeKeywordKey(candidate);
+          if (!candidate || seen.has(candidateKey)) continue;
+          seen.add(candidateKey);
           unique.push(candidate);
+          const views = readMetric(row, TRENDING_VIEW_METRIC_KEYS);
+          const searches = readMetric(row, TRENDING_SEARCH_METRIC_KEYS);
+          statsByKeyword.set(candidateKey, {
+            term: cleanDisplayText(candidate),
+            views: Number.isFinite(views) ? views : 0,
+            searches: Number.isFinite(searches) ? searches : 0
+          });
         }
+        trendingStatsRows = unique
+          .map((term) => statsByKeyword.get(normalizeKeywordKey(term)))
+          .filter(Boolean);
+        renderBannerTrendingSearches();
         if (!unique.length) return [DEFAULT_KEYWORD];
         return unique.slice(0, limit);
       } catch (error) {
         console.warn('Unable to load trending searches; falling back to default keyword', error);
+        trendingStatsRows = [];
+        renderBannerTrendingSearches();
         return [DEFAULT_KEYWORD];
       }
     }
@@ -1705,6 +2042,95 @@
         }
       }
       return dedupeItemsByTxid(interleavedItems);
+    }
+
+    function appendUniqueItemsToQueue(items, maxItems = TRENDING_MAX_PLAYLIST_ITEMS) {
+      const existingQueueUrls = new Set(playQueue.map((item) => item.url));
+      const headroom = maxItems - playQueue.length;
+      if (headroom <= 0) return [];
+      const nextItems = dedupeItemsByTxid(asArray(items))
+        .filter((item) => item?.url && !existingQueueUrls.has(item.url) && !trashedVideoUrls.has(item.url))
+        .slice(0, headroom);
+      if (nextItems.length) playQueue.push(...nextItems);
+      return nextItems;
+    }
+
+    async function fetchFreshTrendingLoopResult() {
+      const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
+
+      const deferred = keywords.map(() => createDeferred());
+      const keywordFetches = deferred.map((d) => d.promise);
+      const maxConcurrentFetches = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
+      let nextKeywordIdx = 0;
+      const runKeywordWorker = async () => {
+        while (nextKeywordIdx < keywords.length) {
+          const idx = nextKeywordIdx++;
+          const raw = await fetchTrendingKeywordMessages(keywords[idx]).catch(() => []);
+          deferred[idx].resolve(raw);
+        }
+      };
+      const keywordWorkers = Array.from({ length: maxConcurrentFetches }, runKeywordWorker);
+      keywordWorkers.forEach((workerPromise) => workerPromise.catch(() => {}));
+
+      const settled = await Promise.allSettled(keywordFetches);
+      const allGroups = settled.map((result) => (result.status === 'fulfilled' ? result.value : []));
+      const nonEmptyGroups = allGroups.filter((group) => group.length);
+      const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
+        ? DEFAULT_KEYWORD
+        : 'trending';
+      if (!nonEmptyGroups.length) {
+        return { items: [], messages: [], addressLabels: new Map(), keywords, displayKeyword };
+      }
+
+      const allMessages = mergeUniqueMessagesByTxid(...nonEmptyGroups);
+      const addressLabels = await resolveAddressLabels(allMessages);
+      const perKeywordItems = allGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
+      let items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+      if (!items.length) items = dedupeItemsByTxid(parseItems(allMessages, addressLabels));
+      return { items, messages: allMessages, addressLabels, keywords, displayKeyword };
+    }
+
+    async function maybeRefillTrendingLoopQueue() {
+      if (!isTrendingStationMode) return false;
+      if (playQueue.length > TRENDING_LOOP_REFILL_THRESHOLD) return false;
+      if (trendingLoopRefillPromise) return trendingLoopRefillPromise;
+
+      trendingLoopRefillPromise = (async () => {
+        await activeTrendingBuildPromise.catch(() => {});
+        if (!isTrendingStationMode || playQueue.length > TRENDING_LOOP_REFILL_THRESHOLD) return false;
+
+        const [defaultResult, trendingResult] = await Promise.allSettled([
+          queryP2FK(DEFAULT_KEYWORD),
+          fetchFreshTrendingLoopResult()
+        ]);
+
+        if (!isTrendingStationMode) return false;
+
+        const defaultItems = defaultResult.status === 'fulfilled'
+          ? defaultResult.value.items.slice(0, TRENDING_DEFAULT_FALLBACK_BATCH_SIZE)
+          : [];
+        const trendingItems = trendingResult.status === 'fulfilled'
+          ? trendingResult.value.items
+          : [];
+        const wasEmpty = !playQueue.length;
+        const added = appendUniqueItemsToQueue([...defaultItems, ...trendingItems], TRENDING_MAX_PLAYLIST_ITEMS);
+        if (added.length) {
+          searchResultTotal = Math.max(searchResultTotal, playQueue.length);
+          updateTicker(playQueue, currentKeyword);
+        }
+        if (wasEmpty && playQueue.length) {
+          playCurrent();
+          return true;
+        }
+        if (!playQueue.length) {
+          throw new Error('no playable videos in trending or default fallback results');
+        }
+        return added.length > 0;
+      })().finally(() => {
+        trendingLoopRefillPromise = null;
+      });
+
+      return trendingLoopRefillPromise;
     }
 
     async function queryTrendingP2FK() {
@@ -1788,7 +2214,7 @@
       // Final phase: once ALL keyword fetches finish, rebuild the complete round-robin queue
       // with properly resolved address labels and replace the pending queue tail so the
       // viewer cycles through all keywords TRENDING_KEYWORD_BATCH_SIZE videos at a time.
-      Promise.allSettled(keywordFetches).then(async (settled) => {
+      activeTrendingBuildPromise = Promise.allSettled(keywordFetches).then(async (settled) => {
         if (bgFetchId !== trendingBackgroundFetchId) return; // superseded or cancelled by explicit search
         const allGroups = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
         const nonEmptyGroups = allGroups.filter((g) => g.length);
@@ -1822,6 +2248,9 @@
         if (wasEmpty && playQueue.length) playCurrent();
 
         trendingResultsCache = { items: allItems, messages: allMessages, addressLabels: allLabels, keywords, displayKeyword };
+        if (isTrendingStationMode && playQueue.length <= TRENDING_LOOP_REFILL_THRESHOLD) {
+          maybeRefillTrendingLoopQueue().catch(() => {});
+        }
       }).catch(() => {}); // Background errors don't affect already-running playback
 
       return partialResult;
@@ -1853,9 +2282,18 @@
       }
       const entry = playQueue[0];
       if (!entry) {
+        currentEntry = null;
         if (activeStreamTimeoutId) {
           clearTimeout(activeStreamTimeoutId);
           activeStreamTimeoutId = null;
+        }
+        if (isTrendingStationMode) {
+          setStatus('Loading more trending and mp4 videos…');
+          maybeRefillTrendingLoopQueue().catch((error) => {
+            showOffAir(`OFF AIR • Unable to refill trending station (${error?.message || 'request failed'})`);
+          });
+          updateTicker(playQueue, currentKeyword);
+          return;
         }
         showOffAir('OFF AIR • Playlist reached the end of search results');
         updateTicker(playQueue, currentKeyword);
@@ -1885,6 +2323,11 @@
         dom.video.load();
       }
       primePreloadCandidates();
+      if (isTrendingStationMode) {
+        maybeRefillTrendingLoopQueue().catch((error) => {
+          console.warn('Unable to refill trending station queue', error);
+        });
+      }
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
       });
@@ -1922,7 +2365,16 @@
         body: `Skipped "${current.title}" until you submit another keyword search`,
         imageUrl: ''
       });
-      if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
+      if (!playQueue.length) {
+        if (isTrendingStationMode) {
+          setStatus('Loading more trending and mp4 videos…');
+          maybeRefillTrendingLoopQueue().catch((error) => {
+            showOffAir(`OFF AIR • Unable to refill trending station (${error?.message || 'request failed'})`);
+          });
+          return;
+        }
+        return showOffAir('OFF AIR • No videos remain after skip');
+      }
       playCurrent();
     }
 
@@ -1943,6 +2395,7 @@
       dom.app.classList.toggle('fullscreen-mode', inFullscreenLike);
       updateFullscreenButtonState();
       if (inFullscreenLike) {
+        closeBannerMenu();
         showHudTemporarily();
       } else {
         dom.app.classList.remove('hidden-ui');
@@ -1955,6 +2408,9 @@
       const requestId = ++loadSearchRequestId;
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
+      isTrendingStationMode = isTrendingDefault;
+      trendingLoopRefillPromise = null;
+      activeTrendingBuildPromise = Promise.resolve();
       if (resetSessionSkips) trashedVideoUrls = new Set();
       // Clear the trending cache when the user performs an explicit keyword search so
       // returning to trending later re-fetches fresh results.
@@ -2173,7 +2629,7 @@
 
       dom.searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        loadSearch(dom.query.value, { resetSessionSkips: true });
+        runSearch(dom.query.value, { resetSessionSkips: true, setInput: false });
       });
 
       window.addEventListener('resize', () => measureTicker());
@@ -2183,8 +2639,20 @@
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       dom.brandBtn.addEventListener('click', () => {
-        dom.query.value = '';
-        loadSearch('');
+        runSearch('', { resetSessionSkips: false, setInput: true });
+      });
+      dom.tickerWrap.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleBannerMenu();
+      });
+      dom.tickerWrap.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleBannerMenu();
+      });
+      dom.bannerQueueMoreBtn.addEventListener('click', () => {
+        bannerQueueVisibleCount = Math.min(playQueue.length, bannerQueueVisibleCount + BANNER_QUEUE_PAGE_SIZE);
+        renderBannerQueue();
       });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
@@ -2205,6 +2673,10 @@
         if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
         if (event.key === 'Escape') {
+          if (bannerMenuOpen) {
+            closeBannerMenu();
+            return;
+          }
           if (pseudoFullscreenActive) {
             pseudoFullscreenActive = false;
             updateFullscreenUiState();
