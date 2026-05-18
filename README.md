@@ -17,6 +17,8 @@ Standard keyword searches page through up to 200 search records (25 per request)
 If the trending API is empty/unavailable, it falls back to `mp4` as the default.
 The search field starts empty; submitting your own query still runs a normal keyword search, while submitting empty keeps the trending-default behavior.
 Playback uses a larger queue for trending mode (up to 500 results) and advances until exhausted, then shows an off-air screen.
+The bottom ticker banner is expandable: click it to open a queue/trending panel, showing queued videos in top-down playback order with a 20-at-a-time **Show more** flow plus top 10 trending searches (click any search to run it), then click outside to collapse.
+Trending ticker crawl text includes search-term stats with view totals when trending data is available.
 You can skip the current video with **Skip** (or mobile left-swipe), and the UI now includes queue + buffering indicators for long streams.
 You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp4`).
 
