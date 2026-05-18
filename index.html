@@ -822,12 +822,13 @@
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
-    const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
+    const URL_REGEX = /((?:https?:\/\/|www\.|[a-z0-9.-]+\.[a-z]{2,}\/)[^\s<>"']+)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
+    const MESSAGE_BODY_MAX_LENGTH = 4000;
     let scheduledMessageTimeouts = [];
     let queuedMessages = [];
     let activeMessageTimeoutId = null;
@@ -894,7 +895,11 @@
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
-    const cleanDisplayText = (value) => decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const cleanDisplayText = (value, maxLength = 220) => {
+      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '');
+      if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
+      return sanitized.slice(0, maxLength);
+    };
     const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
     const parseMetricNumber = (value) => {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -1016,6 +1021,14 @@
       }
       return text;
     };
+    const normalizeLinkForHref = (value) => {
+      const text = normalize(value);
+      if (!text) return '';
+      if (/^https?:\/\//i.test(text)) return text;
+      if (/^www\./i.test(text)) return `https://${text}`;
+      if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(text)) return `https://${text}`;
+      return text;
+    };
     const formatLinkLabel = (value, max = 42) => {
       const text = cleanDisplayText(value || '');
       if (!text) return '';
@@ -1117,6 +1130,7 @@
       const unique = [...new Set(matches
         .map((link) => splitInlineIpfsSuffix(link).primary || link)
         .map((link) => stripTrailingUrlPunctuation(link))
+        .map((link) => normalizeLinkForHref(link))
         .filter(Boolean))];
       return unique.slice(0, 4);
     };
@@ -1187,10 +1201,10 @@
         }
         const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
         const anchor = document.createElement('a');
-        anchor.href = cleanUrl;
+        anchor.href = normalizeLinkForHref(cleanUrl);
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.title = cleanUrl;
+        anchor.title = normalizeLinkForHref(cleanUrl);
         anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
         content.appendChild(anchor);
         if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
@@ -1376,7 +1390,7 @@
             return {
               url: directUrl,
               title,
-              description: cleanDisplayText(messageText),
+              description: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, title),
@@ -1402,7 +1416,7 @@
             return {
               url,
               title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
-              description: cleanDisplayText(messageText),
+              description: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
@@ -1435,7 +1449,7 @@
           return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
             meta: `${from ? shortTitle(from, 18) : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
-            body: cleanDisplayText(messageText),
+            body: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
             imageUrl: extractImageUrl(messageText),
             links: extractLinks(messageText),
             keywords: extractKeywords(messageText, subject),
@@ -1663,7 +1677,7 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body, MESSAGE_BODY_MAX_LENGTH), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
         li.appendChild(body);
       }
 
@@ -1723,7 +1737,7 @@
 
     function showQueueVideoMessageCard(item, queueIndex = 0) {
       if (!item) return;
-      const body = cleanDisplayText(item.description || item.subject || '');
+      const body = cleanDisplayText(item.description || item.subject || '', MESSAGE_BODY_MAX_LENGTH);
       const hasMessage = Boolean(body || (Array.isArray(item.links) && item.links.length) || item.imageUrl);
       if (!hasMessage) return;
       const creator = item.from ? shortTitle(item.from, 18) : 'p2fk';
