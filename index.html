@@ -441,6 +441,7 @@
       right: 0;
       bottom: 0;
       height: 3rem;
+      display: block;
       border-top: 1px solid rgba(131, 152, 206, .3);
       background: rgba(4, 8, 20, .85);
       overflow: hidden;
@@ -452,15 +453,20 @@
       width: 100%;
       text-align: left;
       padding: 0;
+      appearance: none;
+      -webkit-appearance: none;
     }
 
     #ticker {
       position: absolute;
+      top: 0;
       left: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
       white-space: nowrap;
       padding-left: 1.5rem;
       padding-right: 5rem;
-      line-height: 3rem;
       color: #dbebff;
       font-weight: 600;
       font-size: 1rem;
@@ -751,6 +757,8 @@
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
     const TRENDING_KEYWORD_LIMIT = 20;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
+    const TRENDING_DEFAULT_FALLBACK_BATCH_SIZE = 20;
+    const TRENDING_LOOP_REFILL_THRESHOLD = 6;
     const BANNER_QUEUE_PAGE_SIZE = 20;
     const BANNER_TOP_TRENDING_SIZE = TRENDING_KEYWORD_LIMIT;
     const TICKER_TRENDING_STATS_SIZE = 5;
@@ -810,6 +818,7 @@
     let playQueue = [];
     let currentEntry = null;
     let searchResultTotal = 0;
+    let isTrendingStationMode = false;
     let streamCardPool = [];
     let socialTimeline = [];
     let shownSocialCardKeys = new Set();
@@ -829,6 +838,8 @@
     let pseudoFullscreenActive = false;
     let trendingResultsCache = null;
     let trendingBackgroundFetchId = 0;
+    let activeTrendingBuildPromise = Promise.resolve();
+    let trendingLoopRefillPromise = null;
     let tickerAnimationFrameId = null;
     let tickerLastFrameTs = 0;
     let tickerPositionPx = 0;
@@ -2033,6 +2044,95 @@
       return dedupeItemsByTxid(interleavedItems);
     }
 
+    function appendUniqueItemsToQueue(items, maxItems = TRENDING_MAX_PLAYLIST_ITEMS) {
+      const existingQueueUrls = new Set(playQueue.map((item) => item.url));
+      const headroom = maxItems - playQueue.length;
+      if (headroom <= 0) return [];
+      const nextItems = dedupeItemsByTxid(asArray(items))
+        .filter((item) => item?.url && !existingQueueUrls.has(item.url) && !trashedVideoUrls.has(item.url))
+        .slice(0, headroom);
+      if (nextItems.length) playQueue.push(...nextItems);
+      return nextItems;
+    }
+
+    async function fetchFreshTrendingLoopResult() {
+      const keywords = await getTrendingKeywords(TRENDING_KEYWORD_LIMIT);
+
+      const deferred = keywords.map(() => createDeferred());
+      const keywordFetches = deferred.map((d) => d.promise);
+      const maxConcurrentFetches = Math.max(1, Math.min(TRENDING_KEYWORD_FETCH_CONCURRENCY, keywords.length));
+      let nextKeywordIdx = 0;
+      const runKeywordWorker = async () => {
+        while (nextKeywordIdx < keywords.length) {
+          const idx = nextKeywordIdx++;
+          const raw = await fetchTrendingKeywordMessages(keywords[idx]).catch(() => []);
+          deferred[idx].resolve(raw);
+        }
+      };
+      const keywordWorkers = Array.from({ length: maxConcurrentFetches }, runKeywordWorker);
+      keywordWorkers.forEach((workerPromise) => workerPromise.catch(() => {}));
+
+      const settled = await Promise.allSettled(keywordFetches);
+      const allGroups = settled.map((result) => (result.status === 'fulfilled' ? result.value : []));
+      const nonEmptyGroups = allGroups.filter((group) => group.length);
+      const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
+        ? DEFAULT_KEYWORD
+        : 'trending';
+      if (!nonEmptyGroups.length) {
+        return { items: [], messages: [], addressLabels: new Map(), keywords, displayKeyword };
+      }
+
+      const allMessages = mergeUniqueMessagesByTxid(...nonEmptyGroups);
+      const addressLabels = await resolveAddressLabels(allMessages);
+      const perKeywordItems = allGroups.map((group) => dedupeItemsByTxid(parseItems(group, addressLabels)));
+      let items = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
+      if (!items.length) items = dedupeItemsByTxid(parseItems(allMessages, addressLabels));
+      return { items, messages: allMessages, addressLabels, keywords, displayKeyword };
+    }
+
+    async function maybeRefillTrendingLoopQueue() {
+      if (!isTrendingStationMode) return false;
+      if (playQueue.length > TRENDING_LOOP_REFILL_THRESHOLD) return false;
+      if (trendingLoopRefillPromise) return trendingLoopRefillPromise;
+
+      trendingLoopRefillPromise = (async () => {
+        await activeTrendingBuildPromise.catch(() => {});
+        if (!isTrendingStationMode || playQueue.length > TRENDING_LOOP_REFILL_THRESHOLD) return false;
+
+        const [defaultResult, trendingResult] = await Promise.allSettled([
+          queryP2FK(DEFAULT_KEYWORD),
+          fetchFreshTrendingLoopResult()
+        ]);
+
+        if (!isTrendingStationMode) return false;
+
+        const defaultItems = defaultResult.status === 'fulfilled'
+          ? defaultResult.value.items.slice(0, TRENDING_DEFAULT_FALLBACK_BATCH_SIZE)
+          : [];
+        const trendingItems = trendingResult.status === 'fulfilled'
+          ? trendingResult.value.items
+          : [];
+        const wasEmpty = !playQueue.length;
+        const added = appendUniqueItemsToQueue([...defaultItems, ...trendingItems], TRENDING_MAX_PLAYLIST_ITEMS);
+        if (added.length) {
+          searchResultTotal = Math.max(searchResultTotal, playQueue.length);
+          updateTicker(playQueue, currentKeyword);
+        }
+        if (wasEmpty && playQueue.length) {
+          playCurrent();
+          return true;
+        }
+        if (!playQueue.length) {
+          throw new Error('no playable videos in trending or default fallback results');
+        }
+        return added.length > 0;
+      })().finally(() => {
+        trendingLoopRefillPromise = null;
+      });
+
+      return trendingLoopRefillPromise;
+    }
+
     async function queryTrendingP2FK() {
       if (trendingResultsCache) {
         return trendingResultsCache;
@@ -2114,7 +2214,7 @@
       // Final phase: once ALL keyword fetches finish, rebuild the complete round-robin queue
       // with properly resolved address labels and replace the pending queue tail so the
       // viewer cycles through all keywords TRENDING_KEYWORD_BATCH_SIZE videos at a time.
-      Promise.allSettled(keywordFetches).then(async (settled) => {
+      activeTrendingBuildPromise = Promise.allSettled(keywordFetches).then(async (settled) => {
         if (bgFetchId !== trendingBackgroundFetchId) return; // superseded or cancelled by explicit search
         const allGroups = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
         const nonEmptyGroups = allGroups.filter((g) => g.length);
@@ -2148,6 +2248,9 @@
         if (wasEmpty && playQueue.length) playCurrent();
 
         trendingResultsCache = { items: allItems, messages: allMessages, addressLabels: allLabels, keywords, displayKeyword };
+        if (isTrendingStationMode && playQueue.length <= TRENDING_LOOP_REFILL_THRESHOLD) {
+          maybeRefillTrendingLoopQueue().catch(() => {});
+        }
       }).catch(() => {}); // Background errors don't affect already-running playback
 
       return partialResult;
@@ -2179,9 +2282,18 @@
       }
       const entry = playQueue[0];
       if (!entry) {
+        currentEntry = null;
         if (activeStreamTimeoutId) {
           clearTimeout(activeStreamTimeoutId);
           activeStreamTimeoutId = null;
+        }
+        if (isTrendingStationMode) {
+          setStatus('Loading more trending and mp4 videos…');
+          maybeRefillTrendingLoopQueue().catch((error) => {
+            showOffAir(`OFF AIR • Unable to refill trending station (${error?.message || 'request failed'})`);
+          });
+          updateTicker(playQueue, currentKeyword);
+          return;
         }
         showOffAir('OFF AIR • Playlist reached the end of search results');
         updateTicker(playQueue, currentKeyword);
@@ -2211,6 +2323,11 @@
         dom.video.load();
       }
       primePreloadCandidates();
+      if (isTrendingStationMode) {
+        maybeRefillTrendingLoopQueue().catch((error) => {
+          console.warn('Unable to refill trending station queue', error);
+        });
+      }
       dom.video.play().catch(() => {
         console.warn('Autoplay blocked or failed for video:', entry.url);
       });
@@ -2248,7 +2365,16 @@
         body: `Skipped "${current.title}" until you submit another keyword search`,
         imageUrl: ''
       });
-      if (!playQueue.length) return showOffAir('OFF AIR • No videos remain after skip');
+      if (!playQueue.length) {
+        if (isTrendingStationMode) {
+          setStatus('Loading more trending and mp4 videos…');
+          maybeRefillTrendingLoopQueue().catch((error) => {
+            showOffAir(`OFF AIR • Unable to refill trending station (${error?.message || 'request failed'})`);
+          });
+          return;
+        }
+        return showOffAir('OFF AIR • No videos remain after skip');
+      }
       playCurrent();
     }
 
@@ -2282,6 +2408,9 @@
       const requestId = ++loadSearchRequestId;
       const cleanedInput = normalize(keyword);
       const isTrendingDefault = !cleanedInput;
+      isTrendingStationMode = isTrendingDefault;
+      trendingLoopRefillPromise = null;
+      activeTrendingBuildPromise = Promise.resolve();
       if (resetSessionSkips) trashedVideoUrls = new Set();
       // Clear the trending cache when the user performs an explicit keyword search so
       // returning to trending later re-fetches fresh results.

@@ -19,6 +19,7 @@ The search field starts empty; submitting your own query still runs a normal key
 Playback uses a larger queue for trending mode (up to 500 results) and advances until exhausted, then shows an off-air screen.
 The bottom ticker banner is expandable: click it to open a queue/trending panel, showing queued videos in top-down playback order with a 20-at-a-time **Show more** flow plus up to top 20 trending searches (click any search to run it), then click outside to collapse.
 Trending ticker crawl text includes search-term stats with view totals when trending data is available.
+When SupTV is in the default trending mode, it now keeps the station on-air by following exhausted trending results with the top 20 `mp4` results, then a fresh trending cycle, repeating in that order.
 You can skip the current video with **Skip** (or mobile left-swipe), and the UI now includes queue + buffering indicators for long streams.
 You can set the startup keyword with `?q=yourkeyword` (example: `index.html?q=mp4`).
 
