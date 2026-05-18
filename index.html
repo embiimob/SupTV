@@ -709,7 +709,7 @@
           <section class="banner-menu-section">
             <h3>Top Trending Searches</h3>
             <div class="banner-trending-list" id="bannerTrendingList"></div>
-            <p class="banner-menu-empty" id="bannerTrendingEmpty">Trending searches are loading…</p>
+            <p class="banner-menu-empty" id="bannerTrendingEmpty">Nothing is currently trending.</p>
           </section>
         </div>
       </div>
@@ -752,10 +752,11 @@
     const TRENDING_KEYWORD_LIMIT = 20;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
     const BANNER_QUEUE_PAGE_SIZE = 20;
-    const BANNER_TOP_TRENDING_SIZE = 10;
+    const BANNER_TOP_TRENDING_SIZE = TRENDING_KEYWORD_LIMIT;
     const TICKER_TRENDING_STATS_SIZE = 5;
-    const TRENDING_VIEW_METRIC_KEYS = ['viewTotal', 'views', 'totalViews', 'viewCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount'];
-    const TRENDING_SEARCH_METRIC_KEYS = ['searchTotal', 'searchCount', 'count', 'total', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
+    const TRENDING_EMPTY_MESSAGE = 'Nothing is currently trending.';
+    const TRENDING_VIEW_METRIC_KEYS = ['lastResultCount', 'averageResultCount', 'maxResultCount', 'viewTotal', 'views', 'totalViews', 'viewCount', 'LastResultCount', 'AverageResultCount', 'MaxResultCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount'];
+    const TRENDING_SEARCH_METRIC_KEYS = ['successfulSearchCount', 'searchTotal', 'searchCount', 'count', 'total', 'SuccessfulSearchCount', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
     const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
@@ -1524,6 +1525,7 @@
       dom.bannerTrendingList.replaceChildren();
       const topRows = trendingStatsRows.slice(0, BANNER_TOP_TRENDING_SIZE);
       if (!topRows.length) {
+        dom.bannerTrendingEmpty.textContent = TRENDING_EMPTY_MESSAGE;
         dom.bannerTrendingEmpty.style.display = '';
         return;
       }
@@ -1951,6 +1953,7 @@
         const response = await fetch(TRENDING_SEARCHES_ENDPOINT, { cache: 'no-store' });
         if (!response.ok) {
           trendingStatsRows = [];
+          renderBannerTrendingSearches();
           return [DEFAULT_KEYWORD];
         }
         const payload = await response.json();
