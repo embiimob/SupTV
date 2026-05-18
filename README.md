@@ -102,14 +102,14 @@ Edit `index.html` constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`)
 - `TRENDING_STATS_LIMIT` (default: `100`) for `GetTrendingRootSearches?qty=...`
-- `TRENDING_SEARCH_QTY` (default: `200`) controls the total per-keyword result cap used during trending queue assembly (single request, no paging, via `GetKnownRootsBySearchString`)
+- `TRENDING_SEARCH_QTY` (default: `200`) controls the maximum results fetched per keyword during trending queue assembly (single request, no paging, via `GetKnownRootsBySearchString`)
 - `STANDARD_SEARCH_QTY` (default: `200`)
 
 Example:
 
 - `P2FK_BASE_URL = 'http://localhost:5000'`
 - `TRENDING_STATS_LIMIT = 100`
-- `TRENDING_SEARCH_QTY = 200` *(per-keyword result fetch size during trending assembly, not trending-stats qty)*
+- `TRENDING_SEARCH_QTY = 200` *(per-keyword search result limit when building the trending queue, not the trending-stats list size)*
 
 `TRENDING_SEARCHES_ENDPOINT` is derived as:
 
