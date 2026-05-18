@@ -716,7 +716,7 @@
     </section>
 
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
-    <button type="button" class="ticker-wrap" id="tickerWrap" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
+    <button type="button" class="ticker-wrap" id="tickerWrap" aria-controls="bannerMenu" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
 
   <script>
@@ -754,6 +754,8 @@
     const BANNER_QUEUE_PAGE_SIZE = 20;
     const BANNER_TOP_TRENDING_SIZE = 10;
     const TICKER_TRENDING_STATS_SIZE = 5;
+    const TRENDING_VIEW_METRIC_KEYS = ['viewTotal', 'views', 'totalViews', 'viewCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount'];
+    const TRENDING_SEARCH_METRIC_KEYS = ['searchTotal', 'searchCount', 'count', 'total', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
     const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
@@ -1537,9 +1539,7 @@
         btn.appendChild(title);
         btn.appendChild(details);
         btn.addEventListener('click', () => {
-          dom.query.value = term;
-          closeBannerMenu();
-          loadSearch(term, { resetSessionSkips: true });
+          runSearch(term, { resetSessionSkips: true, setInput: true });
         });
         dom.bannerTrendingList.appendChild(btn);
       });
@@ -1560,6 +1560,13 @@
     function toggleBannerMenu() {
       if (bannerMenuOpen) closeBannerMenu();
       else openBannerMenu();
+    }
+
+    function runSearch(keyword, { resetSessionSkips = true, setInput = true } = {}) {
+      const searchKeyword = normalize(keyword);
+      if (setInput) dom.query.value = searchKeyword;
+      closeBannerMenu();
+      loadSearch(searchKeyword, { resetSessionSkips });
     }
 
     function onDocumentClickCloseBanner(event) {
@@ -1965,8 +1972,8 @@
           if (!candidate || seen.has(candidateKey)) continue;
           seen.add(candidateKey);
           unique.push(candidate);
-          const views = readMetric(row, ['viewTotal', 'views', 'totalViews', 'viewCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount']);
-          const searches = readMetric(row, ['searchTotal', 'searchCount', 'count', 'total', 'SearchTotal', 'SearchCount', 'Count', 'Total']);
+          const views = readMetric(row, TRENDING_VIEW_METRIC_KEYS);
+          const searches = readMetric(row, TRENDING_SEARCH_METRIC_KEYS);
           statsByKeyword.set(candidateKey, {
             term: cleanDisplayText(candidate),
             views: Number.isFinite(views) ? views : 0,
@@ -2488,8 +2495,7 @@
 
       dom.searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        closeBannerMenu();
-        loadSearch(dom.query.value, { resetSessionSkips: true });
+        runSearch(dom.query.value, { resetSessionSkips: true, setInput: false });
       });
 
       window.addEventListener('resize', () => measureTicker());
@@ -2499,9 +2505,7 @@
       dom.fullscreenBtn.addEventListener('click', requestFullscreen);
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       dom.brandBtn.addEventListener('click', () => {
-        closeBannerMenu();
-        dom.query.value = '';
-        loadSearch('');
+        runSearch('', { resetSessionSkips: false, setInput: true });
       });
       dom.tickerWrap.addEventListener('click', (event) => {
         event.stopPropagation();
