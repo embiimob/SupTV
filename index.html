@@ -709,7 +709,7 @@
           <section class="banner-menu-section">
             <h3>Top Trending Searches</h3>
             <div class="banner-trending-list" id="bannerTrendingList"></div>
-            <p class="banner-menu-empty" id="bannerTrendingEmpty">Nothing is currently trending.</p>
+            <p class="banner-menu-empty" id="bannerTrendingEmpty"></p>
           </section>
         </div>
       </div>
@@ -1537,9 +1537,9 @@
         const term = cleanDisplayText(row.term);
         const title = document.createElement('strong');
         title.textContent = `${idx + 1}. ${term}`;
-        const details = document.createTextNode(`${formatMetricCount(row.searches)} searches • ${formatMetricCount(row.views)} views`);
+        const statsText = document.createTextNode(`${formatMetricCount(row.searches)} searches • ${formatMetricCount(row.views)} views`);
         btn.appendChild(title);
-        btn.appendChild(details);
+        btn.appendChild(statsText);
         btn.addEventListener('click', () => {
           runSearch(term, { resetSessionSkips: true, setInput: true });
         });
@@ -1565,6 +1565,8 @@
     }
 
     function runSearch(keyword, { resetSessionSkips = true, setInput = true } = {}) {
+      // Keep resetSessionSkips true by default so direct user-triggered searches
+      // match existing explicit-search behavior and clear session skip state.
       const searchKeyword = normalize(keyword);
       if (setInput) dom.query.value = searchKeyword;
       closeBannerMenu();
