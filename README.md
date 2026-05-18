@@ -24,7 +24,7 @@ SupTV is **not**:
 ## Quick start (local)
 
 1. Clone this repo.
-2. Open `/home/runner/work/SupTV/SupTV/index.html` in a browser.
+2. Open `index.html` in a browser.
 3. Optional: use `?q=keyword` to start with a specific query (example: `index.html?q=mp4`).
 
 ## Technical overview
