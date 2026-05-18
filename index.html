@@ -1026,7 +1026,7 @@
       if (!text) return '';
       if (/^https?:\/\//i.test(text)) return text;
       if (/^www\./i.test(text)) return `https://${text}`;
-      if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(text)) return `https://${text}`;
+      if (/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/|$)/i.test(text)) return `https://${text}`;
       return text;
     };
     const formatLinkLabel = (value, max = 42) => {
