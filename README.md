@@ -107,7 +107,7 @@ Example:
 
 - `P2FK_BASE_URL = 'http://localhost:5000'`
 - `TRENDING_STATS_LIMIT = 100`
-- `TRENDING_SEARCH_QTY = 200`
+- `TRENDING_SEARCH_QTY = 200` *(per-keyword result fetch size during trending assembly, not trending-stats qty)*
 
 `TRENDING_SEARCHES_ENDPOINT` is derived as:
 
