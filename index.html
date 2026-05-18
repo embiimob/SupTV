@@ -552,6 +552,22 @@
       overflow-wrap: anywhere;
     }
 
+    .banner-queue-item {
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: .42rem;
+      padding: .18rem .26rem .24rem;
+      margin-left: -.26rem;
+      transition: background .15s ease, border-color .15s ease;
+    }
+
+    .banner-queue-item:hover,
+    .banner-queue-item:focus-visible {
+      background: rgba(23, 37, 68, .56);
+      border-color: rgba(132, 168, 242, .48);
+      outline: none;
+    }
+
     .banner-queue-item-meta {
       display: block;
       margin-top: .1rem;
@@ -756,14 +772,15 @@
     const MAX_PLAYLIST_ITEMS = 50;
     const TRENDING_MAX_PLAYLIST_ITEMS = 500;
     const TRENDING_KEYWORD_LIMIT = 20;
+    const TRENDING_STATS_LIMIT = 100;
     const TRENDING_KEYWORD_BATCH_SIZE = 5;
     const TRENDING_DEFAULT_FALLBACK_BATCH_SIZE = 20;
     const TRENDING_LOOP_REFILL_THRESHOLD = 6;
     const BANNER_QUEUE_PAGE_SIZE = 20;
-    const BANNER_TOP_TRENDING_SIZE = TRENDING_KEYWORD_LIMIT;
+    const BANNER_TOP_TRENDING_SIZE = TRENDING_STATS_LIMIT;
     const TICKER_TRENDING_STATS_SIZE = 5;
     const TRENDING_EMPTY_MESSAGE = 'Nothing is currently trending.';
-    const TRENDING_VIEW_METRIC_KEYS = ['lastResultCount', 'averageResultCount', 'maxResultCount', 'viewTotal', 'views', 'totalViews', 'viewCount', 'LastResultCount', 'AverageResultCount', 'MaxResultCount', 'ViewTotal', 'Views', 'TotalViews', 'ViewCount'];
+    const TRENDING_RESULT_METRIC_KEYS = ['lastResultCount', 'averageResultCount', 'maxResultCount', 'resultTotal', 'results', 'totalResults', 'resultCount', 'LastResultCount', 'AverageResultCount', 'MaxResultCount', 'ResultTotal', 'Results', 'TotalResults', 'ResultCount'];
     const TRENDING_SEARCH_METRIC_KEYS = ['successfulSearchCount', 'searchTotal', 'searchCount', 'count', 'total', 'SuccessfulSearchCount', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
@@ -793,7 +810,7 @@
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
-    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_KEYWORD_LIMIT}`;
+    const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -805,12 +822,13 @@
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
-    const URL_REGEX = /(https?:\/\/[^\s<>"']+)/gi;
+    const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
+    const MESSAGE_BODY_MAX_LENGTH = 4000;
     let scheduledMessageTimeouts = [];
     let queuedMessages = [];
     let activeMessageTimeoutId = null;
@@ -853,11 +871,11 @@
     const decodeHtmlEntities = (text) => {
       if (typeof text !== 'string') return '';
       return text
+        .replace(/&amp;/gi, '&')
         .replace(/&lt;/gi, '<')
         .replace(/&gt;/gi, '>')
         .replace(/&quot;/gi, '"')
-        .replace(/&#0?39;|&apos;/gi, "'")
-        .replace(/&amp;/gi, '&');
+        .replace(/&#0?39;|&apos;/gi, "'");
     };
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
@@ -877,7 +895,11 @@
     const tickerLabel = (keyword) => `LIVE • ${keyword.toUpperCase()} • `;
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
-    const cleanDisplayText = (value) => decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '').slice(0, 220);
+    const cleanDisplayText = (value, maxLength = 220) => {
+      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '');
+      if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
+      return sanitized.slice(0, maxLength);
+    };
     const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
     const parseMetricNumber = (value) => {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -890,6 +912,12 @@
     const formatMetricCount = (value) => {
       if (!Number.isFinite(value) || value < 0) return '0';
       return Math.round(value).toLocaleString('en-US');
+    };
+    const formatTrendingResultCount = (value, cap = TRENDING_SEARCH_QTY) => {
+      if (!Number.isFinite(value) || value < 0) return '0';
+      const rounded = Math.round(value);
+      if (rounded >= cap) return `${formatMetricCount(cap)}+`;
+      return formatMetricCount(rounded);
     };
     const isInteractiveTouchTarget = (target) => {
       if (!(target instanceof Element)) return false;
@@ -993,6 +1021,14 @@
       }
       return text;
     };
+    const normalizeLinkForHref = (value) => {
+      const text = normalize(value);
+      if (!text) return '';
+      if (/^https?:\/\//i.test(text)) return text;
+      if (/^www\./i.test(text)) return `https://${text}`;
+      if (/^(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/|$)/i.test(text)) return `https://${text}`;
+      return text;
+    };
     const formatLinkLabel = (value, max = 42) => {
       const text = cleanDisplayText(value || '');
       if (!text) return '';
@@ -1094,6 +1130,7 @@
       const unique = [...new Set(matches
         .map((link) => splitInlineIpfsSuffix(link).primary || link)
         .map((link) => stripTrailingUrlPunctuation(link))
+        .map((link) => normalizeLinkForHref(link))
         .filter(Boolean))];
       return unique.slice(0, 4);
     };
@@ -1164,10 +1201,10 @@
         }
         const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
         const anchor = document.createElement('a');
-        anchor.href = cleanUrl;
+        anchor.href = normalizeLinkForHref(cleanUrl);
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.title = cleanUrl;
+        anchor.title = normalizeLinkForHref(cleanUrl);
         anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
         content.appendChild(anchor);
         if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
@@ -1353,7 +1390,7 @@
             return {
               url: directUrl,
               title,
-              description: cleanDisplayText(messageText),
+              description: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, title),
@@ -1379,7 +1416,7 @@
             return {
               url,
               title: cleanDisplayText(filename || `IPFS ${hash.slice(0, 12)}`),
-              description: cleanDisplayText(messageText),
+              description: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
               tags: [],
               links: extractLinks(messageText),
               keywords: extractKeywords(messageText, normalize(root?.Subject || root?.subject || filename)),
@@ -1412,7 +1449,7 @@
           return createSocialCard({
             title: subject || cleanDisplayText(messageText.slice(0, 58)) || 'Thread update',
             meta: `${from ? shortTitle(from, 18) : 'p2fk'}${createdAt ? ` · ${formatUtcDate(createdAt)}` : ''}${txid ? ` · tx:${txid.slice(0, 10)}…` : ''}`,
-            body: cleanDisplayText(messageText),
+            body: cleanDisplayText(messageText, MESSAGE_BODY_MAX_LENGTH),
             imageUrl: extractImageUrl(messageText),
             links: extractLinks(messageText),
             keywords: extractKeywords(messageText, subject),
@@ -1487,7 +1524,7 @@
       }, 0);
       const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
       const trendingText = normalize(keyword).toLowerCase() === 'trending' && trendingStatsRows.length
-        ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${cleanDisplayText(row?.term || '') || 'unknown'} (${formatMetricCount(row?.views)} views)`).join(' • ')}`
+        ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${cleanDisplayText(row?.term || '') || 'unknown'} (${formatTrendingResultCount(row?.results)} results)`).join(' • ')}`
         : '';
       dom.ticker.textContent = statusCards.length
         ? `${tickerLabel(keyword)}${summary}${trendingText ? `${TICKER_SECTION_SEPARATOR}${trendingText}` : ''}${TICKER_SECTION_SEPARATOR}${statusCards.join(TICKER_ITEM_SEPARATOR)}`
@@ -1515,11 +1552,22 @@
         dom.bannerQueueEmpty.style.display = 'none';
         visibleItems.forEach((item, queueIndex) => {
           const li = document.createElement('li');
+          li.className = 'banner-queue-item';
+          li.tabIndex = 0;
+          li.setAttribute('role', 'button');
+          li.setAttribute('aria-label', `Show message card for queued video ${queueIndex + 1}: ${cleanDisplayText(item?.title || 'Queued video')}`);
           li.textContent = cleanDisplayText(item?.title || 'Queued video');
           const meta = document.createElement('span');
           meta.className = 'banner-queue-item-meta';
           meta.textContent = `#${queueIndex + 1} • ${statusForItem(item, queueIndex).toUpperCase()}`;
           li.appendChild(meta);
+          const showItemCard = () => showQueueVideoMessageCard(item, queueIndex);
+          li.addEventListener('click', showItemCard);
+          li.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            showItemCard();
+          });
           dom.bannerQueueList.appendChild(li);
         });
       }
@@ -1548,7 +1596,7 @@
         const term = cleanDisplayText(row.term);
         const title = document.createElement('strong');
         title.textContent = `${idx + 1}. ${term}`;
-        const statsText = document.createTextNode(`${formatMetricCount(row.searches)} searches • ${formatMetricCount(row.views)} views`);
+        const statsText = document.createTextNode(`${formatMetricCount(row.searches)} searches • ${formatTrendingResultCount(row.results)} results`);
         btn.appendChild(title);
         btn.appendChild(statsText);
         btn.addEventListener('click', () => {
@@ -1629,7 +1677,7 @@
       if (card.body) {
         const body = document.createElement('div');
         body.className = 'message-card-body';
-        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
+        body.replaceChildren(buildInteractiveContent(cleanDisplayText(card.body, MESSAGE_BODY_MAX_LENGTH), { urlMaxLength: MESSAGE_URL_MAX_LENGTH }));
         li.appendChild(body);
       }
 
@@ -1670,6 +1718,42 @@
       if (!card) return;
       queuedMessages.push(card);
       flushNextQueuedMessage();
+    }
+
+    function showMessageNow(card) {
+      if (!card) return;
+      if (activeMessageTimeoutId) {
+        clearTimeout(activeMessageTimeoutId);
+        activeMessageTimeoutId = null;
+      }
+      const li = renderMessageCard(card);
+      dom.messages.replaceChildren(li);
+      activeMessageTimeoutId = window.setTimeout(() => {
+        if (li.parentElement === dom.messages) dom.messages.removeChild(li);
+        activeMessageTimeoutId = null;
+        flushNextQueuedMessage();
+      }, MESSAGE_ROTATION_INTERVAL_MS);
+    }
+
+    function showQueueVideoMessageCard(item, queueIndex = 0) {
+      if (!item) return;
+      const body = cleanDisplayText(item.description || item.subject || '', MESSAGE_BODY_MAX_LENGTH);
+      const hasMessage = Boolean(body || (Array.isArray(item.links) && item.links.length) || item.imageUrl);
+      if (!hasMessage) return;
+      const creator = item.from ? shortTitle(item.from, 18) : 'p2fk';
+      const status = statusForItem(item, queueIndex).toUpperCase();
+      const card = createSocialCard({
+        title: `Queued: ${item.title || 'Video'}`,
+        meta: `#${queueIndex + 1} • ${status} • ${creator}${item.createdAt ? ` · ${formatUtcDate(item.createdAt)}` : ''}`,
+        body: body || `Queued video "${item.title || 'Video'}"`,
+        imageUrl: item.imageUrl || '',
+        links: Array.isArray(item.links) ? item.links : [],
+        keywords: Array.isArray(item.keywords) ? item.keywords : [],
+        createdAt: item.createdAt || '',
+        timestamp: item.timestamp,
+        key: `queue:${item.txid || item.url || `${queueIndex}:${item.title || 'video'}`}`
+      });
+      showMessageNow(card);
     }
 
     function clearScheduledMessages() {
@@ -1988,11 +2072,11 @@
           if (!candidate || seen.has(candidateKey)) continue;
           seen.add(candidateKey);
           unique.push(candidate);
-          const views = readMetric(row, TRENDING_VIEW_METRIC_KEYS);
+          const results = readMetric(row, TRENDING_RESULT_METRIC_KEYS);
           const searches = readMetric(row, TRENDING_SEARCH_METRIC_KEYS);
           statsByKeyword.set(candidateKey, {
             term: cleanDisplayText(candidate),
-            views: Number.isFinite(views) ? views : 0,
+            results: Number.isFinite(results) ? results : 0,
             searches: Number.isFinite(searches) ? searches : 0
           });
         }
