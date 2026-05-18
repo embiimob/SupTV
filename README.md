@@ -70,8 +70,10 @@ Why this is relatively fair/unbiased:
 
 Important limits (for accuracy):
 - This is **spam-resistant**, not perfect Sybil-proof fairness: there is no per-user identity weighting in this path.
-- Trending state is in-memory in the API process, so results are instance-local and reset on restart.
 - SupTV still applies its own queue round-robin/dedupe for playback diversity after receiving p2fk trends.
+
+Operational characteristic:
+- Trending state is in-memory in the API process, so results are instance-local and reset on restart.
 
 ## Censorship resistance when running locally
 
@@ -100,7 +102,7 @@ Edit `index.html` constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`)
 - `TRENDING_STATS_LIMIT` (default: `100`) for `GetTrendingRootSearches?qty=...`
-- `TRENDING_SEARCH_QTY` (default: `200`) controls max per-keyword results for trending queue assembly (`GetKnownRootsBySearchString`)
+- `TRENDING_SEARCH_QTY` (default: `200`) controls the total per-keyword result cap used during trending queue assembly (single request, no paging, via `GetKnownRootsBySearchString`)
 - `STANDARD_SEARCH_QTY` (default: `200`)
 
 Example:
