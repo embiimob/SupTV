@@ -87,7 +87,7 @@ Edit `index.html` constants near the top of the script:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`)
 - `TRENDING_STATS_LIMIT` (default: `100`) for `GetTrendingRootSearches?qty=...`
-- `TRENDING_SEARCH_QTY` (default: `200`)
+- `TRENDING_SEARCH_QTY` (default: `200`) for per-keyword trending text-search fetch size (`GetKnownRootsBySearchString`)
 - `STANDARD_SEARCH_QTY` (default: `200`)
 
 Example:
