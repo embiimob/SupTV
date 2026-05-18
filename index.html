@@ -1488,6 +1488,8 @@
       dom.bannerMenu.classList.remove('visible');
       dom.bannerMenu.setAttribute('aria-hidden', 'true');
       dom.tickerWrap.setAttribute('aria-expanded', 'false');
+      dom.tickerWrap.setAttribute('aria-label', 'Show queued videos and trending searches');
+      document.removeEventListener('click', onDocumentClickCloseBanner);
     }
 
     function renderBannerQueue() {
@@ -1551,11 +1553,20 @@
       dom.bannerMenu.classList.add('visible');
       dom.bannerMenu.setAttribute('aria-hidden', 'false');
       dom.tickerWrap.setAttribute('aria-expanded', 'true');
+      dom.tickerWrap.setAttribute('aria-label', 'Hide queued videos and trending searches');
+      document.addEventListener('click', onDocumentClickCloseBanner);
     }
 
     function toggleBannerMenu() {
       if (bannerMenuOpen) closeBannerMenu();
       else openBannerMenu();
+    }
+
+    function onDocumentClickCloseBanner(event) {
+      if (!bannerMenuOpen) return;
+      const target = event.target;
+      if (dom.bannerMenu.contains(target) || dom.tickerWrap.contains(target)) return;
+      closeBannerMenu();
     }
 
     function syncAudioUi() {
@@ -2504,12 +2515,6 @@
       dom.bannerQueueMoreBtn.addEventListener('click', () => {
         bannerQueueVisibleCount = Math.min(playQueue.length, bannerQueueVisibleCount + BANNER_QUEUE_PAGE_SIZE);
         renderBannerQueue();
-      });
-      document.addEventListener('click', (event) => {
-        if (!bannerMenuOpen) return;
-        const target = event.target;
-        if (dom.bannerMenu.contains(target) || dom.tickerWrap.contains(target)) return;
-        closeBannerMenu();
       });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
