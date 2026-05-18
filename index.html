@@ -448,9 +448,7 @@
       transition: opacity .25s ease;
       z-index: 7;
       cursor: pointer;
-      border-left: none;
-      border-right: none;
-      border-bottom: none;
+      border: none;
       width: 100%;
       text-align: left;
       padding: 0;
@@ -1499,12 +1497,12 @@
         dom.bannerQueueEmpty.style.display = '';
       } else {
         dom.bannerQueueEmpty.style.display = 'none';
-        visibleItems.forEach((item, idx) => {
+        visibleItems.forEach((item, queueIndex) => {
           const li = document.createElement('li');
           li.textContent = cleanDisplayText(item?.title || 'Queued video');
           const meta = document.createElement('span');
           meta.className = 'banner-queue-item-meta';
-          meta.textContent = `#${idx + 1} • ${statusForItem(item, idx).toUpperCase()}`;
+          meta.textContent = `#${queueIndex + 1} • ${statusForItem(item, queueIndex).toUpperCase()}`;
           li.appendChild(meta);
           dom.bannerQueueList.appendChild(li);
         });
