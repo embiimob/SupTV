@@ -46,19 +46,32 @@ For direct keyword search, SupTV combines:
 - keyword-channel messages, and
 - paged search-window results (up to `STANDARD_SEARCH_QTY`, default 200)
 
-## Trending logic from p2fk.io and why it is fair
+## Trending logic (verified from p2fk.io source)
 
-SupTV reads trending rows from p2fk and displays ranking + metrics in the UI.
+SupTV does **not** compute trending scores.  
+SupTV only requests `GetTrendingRootSearches` and displays the returned `rank`, `searchString`, and metrics.
 
-It also parses metric field variants so payload schema differences do not break the UI, including:
-- search-volume fields: `successfulSearchCount`, `searchTotal`, `searchCount`, `count`, `total` (and PascalCase variants)
-- result-volume fields: `lastResultCount`, `averageResultCount`, `maxResultCount`, `resultTotal`, `results`, `totalResults`, `resultCount` (and PascalCase variants)
+Based on `embiimob/p2fk.io` code:
+- Trending events are recorded from `GetKnownRootsBySearchString` **only when a search returns at least one result**.
+- Empty queries and wildcard `*` are excluded from trending tracking.
+- Search strings are normalized (trim + whitespace collapse).
+- Entries expire after 24 hours of inactivity.
+- Ranking score combines:
+  - **freshness** (recent searches rank higher),
+  - **result signal** (weighted `maxResultCount` and `averageResultCount`), and
+  - **search signal** (`successfulSearchCount`),
+  with logarithmic scaling to damp repeated spammy calls.
+- Output quantity is clamped to `1..100`.
 
-Fairness properties in SupTV’s playback assembly:
-- **Diversity by design:** round-robin batching prevents one keyword from dominating the queue.
-- **Bounded influence:** each keyword contributes in equal-size chunks per cycle.
-- **Deduplication:** repeated txids are collapsed so duplicates don’t inflate exposure.
-- **Transparent display:** top searches + result counts are shown in the banner and ticker.
+Why this is relatively fair/unbiased:
+- No manual curation list in SupTV; ordering comes from p2fk scoring.
+- Scoring uses objective, measurable signals (recency + successful usage + result volume).
+- Log-based weighting gives diminishing returns to repeated identical searches.
+
+Important limits (for accuracy):
+- This is **spam-resistant**, not perfect Sybil-proof fairness: there is no per-user identity weighting in this path.
+- Trending state is in-memory in the API process, so results are instance-local and reset on restart.
+- SupTV still applies its own queue round-robin/dedupe for playback diversity after receiving p2fk trends.
 
 ## Censorship resistance when running locally
 
