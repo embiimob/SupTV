@@ -35,7 +35,7 @@ At runtime, SupTV does this:
 2. Selects up to **20 unique keywords** (`TRENDING_KEYWORD_LIMIT`).
 3. Fetches per-keyword results with bounded concurrency (**4 at a time**, `TRENDING_KEYWORD_FETCH_CONCURRENCY`):
    - keyword channel messages (`GetPublicAddressByKeyword` + `GetPublicMessagesByAddress`)
-   - text search results (`GetKnownRootsBySearchString`)
+   - text search results (`GetKnownRootsBySearchString`) using `TRENDING_SEARCH_QTY` rows per keyword (default 200)
 4. Uses a **fast-start** model: playback begins as soon as first keyword results are ready.
 5. Builds a trending queue using **round-robin batching** (5-per-keyword batches, `TRENDING_KEYWORD_BATCH_SIZE`) with dedupe.
 6. Caps trending queue size at **500** (`TRENDING_MAX_PLAYLIST_ITEMS`).
