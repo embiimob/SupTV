@@ -5,7 +5,7 @@ It is software you run yourself (`index.html`) — **not** a streaming company o
 
 - p2fk.io: https://p2fk.io  
 - SupTV repository: https://github.com/embiimob/SupTV  
-- Public demo host: https://supgalaxy.org/TV
+- Live demo: https://supgalaxy.org/TV
 
 > The demo URL is just a convenient host for the same client app. SupTV itself is not a service business; it is a local-first app you can run anywhere.
 
@@ -50,7 +50,9 @@ For direct keyword search, SupTV combines:
 
 SupTV reads trending rows from p2fk and displays ranking + metrics in the UI.
 
-It also parses multiple metric field variants (`successfulSearchCount`, `lastResultCount`, and related aliases) so data remains usable even if payload field names vary.
+It also parses metric field variants so payload schema differences do not break the UI, including:
+- search-volume fields: `successfulSearchCount`, `searchTotal`, `searchCount`, `count`, `total` (and PascalCase variants)
+- result-volume fields: `lastResultCount`, `averageResultCount`, `maxResultCount`, `resultTotal`, `results`, `totalResults`, `resultCount` (and PascalCase variants)
 
 Fairness properties in SupTV’s playback assembly:
 - **Diversity by design:** round-robin batching prevents one keyword from dominating the queue.
