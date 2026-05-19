@@ -715,8 +715,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span></button>
-      <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -1159,7 +1158,6 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
-      IPFS_TOKEN_REGEX.lastIndex = 0;
       const ipfsMatches = [...text.matchAll(IPFS_TOKEN_REGEX)]
         .map((match) => {
           const hash = normalize(match[1]);
@@ -1227,11 +1225,11 @@
       const source = normalize(text);
       if (!source) return;
       IPFS_TOKEN_REGEX.lastIndex = 0;
-      let lastIndex = 0;
+      let textIndex = 0;
       let match;
       while ((match = IPFS_TOKEN_REGEX.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendHashtagsInText(fragment, source.slice(lastIndex, start));
+        appendHashtagsInText(fragment, source.slice(textIndex, start));
         const hash = normalize(match[1]);
         const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
         const ipfsUrl = buildIpfsPathUrl(hash, path || '', 0);
@@ -1242,9 +1240,9 @@
         anchor.title = ipfsUrl;
         anchor.textContent = shortTitle(`IPFS:${hash}${path ? `/${path}` : ''}`, 56);
         fragment.appendChild(anchor);
-        lastIndex = start + match[0].length;
+        textIndex = start + match[0].length;
       }
-      appendHashtagsInText(fragment, source.slice(lastIndex));
+      appendHashtagsInText(fragment, source.slice(textIndex));
     }
 
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
