@@ -111,9 +111,9 @@
     .brand b { font-size: 1.15rem; }
     .brand span { color: var(--muted); font-size: .85rem; }
     .brand .uncensored-hint { text-decoration: underline dotted rgba(186, 206, 255, .45); text-underline-offset: .18rem; }
-    .brand .uncensored-tooltip {
+    .uncensored-tooltip {
       position: absolute;
-      top: calc(100% + .45rem);
+      top: calc(100% - .15rem);
       left: 0;
       width: min(92vw, 460px);
       padding: .5rem .62rem;
@@ -131,7 +131,7 @@
       z-index: 10;
       white-space: normal;
     }
-    .brand .uncensored-tooltip.visible {
+    .uncensored-tooltip.visible {
       opacity: 1;
       transform: translate3d(0, 0, 0);
     }
@@ -715,7 +715,8 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span></button>
+      <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -1201,7 +1202,7 @@
       loadSearch(keyword);
     }
 
-    function appendHashtagTokenText(fragment, text) {
+    function appendHashtagsInText(fragment, text) {
       const source = normalize(text);
       if (!source) return;
       const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
@@ -1230,7 +1231,7 @@
       let match;
       while ((match = IPFS_TOKEN_REGEX.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendHashtagTokenText(fragment, source.slice(lastIndex, start));
+        appendHashtagsInText(fragment, source.slice(lastIndex, start));
         const hash = normalize(match[1]);
         const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
         const ipfsUrl = buildIpfsPathUrl(hash, path || '', 0);
@@ -1243,7 +1244,7 @@
         fragment.appendChild(anchor);
         lastIndex = start + match[0].length;
       }
-      appendHashtagTokenText(fragment, source.slice(lastIndex));
+      appendHashtagsInText(fragment, source.slice(lastIndex));
     }
 
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
