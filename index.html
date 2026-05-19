@@ -99,18 +99,27 @@
       font-weight: 700;
       letter-spacing: .02em;
       white-space: nowrap;
+      position: relative;
+    }
+
+    .brand-home {
       background: none;
       border: none;
       color: inherit;
       padding: 0;
       cursor: pointer;
       font-family: inherit;
-      position: relative;
+      font-weight: inherit;
+      letter-spacing: inherit;
     }
-
     .brand b { font-size: 1.15rem; }
-    .brand span { color: var(--muted); font-size: .85rem; }
-    .brand .uncensored-hint { text-decoration: underline dotted rgba(186, 206, 255, .45); text-underline-offset: .18rem; }
+    .brand .uncensored-hint {
+      color: var(--muted);
+      font-size: .85rem;
+      text-decoration: underline dotted rgba(186, 206, 255, .45);
+      text-underline-offset: .18rem;
+      cursor: pointer;
+    }
     .uncensored-tooltip {
       position: absolute;
       top: calc(100% - .15rem);
@@ -128,7 +137,7 @@
       transform: translate3d(0, -4px, 0);
       pointer-events: none;
       transition: opacity .14s ease, transform .14s ease;
-      z-index: 10;
+      z-index: 40;
       white-space: normal;
     }
     .uncensored-tooltip.visible {
@@ -715,7 +724,11 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
+      <div class="brand">
+        <button type="button" class="brand-home" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b></button>
+        <a class="uncensored-hint" id="uncensoredHint" href="https://github.com/embiimob/SUP" aria-describedby="uncensoredTooltip">uncensored</a>
+        <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
+      </div>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -1162,8 +1175,7 @@
         .map((match) => {
           const hash = normalize(match[1]);
           if (!hash) return '';
-          const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
-          return buildIpfsPathUrl(hash, path || '', 0);
+          return buildIpfsPathUrl(hash, '', 0);
         })
         .filter(Boolean);
       const unique = [...new Set(matches
@@ -1200,82 +1212,69 @@
       loadSearch(keyword);
     }
 
-    function appendHashtagsInText(fragment, text) {
-      const source = normalize(text);
-      if (!source) return;
-      const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
-      let lastIndex = 0;
-      let match;
-      while ((match = hashtagRegex.exec(source)) !== null) {
-        const before = source.slice(lastIndex, match.index);
-        if (before) fragment.appendChild(document.createTextNode(before));
-        const keyword = normalize(match[1]).toLowerCase();
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = `#${keyword}`;
-        button.addEventListener('click', () => triggerKeywordSearch(keyword));
-        fragment.appendChild(button);
-        lastIndex = hashtagRegex.lastIndex;
-      }
-      const trailing = source.slice(lastIndex);
-      if (trailing) fragment.appendChild(document.createTextNode(trailing));
-    }
-
-    function appendIpfsAndHashtagTokenText(fragment, text) {
-      const source = normalize(text);
-      if (!source) return;
-      IPFS_TOKEN_REGEX.lastIndex = 0;
-      let textIndex = 0;
-      let match;
-      while ((match = IPFS_TOKEN_REGEX.exec(source)) !== null) {
-        const start = match.index ?? 0;
-        appendHashtagsInText(fragment, source.slice(textIndex, start));
-        const hash = normalize(match[1]);
-        const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
-        const ipfsUrl = buildIpfsPathUrl(hash, path || '', 0);
-        const anchor = document.createElement('a');
-        anchor.href = ipfsUrl;
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
-        anchor.title = ipfsUrl;
-        anchor.textContent = shortTitle(`IPFS:${hash}${path ? `/${path}` : ''}`, 56);
-        fragment.appendChild(anchor);
-        textIndex = start + match[0].length;
-      }
-      appendHashtagsInText(fragment, source.slice(textIndex));
-    }
-
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
       const content = document.createDocumentFragment();
       const source = normalize(text);
-      const urlRegex = new RegExp(URL_REGEX.source, 'gi');
+      const tokenRegex = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
+      const ipfsTokenParser = new RegExp(`^${IPFS_TOKEN_REGEX.source}$`, 'i');
+      const hashtagTokenParser = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
       let lastIndex = 0;
       let match;
-      while ((match = urlRegex.exec(source)) !== null) {
+      while ((match = tokenRegex.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendIpfsAndHashtagTokenText(content, source.slice(lastIndex, start));
-        const matchedUrl = match[0];
-        const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
-        const candidateUrl = matchedPrimaryUrl || matchedUrl;
-        const cleanUrl = stripTrailingUrlPunctuation(candidateUrl);
-        if (!cleanUrl) {
-          appendIpfsAndHashtagTokenText(content, matchedUrl);
-          lastIndex = start + matchedUrl.length;
-          continue;
+        const leadingText = source.slice(lastIndex, start);
+        if (leadingText) content.appendChild(document.createTextNode(leadingText));
+
+        const fullMatch = match[0];
+        const ipfsParts = fullMatch.match(ipfsTokenParser);
+        if (ipfsParts) {
+          const hash = normalize(ipfsParts?.[1] || '');
+          if (hash) {
+            const ipfsUrl = buildIpfsPathUrl(hash, '', 0);
+            const anchor = document.createElement('a');
+            anchor.href = ipfsUrl;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.title = ipfsUrl;
+            anchor.textContent = `IPFS:${hash}`;
+            content.appendChild(anchor);
+          } else {
+            content.appendChild(document.createTextNode(fullMatch));
+          }
+        } else if (fullMatch.startsWith('#')) {
+          const hashtagParts = fullMatch.match(hashtagTokenParser);
+          const keyword = normalize(hashtagParts?.[1] || fullMatch.replace(/^#/, '')).toLowerCase();
+          if (!keyword) {
+            content.appendChild(document.createTextNode(fullMatch));
+            lastIndex = start + fullMatch.length;
+            continue;
+          }
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `#${keyword}`;
+          button.addEventListener('click', () => triggerKeywordSearch(keyword));
+          content.appendChild(button);
+        } else {
+          const cleanUrl = stripTrailingUrlPunctuation(fullMatch);
+          if (!cleanUrl) {
+            content.appendChild(document.createTextNode(fullMatch));
+            lastIndex = start + fullMatch.length;
+            continue;
+          }
+          const trailingPunctuation = fullMatch.slice(cleanUrl.length);
+          const anchor = document.createElement('a');
+          anchor.href = normalizeLinkForHref(cleanUrl);
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.title = normalizeLinkForHref(cleanUrl);
+          anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
+          content.appendChild(anchor);
+          if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         }
-        const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
-        const anchor = document.createElement('a');
-        anchor.href = normalizeLinkForHref(cleanUrl);
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
-        anchor.title = normalizeLinkForHref(cleanUrl);
-        anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
-        content.appendChild(anchor);
-        if (matchedIpfsSuffix) appendIpfsAndHashtagTokenText(content, matchedIpfsSuffix);
-        if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
-        lastIndex = start + matchedUrl.length;
+        lastIndex = start + fullMatch.length;
       }
-      appendIpfsAndHashtagTokenText(content, source.slice(lastIndex));
+      const trailingText = source.slice(lastIndex);
+      if (trailingText) content.appendChild(document.createTextNode(trailingText));
       return content;
     }
 
@@ -1764,37 +1763,6 @@
         }
       }
 
-      if (Array.isArray(card.links) && card.links.length) {
-        const links = document.createElement('div');
-        links.className = 'message-card-links';
-        for (const link of card.links.slice(0, 4)) {
-          const cleanUrl = normalizeLinkForHref(stripTrailingUrlPunctuation(link || ''));
-          if (!cleanUrl) continue;
-          const anchor = document.createElement('a');
-          anchor.href = cleanUrl;
-          anchor.target = '_blank';
-          anchor.rel = 'noopener noreferrer';
-          anchor.title = cleanUrl;
-          anchor.textContent = formatLinkLabel(cleanUrl, 56);
-          links.appendChild(anchor);
-        }
-        if (links.childElementCount) li.appendChild(links);
-      }
-
-      if (Array.isArray(card.keywords) && card.keywords.length) {
-        const keywords = document.createElement('div');
-        keywords.className = 'message-card-keywords';
-        for (const keyword of card.keywords.slice(0, 5)) {
-          const cleanKeyword = normalize(keyword).replace(/^#/, '').toLowerCase();
-          if (!cleanKeyword || cleanKeyword.length < 2) continue;
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = `#${cleanKeyword}`;
-          button.addEventListener('click', () => triggerKeywordSearch(cleanKeyword));
-          keywords.appendChild(button);
-        }
-        if (keywords.childElementCount) li.appendChild(keywords);
-      }
       return li;
     }
 
@@ -1812,6 +1780,10 @@
       if (!dom.uncensoredTooltip) return;
       if (uncensoredTooltipTimerId) clearTimeout(uncensoredTooltipTimerId);
       uncensoredTooltipTimerId = window.setTimeout(() => {
+        if (!dom.uncensoredHint?.matches(':hover') && document.activeElement !== dom.uncensoredHint) {
+          uncensoredTooltipTimerId = null;
+          return;
+        }
         dom.uncensoredTooltip.classList.add('visible');
         dom.uncensoredTooltip.setAttribute('aria-hidden', 'false');
         uncensoredTooltipTimerId = null;
