@@ -6,13 +6,13 @@
   <meta name="description" content="SupTV - fullscreen-first infinite p2fk.io video stream with live social overlays." />
   <meta name="theme-color" content="#02020a" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="SupTV" />
-  <meta property="og:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta property="og:site_name" content="SupTV.io" />
+  <meta property="og:title" content="SupTV.io ✦ Infinite Video Stream" />
   <meta property="og:description" content="Search p2fk.io videos, go fullscreen, and ride a nonstop SupTV stream." />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta name="twitter:title" content="SupTV.io ✦ Infinite Video Stream" />
   <meta name="twitter:description" content="Fullscreen-first p2fk.io stream with a retro-cool SupTV vibe." />
-  <title>SupTV</title>
+  <title>SupTV.io</title>
   <style>
     :root {
       color-scheme: dark;
@@ -105,10 +105,36 @@
       padding: 0;
       cursor: pointer;
       font-family: inherit;
+      position: relative;
     }
 
     .brand b { font-size: 1.15rem; }
     .brand span { color: var(--muted); font-size: .85rem; }
+    .brand .uncensored-hint { text-decoration: underline dotted rgba(186, 206, 255, .45); text-underline-offset: .18rem; }
+    .brand .uncensored-tooltip {
+      position: absolute;
+      top: calc(100% + .45rem);
+      left: 0;
+      width: min(92vw, 460px);
+      padding: .5rem .62rem;
+      border-radius: .58rem;
+      border: 1px solid rgba(124, 150, 214, .5);
+      background: rgba(7, 14, 28, .96);
+      color: #d6e7ff;
+      font-size: .72rem;
+      line-height: 1.3;
+      text-align: left;
+      opacity: 0;
+      transform: translate3d(0, -4px, 0);
+      pointer-events: none;
+      transition: opacity .14s ease, transform .14s ease;
+      z-index: 10;
+      white-space: normal;
+    }
+    .brand .uncensored-tooltip.visible {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
 
     .controls {
       display: flex;
@@ -689,7 +715,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV</b><span>uncensored</span></button>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -754,6 +780,8 @@
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       brandBtn: document.getElementById('brandBtn'),
+      uncensoredHint: document.getElementById('uncensoredHint'),
+      uncensoredTooltip: document.getElementById('uncensoredTooltip'),
       app: document.getElementById('app'),
       tickerWrap: document.getElementById('tickerWrap'),
       bannerMenu: document.getElementById('bannerMenu'),
@@ -799,6 +827,7 @@
     const FULLSCREEN_ACTIVATION_DELAY_MS = 120;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
+    const UNCENSORED_TOOLTIP_DELAY_MS = 1100;
     const SWIPE_SKIP_MIN_X_PX = 120; // Higher than before to reduce accidental skips while interacting on mobile.
     const SWIPE_SKIP_MAX_Y_PX = 80;
     const SWIPE_TUG_MAX_X_PX = 44;
@@ -866,6 +895,7 @@
     let trendingStatsRows = [];
     let bannerMenuOpen = false;
     let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
+    let uncensoredTooltipTimerId = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1127,11 +1157,20 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
+      const ipfsMatches = [...text.matchAll(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi)]
+        .map((match) => {
+          const hash = normalize(match[1]);
+          if (!hash) return '';
+          const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
+          return buildIpfsPathUrl(hash, path || '', 0);
+        })
+        .filter(Boolean);
       const unique = [...new Set(matches
         .map((link) => splitInlineIpfsSuffix(link).primary || link)
         .map((link) => stripTrailingUrlPunctuation(link))
         .map((link) => normalizeLinkForHref(link))
-        .filter(Boolean))];
+        .filter(Boolean)
+        .concat(ipfsMatches))];
       return unique.slice(0, 4);
     };
     const extractKeywords = (messageText, subjectText) => {
@@ -1160,7 +1199,7 @@
       loadSearch(keyword);
     }
 
-    function appendInteractiveTokenText(fragment, text) {
+    function appendHashtagTokenText(fragment, text) {
       const source = normalize(text);
       if (!source) return;
       const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
@@ -1179,6 +1218,30 @@
       }
       const trailing = source.slice(lastIndex);
       if (trailing) fragment.appendChild(document.createTextNode(trailing));
+    }
+
+    function appendInteractiveTokenText(fragment, text) {
+      const source = normalize(text);
+      if (!source) return;
+      const ipfsTokenRegex = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi;
+      let lastIndex = 0;
+      let match;
+      while ((match = ipfsTokenRegex.exec(source)) !== null) {
+        const start = match.index ?? 0;
+        appendHashtagTokenText(fragment, source.slice(lastIndex, start));
+        const hash = normalize(match[1]);
+        const path = stripTrailingUrlPunctuation(normalize(match[2] || '')).replace(/^[/\\]+/, '');
+        const ipfsUrl = buildIpfsPathUrl(hash, path || '', 0);
+        const anchor = document.createElement('a');
+        anchor.href = ipfsUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.title = ipfsUrl;
+        anchor.textContent = shortTitle(`IPFS:${hash}${path ? `/${path}` : ''}`, 56);
+        fragment.appendChild(anchor);
+        lastIndex = start + match[0].length;
+      }
+      appendHashtagTokenText(fragment, source.slice(lastIndex));
     }
 
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
@@ -1699,7 +1762,59 @@
           li.appendChild(image);
         }
       }
+
+      if (Array.isArray(card.links) && card.links.length) {
+        const links = document.createElement('div');
+        links.className = 'message-card-links';
+        for (const link of card.links.slice(0, 4)) {
+          const cleanUrl = normalizeLinkForHref(stripTrailingUrlPunctuation(link || ''));
+          if (!cleanUrl) continue;
+          const anchor = document.createElement('a');
+          anchor.href = cleanUrl;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.title = cleanUrl;
+          anchor.textContent = formatLinkLabel(cleanUrl, 56);
+          links.appendChild(anchor);
+        }
+        if (links.childElementCount) li.appendChild(links);
+      }
+
+      if (Array.isArray(card.keywords) && card.keywords.length) {
+        const keywords = document.createElement('div');
+        keywords.className = 'message-card-keywords';
+        for (const keyword of card.keywords.slice(0, 5)) {
+          const cleanKeyword = normalize(keyword).replace(/^#/, '').toLowerCase();
+          if (!cleanKeyword || cleanKeyword.length < 2) continue;
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `#${cleanKeyword}`;
+          button.addEventListener('click', () => triggerKeywordSearch(cleanKeyword));
+          keywords.appendChild(button);
+        }
+        if (keywords.childElementCount) li.appendChild(keywords);
+      }
       return li;
+    }
+
+    function hideUncensoredTooltip() {
+      if (uncensoredTooltipTimerId) {
+        clearTimeout(uncensoredTooltipTimerId);
+        uncensoredTooltipTimerId = null;
+      }
+      if (!dom.uncensoredTooltip) return;
+      dom.uncensoredTooltip.classList.remove('visible');
+      dom.uncensoredTooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    function queueUncensoredTooltip() {
+      if (!dom.uncensoredTooltip) return;
+      if (uncensoredTooltipTimerId) clearTimeout(uncensoredTooltipTimerId);
+      uncensoredTooltipTimerId = window.setTimeout(() => {
+        dom.uncensoredTooltip.classList.add('visible');
+        dom.uncensoredTooltip.setAttribute('aria-hidden', 'false');
+        uncensoredTooltipTimerId = null;
+      }, UNCENSORED_TOOLTIP_DELAY_MS);
     }
 
     function flushNextQueuedMessage() {
@@ -2725,6 +2840,12 @@
       dom.brandBtn.addEventListener('click', () => {
         runSearch('', { resetSessionSkips: false, setInput: true });
       });
+      if (dom.uncensoredHint) {
+        dom.uncensoredHint.addEventListener('mouseenter', queueUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('focus', queueUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('mouseleave', hideUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('blur', hideUncensoredTooltip);
+      }
       dom.tickerWrap.addEventListener('click', (event) => {
         event.stopPropagation();
         toggleBannerMenu();
