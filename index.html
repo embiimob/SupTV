@@ -867,6 +867,10 @@
     const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
     const IPFS_TOKEN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi;
+    const LINK_OR_IPFS_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})`, 'gi');
+    const INLINE_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
+    const IPFS_TOKEN_PARSER_REGEX = new RegExp(`^${IPFS_TOKEN_REGEX.source}$`, 'i');
+    const HASHTAG_TOKEN_PARSER_REGEX = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
@@ -910,6 +914,7 @@
     let bannerMenuOpen = false;
     let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
     let uncensoredTooltipTimerId = null;
+    let uncensoredHintHovered = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1170,20 +1175,23 @@
     const extractLinks = (value) => {
       const text = normalize(value);
       if (!text) return [];
-      const matches = text.match(URL_REGEX) || [];
-      const ipfsMatches = [...text.matchAll(IPFS_TOKEN_REGEX)]
-        .map((match) => {
-          const hash = normalize(match[1]);
-          if (!hash) return '';
-          return buildIpfsPathUrl(hash, '', 0);
-        })
-        .filter(Boolean);
-      const unique = [...new Set(matches
-        .map((link) => splitInlineIpfsSuffix(link).primary || link)
-        .map((link) => stripTrailingUrlPunctuation(link))
-        .map((link) => normalizeLinkForHref(link))
-        .filter(Boolean)
-        .concat(ipfsMatches))];
+      LINK_OR_IPFS_TOKEN_REGEX.lastIndex = 0;
+      const extracted = [];
+      let match;
+      while ((match = LINK_OR_IPFS_TOKEN_REGEX.exec(text)) !== null) {
+        const token = match[0] || '';
+        if (!token) continue;
+        const ipfsParts = token.match(IPFS_TOKEN_PARSER_REGEX);
+        if (ipfsParts) {
+          const hash = normalize(ipfsParts[1] || '');
+          if (!hash) continue;
+          extracted.push(buildIpfsPathUrl(hash, '', 0));
+          continue;
+        }
+        const cleanUrl = normalizeLinkForHref(stripTrailingUrlPunctuation(splitInlineIpfsSuffix(token).primary || token));
+        if (cleanUrl) extracted.push(cleanUrl);
+      }
+      const unique = [...new Set(extracted)];
       return unique.slice(0, 4);
     };
     const extractKeywords = (messageText, subjectText) => {
@@ -1215,18 +1223,16 @@
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
       const content = document.createDocumentFragment();
       const source = normalize(text);
-      const tokenRegex = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
-      const ipfsTokenParser = new RegExp(`^${IPFS_TOKEN_REGEX.source}$`, 'i');
-      const hashtagTokenParser = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
+      INLINE_TOKEN_REGEX.lastIndex = 0;
       let lastIndex = 0;
       let match;
-      while ((match = tokenRegex.exec(source)) !== null) {
+      while ((match = INLINE_TOKEN_REGEX.exec(source)) !== null) {
         const start = match.index ?? 0;
         const leadingText = source.slice(lastIndex, start);
         if (leadingText) content.appendChild(document.createTextNode(leadingText));
 
         const fullMatch = match[0];
-        const ipfsParts = fullMatch.match(ipfsTokenParser);
+        const ipfsParts = fullMatch.match(IPFS_TOKEN_PARSER_REGEX);
         if (ipfsParts) {
           const hash = normalize(ipfsParts?.[1] || '');
           if (hash) {
@@ -1242,7 +1248,7 @@
             content.appendChild(document.createTextNode(fullMatch));
           }
         } else if (fullMatch.startsWith('#')) {
-          const hashtagParts = fullMatch.match(hashtagTokenParser);
+          const hashtagParts = fullMatch.match(HASHTAG_TOKEN_PARSER_REGEX);
           const keyword = normalize(hashtagParts?.[1] || fullMatch.replace(/^#/, '')).toLowerCase();
           if (!keyword) {
             content.appendChild(document.createTextNode(fullMatch));
@@ -1780,7 +1786,7 @@
       if (!dom.uncensoredTooltip) return;
       if (uncensoredTooltipTimerId) clearTimeout(uncensoredTooltipTimerId);
       uncensoredTooltipTimerId = window.setTimeout(() => {
-        if (!dom.uncensoredHint?.matches(':hover') && document.activeElement !== dom.uncensoredHint) {
+        if (!uncensoredHintHovered && document.activeElement !== dom.uncensoredHint) {
           uncensoredTooltipTimerId = null;
           return;
         }
@@ -2814,9 +2820,15 @@
         runSearch('', { resetSessionSkips: false, setInput: true });
       });
       if (dom.uncensoredHint) {
-        dom.uncensoredHint.addEventListener('mouseenter', queueUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('mouseenter', () => {
+          uncensoredHintHovered = true;
+          queueUncensoredTooltip();
+        });
         dom.uncensoredHint.addEventListener('focus', queueUncensoredTooltip);
-        dom.uncensoredHint.addEventListener('mouseleave', hideUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('mouseleave', () => {
+          uncensoredHintHovered = false;
+          hideUncensoredTooltip();
+        });
         dom.uncensoredHint.addEventListener('blur', hideUncensoredTooltip);
         dom.uncensoredHint.addEventListener('keydown', (event) => {
           if (event.key !== 'Escape') return;
