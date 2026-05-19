@@ -715,7 +715,7 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
+      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b><span class="uncensored-hint" id="uncensoredHint" aria-describedby="uncensoredTooltip" tabindex="0">uncensored</span><span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span></button>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -853,6 +853,7 @@
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
     const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
+    const IPFS_TOKEN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi;
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
@@ -1157,7 +1158,7 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
-      const ipfsMatches = [...text.matchAll(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi)]
+      const ipfsMatches = [...text.matchAll(new RegExp(IPFS_TOKEN_REGEX.source, 'gi'))]
         .map((match) => {
           const hash = normalize(match[1]);
           if (!hash) return '';
@@ -1220,10 +1221,10 @@
       if (trailing) fragment.appendChild(document.createTextNode(trailing));
     }
 
-    function appendInteractiveTokenText(fragment, text) {
+    function appendIpfsAndHashtagTokenText(fragment, text) {
       const source = normalize(text);
       if (!source) return;
-      const ipfsTokenRegex = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi;
+      const ipfsTokenRegex = new RegExp(IPFS_TOKEN_REGEX.source, 'gi');
       let lastIndex = 0;
       let match;
       while ((match = ipfsTokenRegex.exec(source)) !== null) {
@@ -1252,13 +1253,13 @@
       let match;
       while ((match = urlRegex.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendInteractiveTokenText(content, source.slice(lastIndex, start));
+        appendIpfsAndHashtagTokenText(content, source.slice(lastIndex, start));
         const matchedUrl = match[0];
         const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
         const candidateUrl = matchedPrimaryUrl || matchedUrl;
         const cleanUrl = stripTrailingUrlPunctuation(candidateUrl);
         if (!cleanUrl) {
-          appendInteractiveTokenText(content, matchedUrl);
+          appendIpfsAndHashtagTokenText(content, matchedUrl);
           lastIndex = start + matchedUrl.length;
           continue;
         }
@@ -1270,11 +1271,11 @@
         anchor.title = normalizeLinkForHref(cleanUrl);
         anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
         content.appendChild(anchor);
-        if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
+        if (matchedIpfsSuffix) appendIpfsAndHashtagTokenText(content, matchedIpfsSuffix);
         if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         lastIndex = start + matchedUrl.length;
       }
-      appendInteractiveTokenText(content, source.slice(lastIndex));
+      appendIpfsAndHashtagTokenText(content, source.slice(lastIndex));
       return content;
     }
 
