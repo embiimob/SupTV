@@ -946,7 +946,7 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value, maxLength = 220) => {
-      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '');
+      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, ' ');
       if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
       return sanitized.slice(0, maxLength);
     };
