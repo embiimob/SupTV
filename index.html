@@ -927,6 +927,17 @@
         .replace(/&quot;/gi, '"')
         .replace(/&#0?39;|&apos;/gi, "'");
     };
+    const SALT_EMOJI_POOL = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '🤗', '🤠', '🥳', '🤓', '😎', '🤖', '👾', '👻', '🎃', '💀', '🧠', '🫀', '🦾', '🦿', '👁️', '🔥', '⚡', '💥', '✨', '🌟', '⭐', '🌈', '☀️', '🌙', '🪐', '🌌', '🌊', '🌀', '❄️', '☁️', '🌤️', '🌋', '🧊', '🌱', '🌿', '🍀', '🌵', '🌴', '🌺', '🌸', '🌼', '🍄', '🪷', '🦋', '🐝', '🐞', '🦄', '🐉', '🐲', '🦊', '🐺', '🦁', '🐯', '🐼', '🐸', '🐙', '🦑', '🦐', '🦞', '🦀', '🐬', '🐳', '🦈', '🐋', '🦅', '🕊️', '🦉', '🦜', '🪶', '🎯', '🎲', '🎮', '🕹️', '🧩', '🧿', '🔮', '💎', '🪙', '🛰️', '🚀', '🛸', '⚙️', '⏳', '⌛', '🧭', '🗺️', '🎵', '🎶', '🎼', '🎸', '🎷', '🥁', '🎹', '🪕', '📻', '📺', '💡', '🕯️', '🧨', '🎇', '🎆'];
+    const saltNumberToEmoji = (value) => {
+      const text = normalize(value);
+      if (!/^-?\d+$/.test(text) || text[0] !== '-') return '';
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) hash = ((hash * 33) + text.charCodeAt(i)) >>> 0;
+      return SALT_EMOJI_POOL[hash % SALT_EMOJI_POOL.length];
+    };
+    const replaceSaltMarkers = (value) => normalize(value)
+      .replace(/<<\s*(-\d+)\s*>>/g, (_, salt) => ` ${saltNumberToEmoji(salt)} `)
+      .replace(/<\s*(-\d+)\s*>/g, (_, salt) => ` ${saltNumberToEmoji(salt)} `);
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
 
@@ -946,7 +957,7 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value, maxLength = 220) => {
-      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, ' ');
+      const sanitized = replaceSaltMarkers(decodeHtmlEntities(normalize(value))).replace(/[<>]/g, ' ');
       if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
       return sanitized.slice(0, maxLength);
     };
@@ -1313,7 +1324,7 @@
     function normalizeRootMsg(root) {
       const raw = root?.Message ?? root?.message ?? root?.text;
       const joined = Array.isArray(raw) ? raw.join('\n').trim() : normalize(raw);
-      return decodeHtmlEntities(joined);
+      return replaceSaltMarkers(decodeHtmlEntities(joined));
     }
 
     function rootFromAddress(root) {
