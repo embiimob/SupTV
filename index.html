@@ -866,10 +866,11 @@
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
     const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
-    const IPFS_TOKEN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/gi;
-    const LINK_OR_IPFS_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})`, 'gi');
-    const INLINE_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
-    const IPFS_TOKEN_PARSER_REGEX = new RegExp(`^${IPFS_TOKEN_REGEX.source}$`, 'i');
+    const IPFS_TOKEN_PATTERN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/;
+    const IPFS_TOKEN_REGEX = new RegExp(IPFS_TOKEN_PATTERN_REGEX.source, 'gi');
+    const LINK_OR_IPFS_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})`, 'gi');
+    const INLINE_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
+    const IPFS_TOKEN_PARSER_REGEX = new RegExp(`^${IPFS_TOKEN_PATTERN_REGEX.source}$`, 'i');
     const HASHTAG_TOKEN_PARSER_REGEX = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
@@ -1234,7 +1235,7 @@
         const fullMatch = match[0];
         const ipfsParts = fullMatch.match(IPFS_TOKEN_PARSER_REGEX);
         if (ipfsParts) {
-          const hash = normalize(ipfsParts?.[1] || '');
+          const hash = normalize(ipfsParts[1] || '');
           if (hash) {
             const ipfsUrl = buildIpfsPathUrl(hash, '', 0);
             const anchor = document.createElement('a');
