@@ -1223,7 +1223,11 @@
 
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
       const content = document.createDocumentFragment();
-      const source = normalize(text);
+      // Pre-process: when a hashtag runs directly into an IPFS: token (e.g.
+      // "#wordIPFS:Qm..."), KEYWORD_REGEX would greedily consume "IPFS" as part of
+      // the hashtag, leaving ":Qm..." as orphaned text.  Insert a space so both
+      // tokens parse independently.
+      const source = normalize(text).replace(/(#[a-zA-Z0-9_-]+?)(IPFS:)/gi, '$1 $2');
       INLINE_TOKEN_REGEX.lastIndex = 0;
       let lastIndex = 0;
       let match;
