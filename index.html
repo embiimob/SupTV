@@ -6,13 +6,13 @@
   <meta name="description" content="SupTV - fullscreen-first infinite p2fk.io video stream with live social overlays." />
   <meta name="theme-color" content="#02020a" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="SupTV" />
-  <meta property="og:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta property="og:site_name" content="SupTV.io" />
+  <meta property="og:title" content="SupTV.io ✦ Infinite Video Stream" />
   <meta property="og:description" content="Search p2fk.io videos, go fullscreen, and ride a nonstop SupTV stream." />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="SupTV ✦ Infinite Video Stream" />
+  <meta name="twitter:title" content="SupTV.io ✦ Infinite Video Stream" />
   <meta name="twitter:description" content="Fullscreen-first p2fk.io stream with a retro-cool SupTV vibe." />
-  <title>SupTV</title>
+  <title>SupTV.io</title>
   <style>
     :root {
       color-scheme: dark;
@@ -99,16 +99,51 @@
       font-weight: 700;
       letter-spacing: .02em;
       white-space: nowrap;
+      position: relative;
+    }
+
+    .brand-home {
       background: none;
       border: none;
       color: inherit;
       padding: 0;
       cursor: pointer;
       font-family: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
     }
-
     .brand b { font-size: 1.15rem; }
-    .brand span { color: var(--muted); font-size: .85rem; }
+    .brand .uncensored-hint {
+      color: var(--muted);
+      font-size: .85rem;
+      text-decoration: underline dotted rgba(186, 206, 255, .45);
+      text-underline-offset: .18rem;
+      cursor: pointer;
+    }
+    .uncensored-tooltip {
+      position: absolute;
+      top: calc(100% - .15rem);
+      left: 0;
+      width: min(92vw, 460px);
+      padding: .5rem .62rem;
+      border-radius: .58rem;
+      border: 1px solid rgba(124, 150, 214, .5);
+      background: rgba(7, 14, 28, .96);
+      color: #d6e7ff;
+      font-size: .72rem;
+      line-height: 1.3;
+      text-align: left;
+      opacity: 0;
+      transform: translate3d(0, -4px, 0);
+      pointer-events: none;
+      transition: opacity .14s ease, transform .14s ease;
+      z-index: 40;
+      white-space: normal;
+    }
+    .uncensored-tooltip.visible {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
 
     .controls {
       display: flex;
@@ -689,7 +724,11 @@
     <div class="overlay"></div>
 
     <header class="topbar">
-      <button type="button" class="brand" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV</b><span>uncensored</span></button>
+      <div class="brand">
+        <button type="button" class="brand-home" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b></button>
+        <a class="uncensored-hint" id="uncensoredHint" href="https://github.com/embiimob/SUP" aria-describedby="uncensoredTooltip">uncensored</a>
+        <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
+      </div>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
@@ -754,6 +793,8 @@
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
       brandBtn: document.getElementById('brandBtn'),
+      uncensoredHint: document.getElementById('uncensoredHint'),
+      uncensoredTooltip: document.getElementById('uncensoredTooltip'),
       app: document.getElementById('app'),
       tickerWrap: document.getElementById('tickerWrap'),
       bannerMenu: document.getElementById('bannerMenu'),
@@ -799,6 +840,7 @@
     const FULLSCREEN_ACTIVATION_DELAY_MS = 120;
     const MOUSE_SHOW_DISTANCE_PX = 48;
     const DOWNLOAD_BLOB_URL_REVOKE_DELAY_MS = 5000;
+    const UNCENSORED_TOOLTIP_DELAY_MS = 1100;
     const SWIPE_SKIP_MIN_X_PX = 120; // Higher than before to reduce accidental skips while interacting on mobile.
     const SWIPE_SKIP_MAX_Y_PX = 80;
     const SWIPE_TUG_MAX_X_PX = 44;
@@ -822,8 +864,14 @@
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
-    const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
+    const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{1,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
+    const IPFS_TOKEN_PATTERN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/;
+    const IPFS_TOKEN_REGEX = new RegExp(IPFS_TOKEN_PATTERN_REGEX.source, 'gi');
+    const LINK_OR_IPFS_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})`, 'gi');
+    const INLINE_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
+    const IPFS_TOKEN_PARSER_REGEX = new RegExp(`^${IPFS_TOKEN_PATTERN_REGEX.source}$`, 'i');
+    const HASHTAG_TOKEN_PARSER_REGEX = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
     const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
@@ -866,6 +914,8 @@
     let trendingStatsRows = [];
     let bannerMenuOpen = false;
     let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
+    let uncensoredTooltipTimerId = null;
+    let uncensoredHintHovered = false;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -877,6 +927,17 @@
         .replace(/&quot;/gi, '"')
         .replace(/&#0?39;|&apos;/gi, "'");
     };
+    const SALT_EMOJI_POOL = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '🤗', '🤠', '🥳', '🤓', '😎', '🤖', '👾', '👻', '🎃', '💀', '🧠', '🫀', '🦾', '🦿', '👁️', '🔥', '⚡', '💥', '✨', '🌟', '⭐', '🌈', '☀️', '🌙', '🪐', '🌌', '🌊', '🌀', '❄️', '☁️', '🌤️', '🌋', '🧊', '🌱', '🌿', '🍀', '🌵', '🌴', '🌺', '🌸', '🌼', '🍄', '🪷', '🦋', '🐝', '🐞', '🦄', '🐉', '🐲', '🦊', '🐺', '🦁', '🐯', '🐼', '🐸', '🐙', '🦑', '🦐', '🦞', '🦀', '🐬', '🐳', '🦈', '🐋', '🦅', '🕊️', '🦉', '🦜', '🪶', '🎯', '🎲', '🎮', '🕹️', '🧩', '🧿', '🔮', '💎', '🪙', '🛰️', '🚀', '🛸', '⚙️', '⏳', '⌛', '🧭', '🗺️', '🎵', '🎶', '🎼', '🎸', '🎷', '🥁', '🎹', '🪕', '📻', '📺', '💡', '🕯️', '🧨', '🎇', '🎆'];
+    const saltNumberToEmoji = (value) => {
+      const text = normalize(value);
+      if (!/^-\d+$/.test(text)) return '';
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) hash = ((hash * 33) + text.charCodeAt(i)) >>> 0;
+      return SALT_EMOJI_POOL[hash % SALT_EMOJI_POOL.length];
+    };
+    const replaceSaltMarkers = (value) => normalize(value)
+      .replace(/<<\s*(-\d+)\s*>>/g, (_, salt) => ` ${saltNumberToEmoji(salt)} `)
+      .replace(/<\s*(-\d+)\s*>/g, (_, salt) => ` ${saltNumberToEmoji(salt)} `);
     const getNativeFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
     const isFullscreenLikeMode = () => Boolean(getNativeFullscreenElement()) || pseudoFullscreenActive;
 
@@ -896,7 +957,7 @@
     const TICKER_SECTION_SEPARATOR = ' ║ ';
     const TICKER_ITEM_SEPARATOR = ' ✦ ';
     const cleanDisplayText = (value, maxLength = 220) => {
-      const sanitized = decodeHtmlEntities(normalize(value)).replace(/[<>]/g, '').replace(/>{2,}|<{2,}/g, '');
+      const sanitized = replaceSaltMarkers(decodeHtmlEntities(normalize(value))).replace(/[<>]/g, ' ');
       if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
       return sanitized.slice(0, maxLength);
     };
@@ -1026,7 +1087,7 @@
       if (!text) return '';
       if (/^https?:\/\//i.test(text)) return text;
       if (/^www\./i.test(text)) return `https://${text}`;
-      if (/^(?:[a-z0-9-]{2,}\.)+[a-z]{2,}(?:\/|$)/i.test(text)) return `https://${text}`;
+      if (/^(?:[a-z0-9-]{1,}\.)+[a-z]{2,}(?:\/|$)/i.test(text)) return `https://${text}`;
       return text;
     };
     const formatLinkLabel = (value, max = 42) => {
@@ -1126,12 +1187,23 @@
     const extractLinks = (value) => {
       const text = normalize(value);
       if (!text) return [];
-      const matches = text.match(URL_REGEX) || [];
-      const unique = [...new Set(matches
-        .map((link) => splitInlineIpfsSuffix(link).primary || link)
-        .map((link) => stripTrailingUrlPunctuation(link))
-        .map((link) => normalizeLinkForHref(link))
-        .filter(Boolean))];
+      LINK_OR_IPFS_TOKEN_REGEX.lastIndex = 0;
+      const extracted = [];
+      let match;
+      while ((match = LINK_OR_IPFS_TOKEN_REGEX.exec(text)) !== null) {
+        const token = match[0] || '';
+        if (!token) continue;
+        const ipfsParts = token.match(IPFS_TOKEN_PARSER_REGEX);
+        if (ipfsParts) {
+          const hash = normalize(ipfsParts[1] || '');
+          if (!hash) continue;
+          extracted.push(buildIpfsPathUrl(hash, '', 0));
+          continue;
+        }
+        const cleanUrl = normalizeLinkForHref(stripTrailingUrlPunctuation(splitInlineIpfsSuffix(token).primary || token));
+        if (cleanUrl) extracted.push(cleanUrl);
+      }
+      const unique = [...new Set(extracted)];
       return unique.slice(0, 4);
     };
     const extractKeywords = (messageText, subjectText) => {
@@ -1160,58 +1232,71 @@
       loadSearch(keyword);
     }
 
-    function appendInteractiveTokenText(fragment, text) {
-      const source = normalize(text);
-      if (!source) return;
-      const hashtagRegex = new RegExp(KEYWORD_REGEX.source, 'g');
-      let lastIndex = 0;
-      let match;
-      while ((match = hashtagRegex.exec(source)) !== null) {
-        const before = source.slice(lastIndex, match.index);
-        if (before) fragment.appendChild(document.createTextNode(before));
-        const keyword = normalize(match[1]).toLowerCase();
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = `#${keyword}`;
-        button.addEventListener('click', () => triggerKeywordSearch(keyword));
-        fragment.appendChild(button);
-        lastIndex = hashtagRegex.lastIndex;
-      }
-      const trailing = source.slice(lastIndex);
-      if (trailing) fragment.appendChild(document.createTextNode(trailing));
-    }
-
     function buildInteractiveContent(text, { urlMaxLength = 42 } = {}) {
       const content = document.createDocumentFragment();
-      const source = normalize(text);
-      const urlRegex = new RegExp(URL_REGEX.source, 'gi');
+      // Pre-process: when a hashtag runs directly into an IPFS: token (e.g.
+      // "#wordIPFS:Qm..."), KEYWORD_REGEX would greedily consume "IPFS" as part of
+      // the hashtag, leaving ":Qm..." as orphaned text.  Insert a space so both
+      // tokens parse independently.
+      const source = normalize(text).replace(/(#[a-zA-Z0-9_-]+?)(IPFS:)/gi, '$1 $2');
+      INLINE_TOKEN_REGEX.lastIndex = 0;
       let lastIndex = 0;
       let match;
-      while ((match = urlRegex.exec(source)) !== null) {
+      while ((match = INLINE_TOKEN_REGEX.exec(source)) !== null) {
         const start = match.index ?? 0;
-        appendInteractiveTokenText(content, source.slice(lastIndex, start));
-        const matchedUrl = match[0];
-        const { primary: matchedPrimaryUrl, suffix: matchedIpfsSuffix } = splitInlineIpfsSuffix(matchedUrl);
-        const candidateUrl = matchedPrimaryUrl || matchedUrl;
-        const cleanUrl = stripTrailingUrlPunctuation(candidateUrl);
-        if (!cleanUrl) {
-          appendInteractiveTokenText(content, matchedUrl);
-          lastIndex = start + matchedUrl.length;
-          continue;
+        const leadingText = source.slice(lastIndex, start);
+        if (leadingText) content.appendChild(document.createTextNode(leadingText));
+
+        const fullMatch = match[0];
+        const ipfsParts = fullMatch.match(IPFS_TOKEN_PARSER_REGEX);
+        if (ipfsParts) {
+          const hash = normalize(ipfsParts[1] || '');
+          if (hash) {
+            const ipfsUrl = buildIpfsPathUrl(hash, '', 0);
+            const anchor = document.createElement('a');
+            anchor.href = ipfsUrl;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.title = ipfsUrl;
+            anchor.textContent = `IPFS:${hash}`;
+            content.appendChild(anchor);
+          } else {
+            content.appendChild(document.createTextNode(fullMatch));
+          }
+        } else if (fullMatch.startsWith('#')) {
+          const hashtagParts = fullMatch.match(HASHTAG_TOKEN_PARSER_REGEX);
+          const keyword = normalize(hashtagParts?.[1] || fullMatch.replace(/^#/, '')).toLowerCase();
+          if (!keyword) {
+            content.appendChild(document.createTextNode(fullMatch));
+            lastIndex = start + fullMatch.length;
+            continue;
+          }
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `#${keyword}`;
+          button.addEventListener('click', () => triggerKeywordSearch(keyword));
+          content.appendChild(button);
+        } else {
+          const cleanUrl = stripTrailingUrlPunctuation(fullMatch);
+          if (!cleanUrl) {
+            content.appendChild(document.createTextNode(fullMatch));
+            lastIndex = start + fullMatch.length;
+            continue;
+          }
+          const trailingPunctuation = fullMatch.slice(cleanUrl.length);
+          const anchor = document.createElement('a');
+          anchor.href = normalizeLinkForHref(cleanUrl);
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.title = normalizeLinkForHref(cleanUrl);
+          anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
+          content.appendChild(anchor);
+          if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
         }
-        const trailingPunctuation = candidateUrl.slice(cleanUrl.length);
-        const anchor = document.createElement('a');
-        anchor.href = normalizeLinkForHref(cleanUrl);
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
-        anchor.title = normalizeLinkForHref(cleanUrl);
-        anchor.textContent = formatLinkLabel(cleanUrl, urlMaxLength);
-        content.appendChild(anchor);
-        if (matchedIpfsSuffix) appendInteractiveTokenText(content, matchedIpfsSuffix);
-        if (trailingPunctuation) content.appendChild(document.createTextNode(trailingPunctuation));
-        lastIndex = start + matchedUrl.length;
+        lastIndex = start + fullMatch.length;
       }
-      appendInteractiveTokenText(content, source.slice(lastIndex));
+      const trailingText = source.slice(lastIndex);
+      if (trailingText) content.appendChild(document.createTextNode(trailingText));
       return content;
     }
 
@@ -1239,7 +1324,7 @@
     function normalizeRootMsg(root) {
       const raw = root?.Message ?? root?.message ?? root?.text;
       const joined = Array.isArray(raw) ? raw.join('\n').trim() : normalize(raw);
-      return decodeHtmlEntities(joined);
+      return replaceSaltMarkers(decodeHtmlEntities(joined));
     }
 
     function rootFromAddress(root) {
@@ -1699,7 +1784,32 @@
           li.appendChild(image);
         }
       }
+
       return li;
+    }
+
+    function hideUncensoredTooltip() {
+      if (uncensoredTooltipTimerId) {
+        clearTimeout(uncensoredTooltipTimerId);
+        uncensoredTooltipTimerId = null;
+      }
+      if (!dom.uncensoredTooltip) return;
+      dom.uncensoredTooltip.classList.remove('visible');
+      dom.uncensoredTooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    function queueUncensoredTooltip() {
+      if (!dom.uncensoredTooltip) return;
+      if (uncensoredTooltipTimerId) clearTimeout(uncensoredTooltipTimerId);
+      uncensoredTooltipTimerId = window.setTimeout(() => {
+        if (!uncensoredHintHovered && document.activeElement !== dom.uncensoredHint) {
+          uncensoredTooltipTimerId = null;
+          return;
+        }
+        dom.uncensoredTooltip.classList.add('visible');
+        dom.uncensoredTooltip.setAttribute('aria-hidden', 'false');
+        uncensoredTooltipTimerId = null;
+      }, UNCENSORED_TOOLTIP_DELAY_MS);
     }
 
     function flushNextQueuedMessage() {
@@ -2725,6 +2835,24 @@
       dom.brandBtn.addEventListener('click', () => {
         runSearch('', { resetSessionSkips: false, setInput: true });
       });
+      if (dom.uncensoredHint) {
+        dom.uncensoredHint.addEventListener('mouseenter', () => {
+          uncensoredHintHovered = true;
+          queueUncensoredTooltip();
+        });
+        dom.uncensoredHint.addEventListener('focus', queueUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('mouseleave', () => {
+          uncensoredHintHovered = false;
+          hideUncensoredTooltip();
+        });
+        dom.uncensoredHint.addEventListener('blur', hideUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('keydown', (event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          hideUncensoredTooltip();
+          dom.uncensoredHint.blur();
+        });
+      }
       dom.tickerWrap.addEventListener('click', (event) => {
         event.stopPropagation();
         toggleBannerMenu();
