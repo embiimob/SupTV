@@ -1158,7 +1158,8 @@
       const text = normalize(value);
       if (!text) return [];
       const matches = text.match(URL_REGEX) || [];
-      const ipfsMatches = [...text.matchAll(new RegExp(IPFS_TOKEN_REGEX.source, 'gi'))]
+      IPFS_TOKEN_REGEX.lastIndex = 0;
+      const ipfsMatches = [...text.matchAll(IPFS_TOKEN_REGEX)]
         .map((match) => {
           const hash = normalize(match[1]);
           if (!hash) return '';
@@ -1224,10 +1225,10 @@
     function appendIpfsAndHashtagTokenText(fragment, text) {
       const source = normalize(text);
       if (!source) return;
-      const ipfsTokenRegex = new RegExp(IPFS_TOKEN_REGEX.source, 'gi');
+      IPFS_TOKEN_REGEX.lastIndex = 0;
       let lastIndex = 0;
       let match;
-      while ((match = ipfsTokenRegex.exec(source)) !== null) {
+      while ((match = IPFS_TOKEN_REGEX.exec(source)) !== null) {
         const start = match.index ?? 0;
         appendHashtagTokenText(fragment, source.slice(lastIndex, start));
         const hash = normalize(match[1]);
@@ -2846,6 +2847,12 @@
         dom.uncensoredHint.addEventListener('focus', queueUncensoredTooltip);
         dom.uncensoredHint.addEventListener('mouseleave', hideUncensoredTooltip);
         dom.uncensoredHint.addEventListener('blur', hideUncensoredTooltip);
+        dom.uncensoredHint.addEventListener('keydown', (event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          hideUncensoredTooltip();
+          dom.uncensoredHint.blur();
+        });
       }
       dom.tickerWrap.addEventListener('click', (event) => {
         event.stopPropagation();
