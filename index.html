@@ -195,6 +195,13 @@
       min-width: 3rem;
     }
 
+    .controls .compose-inline {
+      background: rgba(13, 21, 41, .78);
+      color: #dbe7ff;
+      border: 1px solid rgba(132, 157, 217, .36);
+      font-weight: 700;
+    }
+
     .side-feed {
       position: absolute;
       right: 1rem;
@@ -667,6 +674,112 @@
       margin-bottom: .08rem;
     }
 
+    .compose-panel {
+      position: absolute;
+      left: 1rem;
+      bottom: 3.4rem;
+      width: min(94vw, 520px);
+      max-height: min(72vh, 680px);
+      padding: .72rem;
+      border-radius: .82rem;
+      border: 1px solid rgba(122, 149, 216, .35);
+      background: rgba(7, 14, 28, .95);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, .44);
+      overflow: auto;
+      z-index: 12;
+      display: none;
+    }
+
+    .compose-panel.visible {
+      display: block;
+    }
+
+    .compose-grid {
+      display: grid;
+      gap: .5rem;
+    }
+
+    .compose-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: .5rem;
+      align-items: center;
+    }
+
+    .compose-panel input,
+    .compose-panel textarea,
+    .compose-panel select,
+    .compose-panel button {
+      border-radius: .58rem;
+      border: 1px solid rgba(132, 157, 217, .36);
+      background: rgba(10, 18, 36, .82);
+      color: #dbe7ff;
+      font: inherit;
+      padding: .48rem .56rem;
+    }
+
+    .compose-panel textarea {
+      min-height: 5.5rem;
+      resize: vertical;
+    }
+
+    .compose-panel button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .compose-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .5rem;
+    }
+
+    .compose-header b {
+      font-size: .9rem;
+      letter-spacing: .04em;
+    }
+
+    .compose-help {
+      margin: 0;
+      font-size: .72rem;
+      color: #b8ccef;
+      line-height: 1.3;
+    }
+
+    .attachment-list {
+      display: grid;
+      gap: .36rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .attachment-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .4rem;
+      font-size: .74rem;
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .52rem;
+      padding: .34rem .44rem;
+      background: rgba(7, 14, 28, .78);
+    }
+
+    .attachment-list button {
+      padding: .14rem .42rem;
+      min-width: auto;
+    }
+
+    .compose-status {
+      font-size: .72rem;
+      color: #c9ddff;
+      min-height: 1.2rem;
+      overflow-wrap: anywhere;
+    }
+
     @media (max-width: 920px) {
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
@@ -675,6 +788,11 @@
       .banner-menu {
         left: .65rem;
         right: .65rem;
+      }
+      .compose-panel {
+        left: .65rem;
+        right: .65rem;
+        width: auto;
       }
       .banner-menu-grid {
         grid-template-columns: 1fr;
@@ -736,6 +854,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
+        <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
         <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
@@ -780,6 +899,43 @@
       </div>
     </section>
 
+    <section class="compose-panel" id="composePanel" aria-hidden="true">
+      <div class="compose-header">
+        <b>Create p2fk post</b>
+        <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
+      </div>
+      <div class="compose-grid">
+        <p class="compose-help">Connect a wallet extension, build a DiscoBall-style message, upload files to IPFS, then send a sendmany transaction.</p>
+        <div class="compose-row">
+          <select id="walletProvider">
+            <option value="unisat">UniSat</option>
+            <option value="xverse">Xverse</option>
+            <option value="leather">Leather</option>
+            <option value="okx">OKX</option>
+          </select>
+          <button type="button" id="connectWalletBtn">Connect</button>
+        </div>
+        <input id="walletAddress" type="text" placeholder="Connected address" readonly />
+        <input id="postRecipients" type="text" placeholder="Extra recipient addresses (comma/semicolon separated)" />
+        <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
+        <div class="compose-row">
+          <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
+          <button type="button" id="addAttachmentBtn">Add</button>
+        </div>
+        <div class="compose-row">
+          <input id="ipfsUploadEndpoint" type="text" placeholder="IPFS upload endpoint (CORS-enabled add API)" value="https://ipfs.infura.io:5001/api/v0/add" />
+          <button type="button" id="uploadAttachmentBtn">Upload file</button>
+        </div>
+        <input id="attachmentFileInput" type="file" accept="video/*,image/*,audio/*,.json,.txt,.pdf,.zip,.webm,.mp4" />
+        <ul class="attachment-list" id="attachmentList"></ul>
+        <div class="compose-row">
+          <input id="sendAmount" type="number" min="0.00000001" step="0.00000001" value="0.00000546" />
+          <button type="button" id="sendPostBtn">Sign + Send</button>
+        </div>
+        <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
     <button type="button" class="ticker-wrap" id="tickerWrap" aria-controls="bannerMenu" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
@@ -793,6 +949,7 @@
       query: document.getElementById('query'),
       searchForm: document.getElementById('searchForm'),
       audioBtn: document.getElementById('audioBtn'),
+      composeBtn: document.getElementById('composeBtn'),
       downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
@@ -810,7 +967,23 @@
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
       waitingText: document.getElementById('waitingText'),
-      waitingA11yText: document.getElementById('waitingA11yText')
+      waitingA11yText: document.getElementById('waitingA11yText'),
+      composePanel: document.getElementById('composePanel'),
+      composeCloseBtn: document.getElementById('composeCloseBtn'),
+      walletProvider: document.getElementById('walletProvider'),
+      connectWalletBtn: document.getElementById('connectWalletBtn'),
+      walletAddress: document.getElementById('walletAddress'),
+      postRecipients: document.getElementById('postRecipients'),
+      postMessage: document.getElementById('postMessage'),
+      attachmentInput: document.getElementById('attachmentInput'),
+      addAttachmentBtn: document.getElementById('addAttachmentBtn'),
+      ipfsUploadEndpoint: document.getElementById('ipfsUploadEndpoint'),
+      uploadAttachmentBtn: document.getElementById('uploadAttachmentBtn'),
+      attachmentFileInput: document.getElementById('attachmentFileInput'),
+      attachmentList: document.getElementById('attachmentList'),
+      sendAmount: document.getElementById('sendAmount'),
+      sendPostBtn: document.getElementById('sendPostBtn'),
+      composeStatus: document.getElementById('composeStatus')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -857,6 +1030,14 @@
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
+    const P2FK_CHUNK_SIZE_BYTES = 20;
+    const P2FK_DEFAULT_VERSION_BYTE = 0;
+    const WALLET_EXTENSIONS = [
+      { id: 'unisat', name: 'UniSat' },
+      { id: 'xverse', name: 'Xverse' },
+      { id: 'leather', name: 'Leather' },
+      { id: 'okx', name: 'OKX' }
+    ];
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -920,6 +1101,9 @@
     let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
     let uncensoredTooltipTimerId = null;
     let uncensoredHintHovered = false;
+    let composePanelOpen = false;
+    let composerAttachments = [];
+    let walletSession = { providerId: '', provider: null, address: '' };
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1230,6 +1414,308 @@
       }
       return keywords.slice(0, 5);
     };
+    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{20,})/i;
+    const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+
+    function setComposeStatus(message) {
+      if (!dom.composeStatus) return;
+      dom.composeStatus.textContent = cleanDisplayText(message || '', 240);
+    }
+
+    function populateWalletProviderOptions() {
+      if (!dom.walletProvider) return;
+      const selected = normalize(dom.walletProvider.value || WALLET_EXTENSIONS[0]?.id || '');
+      dom.walletProvider.replaceChildren();
+      WALLET_EXTENSIONS.forEach(({ id, name }) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        dom.walletProvider.appendChild(option);
+      });
+      dom.walletProvider.value = WALLET_EXTENSIONS.some((wallet) => wallet.id === selected)
+        ? selected
+        : WALLET_EXTENSIONS[0]?.id || '';
+    }
+
+    function setComposePanelOpen(open) {
+      composePanelOpen = Boolean(open);
+      if (!dom.composePanel) return;
+      dom.composePanel.classList.toggle('visible', composePanelOpen);
+      dom.composePanel.setAttribute('aria-hidden', composePanelOpen ? 'false' : 'true');
+      if (!composePanelOpen) setComposeStatus('');
+    }
+
+    function toggleComposePanel() {
+      setComposePanelOpen(!composePanelOpen);
+      if (composePanelOpen) closeBannerMenu();
+    }
+
+    function pickRandomDelimiter() {
+      const bytes = new Uint8Array(1);
+      crypto.getRandomValues(bytes);
+      return SIGNING_DELIMITERS[bytes[0] % SIGNING_DELIMITERS.length];
+    }
+
+    function createNegativeSalt() {
+      const bytes = new Uint32Array(1);
+      crypto.getRandomValues(bytes);
+      return -Math.abs(bytes[0] % 100000);
+    }
+
+    function parseHashtagKeywords(message) {
+      const matches = normalize(message).match(/#[^\s]{1,20}/g) || [];
+      return [...new Set(matches.map((token) => token.slice(1).trim()).filter(Boolean))];
+    }
+
+    function parseManualRecipients(rawText) {
+      return normalize(rawText)
+        .replace(/\s+/g, '')
+        .split(/[;,]/)
+        .map((address) => address.trim())
+        .filter(Boolean);
+    }
+
+    async function sha256Bytes(bytes) {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return new Uint8Array(digest);
+    }
+
+    async function sha256HexFromText(text) {
+      const bytes = new TextEncoder().encode(text);
+      const digest = await sha256Bytes(bytes);
+      return Array.from(digest).map((value) => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    function encodeBase58(bytes) {
+      if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+      let zeros = 0;
+      while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1;
+      let value = 0n;
+      for (const byte of bytes) value = (value << 8n) + BigInt(byte);
+      let encoded = '';
+      while (value > 0n) {
+        const remainder = Number(value % 58n);
+        value /= 58n;
+        encoded = BASE58_ALPHABET[remainder] + encoded;
+      }
+      return `${BASE58_ALPHABET[0].repeat(zeros)}${encoded || (zeros ? '' : BASE58_ALPHABET[0])}`;
+    }
+
+    async function encodeBase58Check(bytes) {
+      const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      const first = await sha256Bytes(payload);
+      const second = await sha256Bytes(first);
+      const out = new Uint8Array(payload.length + 4);
+      out.set(payload, 0);
+      out.set(second.slice(0, 4), payload.length);
+      return encodeBase58(out);
+    }
+
+    async function encodeP2fkAddresses(payloadText, versionByte = P2FK_DEFAULT_VERSION_BYTE) {
+      const payload = new TextEncoder().encode(payloadText);
+      const addresses = [];
+      const seen = new Set();
+      for (let idx = 0; idx < payload.length; idx += P2FK_CHUNK_SIZE_BYTES) {
+        const chunk = payload.slice(idx, idx + P2FK_CHUNK_SIZE_BYTES);
+        const padded = new Uint8Array(P2FK_CHUNK_SIZE_BYTES);
+        padded.fill('#'.charCodeAt(0));
+        padded.set(chunk);
+        const addressBytes = new Uint8Array(1 + P2FK_CHUNK_SIZE_BYTES);
+        addressBytes[0] = versionByte;
+        addressBytes.set(padded, 1);
+        const encoded = await encodeBase58Check(addressBytes);
+        if (!seen.has(encoded)) {
+          seen.add(encoded);
+          addresses.push(encoded);
+        }
+      }
+      return addresses;
+    }
+
+    function getWalletProvider(providerId) {
+      if (providerId === 'unisat') return window.unisat || null;
+      if (providerId === 'xverse') return window.BitcoinProvider || window.XverseProviders?.BitcoinProvider || window.xverse?.bitcoin || null;
+      if (providerId === 'leather') return window.btc || window.LeatherProvider || null;
+      if (providerId === 'okx') return window.okxwallet?.bitcoin || window.okxwallet || null;
+      return null;
+    }
+
+    async function callProviderRequest(provider, method, params) {
+      if (!provider) return null;
+      if (typeof provider.request === 'function') {
+        try { return await provider.request({ method, params }); } catch {}
+        try { return await provider.request(method, params); } catch {}
+      }
+      return null;
+    }
+
+    function firstAddressFromValue(value) {
+      if (!value) return '';
+      if (typeof value === 'string') return normalize(value);
+      if (Array.isArray(value)) return firstAddressFromValue(value[0] || '');
+      if (typeof value === 'object') {
+        return normalize(
+          value.address
+          || value.paymentAddress
+          || value.ordinalsAddress
+          || value.accounts?.[0]
+          || value.result?.[0]
+          || value.result
+          || ''
+        );
+      }
+      return '';
+    }
+
+    async function connectSelectedWallet() {
+      const providerId = normalize(dom.walletProvider?.value || '');
+      const provider = getWalletProvider(providerId);
+      if (!provider) {
+        throw new Error(`${providerId || 'Selected'} wallet extension is not detected`);
+      }
+      let result = null;
+      if (typeof provider.requestAccounts === 'function') result = await provider.requestAccounts();
+      if (!result && typeof provider.connect === 'function') result = await provider.connect();
+      if (!result && typeof provider.enable === 'function') result = await provider.enable();
+      if (!result && typeof provider.getAccounts === 'function') result = await provider.getAccounts();
+      if (!result) result = await callProviderRequest(provider, 'requestAccounts', []);
+      if (!result) result = await callProviderRequest(provider, 'getAccounts', []);
+      const address = firstAddressFromValue(result);
+      if (!address) throw new Error('Could not read a connected address from the wallet');
+      walletSession = { providerId, provider, address };
+      dom.walletAddress.value = address;
+      return walletSession;
+    }
+
+    async function signWithWallet(messageHashHex) {
+      const provider = walletSession.provider;
+      if (!provider || !walletSession.address) throw new Error('Connect a wallet before signing');
+      if (typeof provider.signMessage === 'function') {
+        try { return await provider.signMessage(messageHashHex, 'ecdsa'); } catch {}
+        try { return await provider.signMessage(walletSession.address, messageHashHex); } catch {}
+        try { return await provider.signMessage(messageHashHex); } catch {}
+      }
+      const response = await callProviderRequest(provider, 'signMessage', [walletSession.address, messageHashHex])
+        || await callProviderRequest(provider, 'signMessage', { address: walletSession.address, message: messageHashHex })
+        || await callProviderRequest(provider, 'wallet_signMessage', { address: walletSession.address, message: messageHashHex });
+      const signature = normalize(
+        typeof response === 'string'
+          ? response
+          : response?.signature || response?.result || response?.sig || ''
+      );
+      if (!signature) throw new Error('Wallet did not return a signature');
+      return signature;
+    }
+
+    async function sendManyWithWallet(outputs) {
+      const provider = walletSession.provider;
+      if (!provider) throw new Error('Connect a wallet before sending');
+      if (typeof provider.sendMany === 'function') {
+        try { return await provider.sendMany(outputs); } catch {}
+        try { return await provider.sendMany({ outputs }); } catch {}
+      }
+      const requestResult = await callProviderRequest(provider, 'sendMany', [outputs])
+        || await callProviderRequest(provider, 'sendMany', { outputs })
+        || await callProviderRequest(provider, 'wallet_sendMany', { recipients: outputs })
+        || await callProviderRequest(provider, 'sendmany', outputs);
+      if (requestResult) return requestResult;
+      throw new Error('Selected extension does not expose a sendmany method');
+    }
+
+    function resolveTxidFromSendResult(result) {
+      if (!result) return '';
+      if (typeof result === 'string') return normalize(result);
+      if (Array.isArray(result)) return resolveTxidFromSendResult(result[0] || '');
+      if (typeof result === 'object') {
+        return normalize(result.txid || result.txHash || result.transactionHash || result.result || '');
+      }
+      return '';
+    }
+
+    function renderComposerAttachments() {
+      if (!dom.attachmentList) return;
+      dom.attachmentList.replaceChildren();
+      composerAttachments.forEach((attachment, idx) => {
+        const li = document.createElement('li');
+        const label = document.createElement('span');
+        label.textContent = cleanDisplayText(attachment || '', 110);
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          composerAttachments.splice(idx, 1);
+          renderComposerAttachments();
+        });
+        li.appendChild(label);
+        li.appendChild(removeBtn);
+        dom.attachmentList.appendChild(li);
+      });
+    }
+
+    function addComposerAttachment(value) {
+      const token = cleanDisplayText(normalize(value), 260);
+      if (!token || composerAttachments.includes(token)) return false;
+      composerAttachments.push(token);
+      renderComposerAttachments();
+      return true;
+    }
+
+    function extractIpfsCid(rawText = '') {
+      const match = normalize(rawText).match(COMPOSER_CID_REGEX);
+      return match?.[1] || '';
+    }
+
+    async function uploadComposerFileToIpfs(file, endpoint) {
+      const target = normalize(endpoint);
+      if (!file) throw new Error('Select a file first');
+      if (!target) throw new Error('Set an IPFS upload endpoint first');
+      const formData = new FormData();
+      formData.append('file', file, file.name || 'attachment');
+      const response = await fetch(target, { method: 'POST', body: formData });
+      if (!response.ok) throw new Error(`IPFS upload failed (${response.status})`);
+      const body = await response.text();
+      let cid = extractIpfsCid(body);
+      if (!cid) {
+        try {
+          const parsed = JSON.parse(body);
+          cid = extractIpfsCid(parsed?.Hash || parsed?.Cid || parsed?.cid || parsed?.value?.cid || '');
+        } catch {}
+      }
+      if (!cid) throw new Error('Unable to parse IPFS CID from upload response');
+      const fileName = normalize(file.name || '').replace(/[<>]/g, '').trim();
+      return fileName ? `IPFS:${cid}/${fileName}` : `IPFS:${cid}`;
+    }
+
+    function buildP2fkUnsignedObject(messageText, attachments) {
+      const delimiter = pickRandomDelimiter();
+      const payloadText = normalize(messageText) + attachments.map((value) => `<<${value}>>`).join('') + `<<${createNegativeSalt()}>>`;
+      const payloadLength = new TextEncoder().encode(payloadText).length;
+      const unsignedObj = `${delimiter}${payloadLength}${delimiter}${payloadText}`;
+      return { delimiter, payloadText, unsignedObj };
+    }
+
+    async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients, fromAddress, amountPerRecipient }) {
+      const unsignedPayload = buildP2fkUnsignedObject(messageText, attachments);
+      const signedHashHex = await sha256HexFromText(unsignedPayload.unsignedObj);
+      const signature = await signWithWallet(signedHashHex);
+      const signedObj = `SIG${unsignedPayload.delimiter}88${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
+      const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
+
+      for (const keyword of parseHashtagKeywords(messageText)) {
+        try {
+          const keywordAddress = await getPublicAddressByKeyword(keyword);
+          if (keywordAddress && !recipients.includes(keywordAddress)) recipients.push(keywordAddress);
+        } catch {}
+      }
+      for (const address of extraRecipients) {
+        if (address && address !== fromAddress && !recipients.includes(address)) recipients.push(address);
+      }
+      if (fromAddress && !recipients.includes(fromAddress)) recipients.push(fromAddress);
+      const outputs = recipients.map((address) => ({ address, amount: amountPerRecipient }));
+      const cost = amountPerRecipient * outputs.length;
+      return { outputs, cost };
+    }
 
     function triggerKeywordSearch(keyword) {
       dom.query.value = keyword;
@@ -1719,6 +2205,86 @@
       if (setInput) dom.query.value = searchKeyword;
       closeBannerMenu();
       loadSearch(searchKeyword, { resetSessionSkips });
+    }
+
+    async function onConnectWallet() {
+      setComposeStatus('Connecting wallet…');
+      try {
+        const session = await connectSelectedWallet();
+        setComposeStatus(`Connected ${session.providerId.toUpperCase()} as ${shortTitle(session.address, 24)}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Wallet connection failed');
+      }
+    }
+
+    function onAddAttachment() {
+      const value = normalize(dom.attachmentInput?.value || '');
+      if (!value) {
+        setComposeStatus('Enter a URL/IPFS attachment first');
+        return;
+      }
+      const added = addComposerAttachment(value);
+      dom.attachmentInput.value = '';
+      setComposeStatus(added ? 'Attachment added' : 'Attachment is empty or already listed');
+    }
+
+    async function onUploadAttachment() {
+      const file = dom.attachmentFileInput?.files?.[0];
+      const endpoint = normalize(dom.ipfsUploadEndpoint?.value || '');
+      setComposeStatus('Uploading attachment to IPFS…');
+      try {
+        const attachmentToken = await uploadComposerFileToIpfs(file, endpoint);
+        addComposerAttachment(attachmentToken);
+        if (dom.attachmentFileInput) dom.attachmentFileInput.value = '';
+        setComposeStatus(`Uploaded ${shortTitle(attachmentToken, 52)}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Attachment upload failed');
+      }
+    }
+
+    async function onSendPost() {
+      const messageText = normalize(dom.postMessage?.value || '');
+      if (!messageText && !composerAttachments.length) {
+        setComposeStatus('Write a message or add at least one attachment');
+        return;
+      }
+      if (!walletSession.address || !walletSession.provider) {
+        setComposeStatus('Connect a wallet before sending');
+        return;
+      }
+      const amountPerRecipient = Number(dom.sendAmount?.value || 0);
+      if (!Number.isFinite(amountPerRecipient) || amountPerRecipient <= 0) {
+        setComposeStatus('Enter a valid send amount');
+        return;
+      }
+      const extraRecipients = parseManualRecipients(dom.postRecipients?.value || '');
+      try {
+        setComposeStatus('Signing and building sendmany outputs…');
+        const { outputs, cost } = await buildP2fkRecipientsAndCost({
+          messageText,
+          attachments: composerAttachments,
+          extraRecipients,
+          fromAddress: walletSession.address,
+          amountPerRecipient
+        });
+        if (!outputs.length) throw new Error('No sendmany outputs were generated');
+        setComposeStatus(`Sending ${outputs.length} outputs (${cost.toFixed(8)} BTC + fee)…`);
+        const sendResult = await sendManyWithWallet(outputs);
+        const txid = resolveTxidFromSendResult(sendResult) || 'submitted';
+        setStatus(`Post broadcast: ${txid}`);
+        addMessage({
+          title: 'Post broadcast',
+          meta: `writer · ${shortTitle(walletSession.address, 18)}`,
+          body: `Sent p2fk post in ${outputs.length} outputs. txid: ${txid}`
+        });
+        setComposeStatus(`Success: ${txid}`);
+        if (dom.postMessage) dom.postMessage.value = '';
+        if (dom.postRecipients) dom.postRecipients.value = '';
+        composerAttachments = [];
+        renderComposerAttachments();
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unable to send post');
+      }
     }
 
     function onDocumentClickCloseBanner(event) {
@@ -2823,6 +3389,8 @@
       const initial = normalize(urlQuery);
       // Keep the input blank so the UI starts clean while using trending defaults when no ?q is provided.
       dom.query.value = '';
+      populateWalletProviderOptions();
+      renderComposerAttachments();
       syncAudioUi();
 
       dom.searchForm.addEventListener('submit', (event) => {
@@ -2838,6 +3406,20 @@
       dom.skipInlineBtn.addEventListener('click', trashCurrentVideo);
       dom.brandBtn.addEventListener('click', () => {
         runSearch('', { resetSessionSkips: false, setInput: true });
+      });
+      dom.composeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleComposePanel();
+      });
+      dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
+      dom.connectWalletBtn.addEventListener('click', onConnectWallet);
+      dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
+      dom.uploadAttachmentBtn.addEventListener('click', onUploadAttachment);
+      dom.sendPostBtn.addEventListener('click', onSendPost);
+      dom.attachmentInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onAddAttachment();
       });
       if (dom.uncensoredHint) {
         dom.uncensoredHint.addEventListener('mouseenter', () => {
@@ -2889,6 +3471,10 @@
         if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
         if (event.key === 'Escape') {
+          if (composePanelOpen) {
+            setComposePanelOpen(false);
+            return;
+          }
           if (bannerMenuOpen) {
             closeBannerMenu();
             return;
@@ -2902,6 +3488,12 @@
         }
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      document.addEventListener('click', (event) => {
+        if (!composePanelOpen) return;
+        const target = event.target;
+        if (dom.composePanel.contains(target) || dom.composeBtn.contains(target)) return;
+        setComposePanelOpen(false);
+      });
       dom.app.addEventListener('touchstart', showHudTemporarily, { passive: true });
       const clearSwipeTug = (animate = true) => {
         if (swipeTugResetTimeoutId) {

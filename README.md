@@ -116,3 +116,21 @@ Example:
 ```js
 ${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}
 ```
+
+## Create and publish posts (write flow)
+
+SupTV now includes a **Compose** panel (✎ in the top bar) so users can contribute posts that SupTV indexers can discover:
+
+1. Connect a supported browser extension wallet (UniSat, Xverse, Leather, OKX).
+2. Write a post message with `#keywords`.
+3. Add attachments as URL/IPFS values, or upload a file to an IPFS add endpoint.
+4. Click **Sign + Send** to:
+   - build a DiscoBall-style p2fk payload,
+   - sign the payload hash with the connected wallet,
+   - encode it into p2fk chunk addresses,
+   - submit a `sendmany` request through the wallet extension.
+
+### IPFS upload endpoint note
+
+The file upload button uses a configurable HTTP endpoint (default: `https://ipfs.infura.io:5001/api/v0/add`) and expects a CORS-enabled IPFS add API response containing a CID/hash.
+If your chosen public gateway/API does not allow browser CORS uploads, set this field to an endpoint you control or one your wallet extension supports.
