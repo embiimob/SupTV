@@ -1032,6 +1032,8 @@
     const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
     const P2FK_CHUNK_SIZE_BYTES = 20;
     const P2FK_DEFAULT_VERSION_BYTE = 0;
+    const P2FK_PADDING_CHAR = '#';
+    const P2FK_SIGNATURE_VERSION_MARKER = '88';
     const WALLET_EXTENSIONS = [
       { id: 'unisat', name: 'UniSat' },
       { id: 'xverse', name: 'Xverse' },
@@ -1415,6 +1417,7 @@
       return keywords.slice(0, 5);
     };
     const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/i;
+    const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -1525,7 +1528,7 @@
       for (let idx = 0; idx < payload.length; idx += P2FK_CHUNK_SIZE_BYTES) {
         const chunk = payload.slice(idx, idx + P2FK_CHUNK_SIZE_BYTES);
         const padded = new Uint8Array(P2FK_CHUNK_SIZE_BYTES);
-        padded.fill('#'.charCodeAt(0));
+        padded.fill(P2FK_PADDING_CHAR.charCodeAt(0));
         padded.set(chunk);
         const addressBytes = new Uint8Array(1 + P2FK_CHUNK_SIZE_BYTES);
         addressBytes[0] = versionByte;
@@ -1697,7 +1700,7 @@
       }
       if (!cid) throw new Error('Unable to parse IPFS CID from upload response');
       const fileName = normalize(file.name || '')
-        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+        .replace(UNSAFE_FILENAME_CHARS_REGEX, '')
         .replace(/\s+/g, ' ')
         .trim();
       return fileName ? `IPFS:${cid}/${fileName}` : `IPFS:${cid}`;
@@ -1718,22 +1721,24 @@
       const unsignedPayload = buildP2fkUnsignedObject(messageText, attachments);
       const signedHashHex = await sha256HexFromText(unsignedPayload.unsignedObj);
       const signature = await signWithWallet(signedHashHex);
-      const signedObj = `SIG${unsignedPayload.delimiter}88${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
+      const signedObj = `SIG${unsignedPayload.delimiter}${P2FK_SIGNATURE_VERSION_MARKER}${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
       const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
+      const recipientSet = new Set(recipients);
 
       for (const keyword of parseHashtagKeywords(messageText)) {
         try {
           const keywordAddress = await getPublicAddressByKeyword(keyword);
-          if (keywordAddress && !recipients.includes(keywordAddress)) recipients.push(keywordAddress);
+          if (keywordAddress) recipientSet.add(keywordAddress);
         } catch (error) {
           console.debug('Unable to encode keyword address', keyword, error);
         }
       }
       for (const address of extraRecipients) {
-        if (address && address !== fromAddress && !recipients.includes(address)) recipients.push(address);
+        if (address && address !== fromAddress) recipientSet.add(address);
       }
-      if (fromAddress && !recipients.includes(fromAddress)) recipients.push(fromAddress);
-      const outputs = recipients.map((address) => ({ address, amount: amountPerRecipient }));
+      if (fromAddress) recipientSet.add(fromAddress);
+      const recipientList = [...recipientSet];
+      const outputs = recipientList.map((address) => ({ address, amount: amountPerRecipient }));
       const cost = amountPerRecipient * outputs.length;
       return { outputs, cost };
     }
