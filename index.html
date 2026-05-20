@@ -1416,7 +1416,7 @@
       }
       return keywords.slice(0, 5);
     };
-    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/i;
+    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/;
     const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
@@ -1645,7 +1645,7 @@
     function renderComposerAttachments() {
       if (!dom.attachmentList) return;
       dom.attachmentList.replaceChildren();
-      composerAttachments.forEach((attachment, idx) => {
+      composerAttachments.forEach((attachment) => {
         const li = document.createElement('li');
         const label = document.createElement('span');
         label.textContent = cleanDisplayText(attachment || '', 110);
@@ -1653,7 +1653,7 @@
         removeBtn.type = 'button';
         removeBtn.textContent = 'Remove';
         removeBtn.addEventListener('click', () => {
-          composerAttachments.splice(idx, 1);
+          composerAttachments = composerAttachments.filter((item) => item !== attachment);
           renderComposerAttachments();
         });
         li.appendChild(label);
@@ -2237,7 +2237,8 @@
       setComposeStatus('Connecting wallet…');
       try {
         const session = await connectSelectedWallet();
-        setComposeStatus(`Connected ${session.providerId.toUpperCase()} as ${shortTitle(session.address, 24)}`);
+        const walletLabel = WALLET_EXTENSIONS.find((wallet) => wallet.id === session.providerId)?.name || session.providerId;
+        setComposeStatus(`Connected ${walletLabel} as ${shortTitle(session.address, 24)}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Wallet connection failed');
       }
