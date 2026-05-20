@@ -923,10 +923,10 @@
           <button type="button" id="addAttachmentBtn">Add</button>
         </div>
         <div class="compose-row">
-          <input id="ipfsUploadEndpoint" type="text" placeholder="IPFS upload endpoint (CORS-enabled add API)" value="https://ipfs.infura.io:5001/api/v0/add" />
+          <input id="ipfsUploadEndpoint" type="text" placeholder="IPFS upload endpoint (CORS-enabled add API)" />
           <button type="button" id="uploadAttachmentBtn">Upload file</button>
         </div>
-        <input id="attachmentFileInput" type="file" accept="video/*,image/*,audio/*,.json,.txt,.pdf,.zip,.webm,.mp4" />
+        <input id="attachmentFileInput" type="file" accept="video/*,image/*,audio/*,.json,.txt,.pdf,.zip" />
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row">
           <input id="sendAmount" type="number" min="0.00000001" step="0.00000001" value="0.00000546" />
@@ -1414,7 +1414,7 @@
       }
       return keywords.slice(0, 5);
     };
-    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{20,})/i;
+    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/i;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -1454,8 +1454,13 @@
 
     function pickRandomDelimiter() {
       const bytes = new Uint8Array(1);
-      crypto.getRandomValues(bytes);
-      return SIGNING_DELIMITERS[bytes[0] % SIGNING_DELIMITERS.length];
+      const limit = Math.floor(256 / SIGNING_DELIMITERS.length) * SIGNING_DELIMITERS.length;
+      let value = 0;
+      do {
+        crypto.getRandomValues(bytes);
+        value = bytes[0];
+      } while (value >= limit);
+      return SIGNING_DELIMITERS[value % SIGNING_DELIMITERS.length];
     }
 
     function createNegativeSalt() {
@@ -1673,7 +1678,12 @@
       if (!target) throw new Error('Set an IPFS upload endpoint first');
       const formData = new FormData();
       formData.append('file', file, file.name || 'attachment');
-      const response = await fetch(target, { method: 'POST', body: formData });
+      let response;
+      try {
+        response = await fetch(target, { method: 'POST', body: formData });
+      } catch (error) {
+        throw new Error(`Upload request failed (network/CORS): ${error?.message || 'request failed'}`);
+      }
       if (!response.ok) throw new Error(`IPFS upload failed (${response.status})`);
       const body = await response.text();
       let cid = extractIpfsCid(body);
@@ -1686,7 +1696,10 @@
         }
       }
       if (!cid) throw new Error('Unable to parse IPFS CID from upload response');
-      const fileName = normalize(file.name || '').replace(/[<>]/g, '').trim();
+      const fileName = normalize(file.name || '')
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
       return fileName ? `IPFS:${cid}/${fileName}` : `IPFS:${cid}`;
     }
 
@@ -1694,6 +1707,7 @@
       const delimiter = pickRandomDelimiter();
       // Mirror DiscoBall message structure:
       // "<delimiter><byteLength><delimiter><message><<attachment>>...<<negativeSalt>>"
+      // Use UTF-8 byte length (not JS character count) to match DiscoBall parsing behavior.
       const payloadText = normalize(messageText) + attachments.map((value) => `<<${value}>>`).join('') + `<<${createNegativeSalt()}>>`;
       const payloadLength = new TextEncoder().encode(payloadText).length;
       const unsignedObj = `${delimiter}${payloadLength}${delimiter}${payloadText}`;

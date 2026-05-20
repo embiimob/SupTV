@@ -132,5 +132,5 @@ SupTV now includes a **Compose** panel (✎ in the top bar) so users can contrib
 
 ### IPFS upload endpoint note
 
-The file upload button uses a configurable HTTP endpoint (default: `https://ipfs.infura.io:5001/api/v0/add`) and expects a CORS-enabled IPFS add API response containing a CID/hash.
+The file upload button uses a configurable HTTP endpoint (no default endpoint is prefilled) and expects a CORS-enabled IPFS add API response containing a CID/hash.
 If your chosen public gateway/API does not allow browser CORS uploads, set this field to an endpoint you control or one your wallet extension supports.
