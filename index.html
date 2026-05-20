@@ -1425,7 +1425,8 @@
 
     function populateWalletProviderOptions() {
       if (!dom.walletProvider) return;
-      const selected = normalize(dom.walletProvider.value || WALLET_EXTENSIONS[0]?.id || '');
+      const fallbackWalletId = WALLET_EXTENSIONS.length ? WALLET_EXTENSIONS[0].id : '';
+      const selected = normalize(dom.walletProvider.value || fallbackWalletId || '');
       dom.walletProvider.replaceChildren();
       WALLET_EXTENSIONS.forEach(({ id, name }) => {
         const option = document.createElement('option');
@@ -1435,7 +1436,7 @@
       });
       dom.walletProvider.value = WALLET_EXTENSIONS.some((wallet) => wallet.id === selected)
         ? selected
-        : WALLET_EXTENSIONS[0]?.id || '';
+        : fallbackWalletId;
     }
 
     function setComposePanelOpen(open) {
@@ -1544,8 +1545,8 @@
     async function callProviderRequest(provider, method, params) {
       if (!provider) return null;
       if (typeof provider.request === 'function') {
-        try { return await provider.request({ method, params }); } catch {}
-        try { return await provider.request(method, params); } catch {}
+        try { return await provider.request({ method, params }); } catch (error) { console.debug('Wallet request style 1 failed', method, error); }
+        try { return await provider.request(method, params); } catch (error) { console.debug('Wallet request style 2 failed', method, error); }
       }
       return null;
     }
@@ -1592,9 +1593,9 @@
       const provider = walletSession.provider;
       if (!provider || !walletSession.address) throw new Error('Connect a wallet before signing');
       if (typeof provider.signMessage === 'function') {
-        try { return await provider.signMessage(messageHashHex, 'ecdsa'); } catch {}
-        try { return await provider.signMessage(walletSession.address, messageHashHex); } catch {}
-        try { return await provider.signMessage(messageHashHex); } catch {}
+        try { return await provider.signMessage(messageHashHex, 'ecdsa'); } catch (error) { console.debug('Wallet signMessage ecdsa failed', error); }
+        try { return await provider.signMessage(walletSession.address, messageHashHex); } catch (error) { console.debug('Wallet signMessage(address,message) failed', error); }
+        try { return await provider.signMessage(messageHashHex); } catch (error) { console.debug('Wallet signMessage(message) failed', error); }
       }
       const response = await callProviderRequest(provider, 'signMessage', [walletSession.address, messageHashHex])
         || await callProviderRequest(provider, 'signMessage', { address: walletSession.address, message: messageHashHex })
@@ -1612,8 +1613,8 @@
       const provider = walletSession.provider;
       if (!provider) throw new Error('Connect a wallet before sending');
       if (typeof provider.sendMany === 'function') {
-        try { return await provider.sendMany(outputs); } catch {}
-        try { return await provider.sendMany({ outputs }); } catch {}
+        try { return await provider.sendMany(outputs); } catch (error) { console.debug('Wallet sendMany(outputs) failed', error); }
+        try { return await provider.sendMany({ outputs }); } catch (error) { console.debug('Wallet sendMany({outputs}) failed', error); }
       }
       const requestResult = await callProviderRequest(provider, 'sendMany', [outputs])
         || await callProviderRequest(provider, 'sendMany', { outputs })
@@ -1680,7 +1681,9 @@
         try {
           const parsed = JSON.parse(body);
           cid = extractIpfsCid(parsed?.Hash || parsed?.Cid || parsed?.cid || parsed?.value?.cid || '');
-        } catch {}
+        } catch (error) {
+          console.debug('IPFS upload response was not JSON', error);
+        }
       }
       if (!cid) throw new Error('Unable to parse IPFS CID from upload response');
       const fileName = normalize(file.name || '').replace(/[<>]/g, '').trim();
@@ -1689,6 +1692,8 @@
 
     function buildP2fkUnsignedObject(messageText, attachments) {
       const delimiter = pickRandomDelimiter();
+      // Mirror DiscoBall message structure:
+      // "<delimiter><byteLength><delimiter><message><<attachment>>...<<negativeSalt>>"
       const payloadText = normalize(messageText) + attachments.map((value) => `<<${value}>>`).join('') + `<<${createNegativeSalt()}>>`;
       const payloadLength = new TextEncoder().encode(payloadText).length;
       const unsignedObj = `${delimiter}${payloadLength}${delimiter}${payloadText}`;
@@ -1706,7 +1711,9 @@
         try {
           const keywordAddress = await getPublicAddressByKeyword(keyword);
           if (keywordAddress && !recipients.includes(keywordAddress)) recipients.push(keywordAddress);
-        } catch {}
+        } catch (error) {
+          console.debug('Unable to encode keyword address', keyword, error);
+        }
       }
       for (const address of extraRecipients) {
         if (address && address !== fromAddress && !recipients.includes(address)) recipients.push(address);
