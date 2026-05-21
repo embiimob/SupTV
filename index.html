@@ -1566,6 +1566,27 @@
       return Array.from(digest).map((value) => value.toString(16).padStart(2, '0')).join('');
     }
 
+    function encodeBitcoinVarInt(value) {
+      if (value < 0xfd) return new Uint8Array([value]);
+      if (value <= 0xffff) return new Uint8Array([0xfd, value & 0xff, (value >> 8) & 0xff]);
+      if (value <= 0xffffffff) {
+        return new Uint8Array([0xfe, value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >>> 24) & 0xff]);
+      }
+      throw new Error('Message is too large to sign');
+    }
+
+    async function hashBitcoinSignedMessage(messageText) {
+      const magic = new TextEncoder().encode('Bitcoin Signed Message:\n');
+      const msg = new TextEncoder().encode(messageText);
+      const msgLen = encodeBitcoinVarInt(msg.length);
+      const envelope = new Uint8Array(1 + magic.length + msgLen.length + msg.length);
+      envelope[0] = magic.length;
+      envelope.set(magic, 1);
+      envelope.set(msgLen, 1 + magic.length);
+      envelope.set(msg, 1 + magic.length + msgLen.length);
+      return sha256Bytes(await sha256Bytes(envelope));
+    }
+
     function encodeBase58(bytes) {
       if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
       let zeros = 0;
@@ -2118,9 +2139,11 @@
       return walletSession;
     }
 
-    async function signWithWallet(messageHashHex) {
+    async function signWithWallet(messageText) {
       if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
-      const { r, s, recoveryId } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
+      // Match bitcoin-cli signmessage/verifymessage semantics used by DiscoBall (SUP Root.cs).
+      const messageDigest = await hashBitcoinSignedMessage(messageText);
+      const { r, s, recoveryId } = await ecSign(internalPrivKeyBytes, messageDigest);
       // DiscoBall p2fk expects a compact 65-byte Bitcoin message signature encoded as base64:
       // [recoveryByte (1), r (32), s (32)] where recoveryByte = 27 + 4 (compressed) + recoveryId
       const compact = new Uint8Array(65);
@@ -2295,7 +2318,7 @@
     async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients, fromAddress, amountPerRecipient }) {
       const safeMessageText = sanitizeP2fkMessageText(messageText);
       const unsignedPayload = buildP2fkUnsignedObject(safeMessageText, attachments);
-      const signedHashHex = await sha256HexFromText(unsignedPayload.unsignedObj);
+      const signedHashHex = (await sha256HexFromText(unsignedPayload.unsignedObj)).toUpperCase();
       const signature = await signWithWallet(signedHashHex);
       const signedObj = `SIG${unsignedPayload.delimiter}${P2FK_SIGNATURE_VERSION_MARKER}${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
       const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
