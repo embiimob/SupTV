@@ -1494,7 +1494,7 @@
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+    const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
 
     function setComposeStatus(message) {
       if (!dom.composeStatus) return;
@@ -1541,6 +1541,10 @@
     function parseHashtagKeywords(message) {
       const matches = normalize(message).match(/#[^\s]{1,20}/g) || [];
       return [...new Set(matches.map((token) => token.slice(1).trim()).filter(Boolean))];
+    }
+
+    function sanitizeP2fkMessageText(message) {
+      return decodeHtmlEntities(normalize(message)).replace(/[<>]/g, ' ');
     }
 
     function parseManualRecipients(rawText) {
@@ -2281,7 +2285,8 @@
     }
 
     async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients, fromAddress, amountPerRecipient }) {
-      const unsignedPayload = buildP2fkUnsignedObject(messageText, attachments);
+      const safeMessageText = sanitizeP2fkMessageText(messageText);
+      const unsignedPayload = buildP2fkUnsignedObject(safeMessageText, attachments);
       const signedHashHex = await sha256HexFromText(unsignedPayload.unsignedObj);
       const signature = await signWithWallet(signedHashHex);
       const signedObj = `SIG${unsignedPayload.delimiter}${P2FK_SIGNATURE_VERSION_MARKER}${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
@@ -2290,7 +2295,7 @@
 
       await validateLegacyTestnetAddress(fromAddress);
 
-      for (const keyword of parseHashtagKeywords(messageText)) {
+      for (const keyword of parseHashtagKeywords(safeMessageText)) {
         try {
           const keywordAddress = await getPublicAddressByKeyword(keyword);
           if (keywordAddress) {
