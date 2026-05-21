@@ -1879,24 +1879,44 @@
       }
     }
 
+    function normalizeProfileImageCandidate(value) {
+      const raw = cleanDisplayText(unwrapQuotedText(value || ''), 300);
+      if (!raw) return '';
+      return raw.replace(/\\+/g, '/');
+    }
+
+    function collectProfileImageStrings(value, collected = [], seen = new WeakSet()) {
+      if (typeof value === 'string') {
+        const normalized = normalizeProfileImageCandidate(value);
+        if (normalized) collected.push(normalized);
+        return collected;
+      }
+      if (!value || typeof value !== 'object') return collected;
+      if (seen.has(value)) return collected;
+      seen.add(value);
+      const entries = Array.isArray(value) ? value : Object.values(value);
+      for (const entry of entries) collectProfileImageStrings(entry, collected, seen);
+      return collected;
+    }
+
     function profileImageUrlFromProfile(profile) {
       if (!profile || typeof profile !== 'object') return '';
-      const candidates = [
+      const directCandidates = [
         profile.img, profile.IMG, profile.image, profile.Image, profile.imageUrl, profile.ImageUrl,
         profile.avatar, profile.Avatar, profile.pfp, profile.PFP, profile.photo, profile.Photo,
         profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
       ];
-      for (const candidate of candidates) {
-        const raw = cleanDisplayText(candidate || '', 300).replace(/\\/g, '/');
+      const candidates = [
+        ...directCandidates.map((candidate) => normalizeProfileImageCandidate(candidate)).filter(Boolean),
+        ...collectProfileImageStrings(profile)
+      ];
+      for (const raw of [...new Set(candidates)]) {
         if (!raw) continue;
         if (/^https?:\/\//i.test(raw)) return raw;
         const parsed = extractIpfsPartsFromInput(raw);
         if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
       }
-      const serialized = JSON.stringify(profile).replace(/\\\\/g, '/');
-      const ipfsMatch = serialized.match(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[/]+([^"'<>\s]+?\.(?:png|jpe?g|gif|webp|avif)))?/i);
-      if (!ipfsMatch) return '';
-      return buildIpfsPathUrl(ipfsMatch[1], normalize(ipfsMatch[2] || ''), 0);
+      return '';
     }
 
     async function refreshComposerProfileCard() {
