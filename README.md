@@ -47,8 +47,8 @@ The new Compose flow is designed for p2fk-compatible posting with browser-side s
    - Derives a legacy testnet3 sender address.
 2. **Create post content**  
    - Enter message text (hashtags supported).
-   - Add an attachment as an IPFS URN, gateway link, CID-bearing URL, or compatible NFT/media page URL.
-   - SupTV resolves exposed IPFS media, validates attachment reachability, and canonicalizes to `IPFS:<cid>/<filename.ext>`.
+   - Add an IPFS video attachment as an IPFS URN, gateway link, or CID-bearing URL.
+   - SupTV validates attachment reachability and canonicalizes to `IPFS:<cid>/<filename.ext>`.
 3. **Build sendmany payload**  
    - Converts post body into DiscoBall/p2fk sendmany-compatible recipient outputs.
    - Signs the required payload hash in-browser.

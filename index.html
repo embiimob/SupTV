@@ -1237,7 +1237,7 @@
         </div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
         <div class="compose-row compose-attachment-row">
-          <input id="attachmentInput" type="text" placeholder="Attachment URL, NFT page, or IPFS:CID/path" />
+          <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
           <button type="button" id="addAttachmentBtn">Add</button>
         </div>
         <div class="compose-preview" id="composePreview" aria-live="polite">
@@ -1769,7 +1769,6 @@
       return keywords.slice(0, 5);
     };
     const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/;
-    const COMPOSER_CID_ANYWHERE_REGEX = new RegExp(COMPOSER_CID_REGEX.source, 'ig');
     const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
     const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|ogv|mov|avi|m3u8)$/i;
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
@@ -1777,14 +1776,11 @@
     const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
-    const MAX_URI_DECODE_ITERATIONS = 3; // Enough to unwrap common nested percent-encoded NFT/media URLs without looping excessively.
-    const MAX_METADATA_CANDIDATE_URLS = 4; // Caps follow-up metadata fetches so marketplace/page resolution stays responsive.
-    const MAX_IPFS_CANDIDATE_VALUE_LENGTH = 2000;
+    const MAX_URI_DECODE_ITERATIONS = 3; // Limits successive URI decoding iterations to unwrap percent-encoded IPFS links.
     const MEDIA_QUERY_PARAM_NAMES = [
       'filename', 'file', 'name', 'path', 'download', 'media', 'animation_url', 'animation',
       'video', 'img', 'image', 'uri', 'url', 'artifact_uri', 'artifact', 'display_uri', 'display'
     ];
-    const MEDIA_VALUE_HINT_REGEX = /(ipfs:|ipfs%3a|\/ipfs\/|\.ipfs\.|animation|artifact|display|image|media|metadata|video|uri|url|source)/i;
 
     function setComposeStatus(message) {
       if (!dom.composeStatus) return;
@@ -1873,173 +1869,6 @@
         }
       }
       return null;
-    }
-
-    function addIpfsCandidateValue(collected, value) {
-      const text = normalize(typeof value === 'string' ? value : '');
-      if (!text || text.length > MAX_IPFS_CANDIDATE_VALUE_LENGTH) return;
-      if (/^https?:\/\//i.test(text) || /^ipfs:\/\//i.test(text) || /^IPFS:/i.test(text) || MEDIA_VALUE_HINT_REGEX.test(text) || COMPOSER_CID_REGEX.test(text)) {
-        collected.push(text);
-      }
-    }
-
-    function collectIpfsCandidateValues(value, collected = [], seen = new WeakSet()) {
-      if (typeof value === 'string') {
-        addIpfsCandidateValue(collected, value);
-        return collected;
-      }
-      if (!value || typeof value !== 'object') return collected;
-      if (seen.has(value)) return collected;
-      seen.add(value);
-      if (Array.isArray(value)) {
-        value.forEach((entry) => collectIpfsCandidateValues(entry, collected, seen));
-        return collected;
-      }
-      Object.entries(value).forEach(([key, entry]) => {
-        if (MEDIA_VALUE_HINT_REGEX.test(key) && typeof entry === 'string') addIpfsCandidateValue(collected, entry);
-        collectIpfsCandidateValues(entry, collected, seen);
-      });
-      return collected;
-    }
-
-    function extractIpfsCandidateValuesFromHtml(htmlText) {
-      const html = normalize(htmlText);
-      if (!html) return [];
-      const candidates = [];
-      const add = (value) => addIpfsCandidateValue(candidates, value);
-      try {
-        const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
-        parsedHtml.querySelectorAll('meta[content], video[src], source[src], a[href], img[src], link[href]').forEach((el) => {
-          add(el.getAttribute('content') || el.getAttribute('src') || el.getAttribute('href') || '');
-        });
-        parsedHtml.querySelectorAll('script[type="application/json"], script[type="application/ld+json"]').forEach((script) => {
-          const text = normalize(script.textContent || '');
-          if (!text) return;
-          try {
-            collectIpfsCandidateValues(JSON.parse(text), candidates);
-          } catch {
-            add(text);
-          }
-        });
-      } catch {}
-      const inlineUrls = html.match(/(?:https?:\/\/|ipfs:\/\/|IPFS:)[^\s"'<>\\]+/gi) || [];
-      inlineUrls.forEach((value) => add(value));
-      COMPOSER_CID_ANYWHERE_REGEX.lastIndex = 0;
-      let cidMatch;
-      while ((cidMatch = COMPOSER_CID_ANYWHERE_REGEX.exec(html)) !== null) add(cidMatch[0]);
-      return [...new Set(candidates)];
-    }
-
-    function pickResolvedIpfsPartsFromCandidates(candidates) {
-      for (const candidate of [...new Set((candidates || []).filter(Boolean))]) {
-        const parsed = extractIpfsPartsFromInput(candidate);
-        if (parsed?.cid) return parsed;
-      }
-      return null;
-    }
-
-    async function fetchJsonCandidate(url) {
-      try {
-        const response = await fetch(url, {
-          headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.8' },
-          mode: 'cors'
-        });
-        if (!response.ok) return null;
-        return await response.json();
-      } catch {
-        return null;
-      }
-    }
-
-    async function fetchTextCandidate(url) {
-      try {
-        const response = await fetch(url, {
-          headers: { accept: 'text/html, application/json;q=0.9, text/plain;q=0.8, */*;q=0.5' },
-          mode: 'cors'
-        });
-        if (!response.ok) return null;
-        return {
-          text: await response.text(),
-          contentType: normalize(response.headers.get('content-type') || '')
-        };
-      } catch {
-        return null;
-      }
-    }
-
-    async function resolveMetadataCandidateUrlsToIpfsParts(candidates) {
-      const urls = [...new Set((candidates || [])
-        .map((value) => normalize(value))
-        .filter((value) => /^https?:\/\//i.test(value))
-        .filter((value) => /(metadata|token|asset|nft|json|animation|artifact|media|video|image|uri)/i.test(value))
-        .slice(0, MAX_METADATA_CANDIDATE_URLS))];
-      for (const candidateUrl of urls) {
-        const jsonPayload = await fetchJsonCandidate(candidateUrl);
-        if (jsonPayload) {
-          const jsonCandidates = collectIpfsCandidateValues(jsonPayload);
-          const direct = pickResolvedIpfsPartsFromCandidates(jsonCandidates);
-          if (direct?.cid) return direct;
-        }
-        const textPayload = await fetchTextCandidate(candidateUrl);
-        if (!textPayload?.text) continue;
-        const htmlCandidates = textPayload.contentType.includes('json')
-          ? (() => {
-              try {
-                return collectIpfsCandidateValues(JSON.parse(textPayload.text));
-              } catch {
-                return extractIpfsCandidateValuesFromHtml(textPayload.text);
-              }
-            })()
-          : extractIpfsCandidateValuesFromHtml(textPayload.text);
-        const direct = pickResolvedIpfsPartsFromCandidates(htmlCandidates);
-        if (direct?.cid) return direct;
-      }
-      return null;
-    }
-
-    async function resolveOpenSeaUrlToIpfsParts(parsedUrl) {
-      if (!(parsedUrl instanceof URL) || !/(\.|^)opensea\.io$/i.test(parsedUrl.hostname)) return null;
-      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-      if (pathParts[0] !== 'item' || pathParts.length < 4) return null;
-      const [, chain, contract, tokenId] = pathParts;
-      if (!chain || !contract || !tokenId) return null;
-      const payload = await fetchJsonCandidate(`https://api.opensea.io/api/v2/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contract)}/nfts/${encodeURIComponent(tokenId)}`);
-      if (!payload) return null;
-      const candidates = collectIpfsCandidateValues(payload);
-      const direct = pickResolvedIpfsPartsFromCandidates(candidates);
-      if (direct?.cid) return direct;
-      return await resolveMetadataCandidateUrlsToIpfsParts(candidates);
-    }
-
-    async function resolveExternalIpfsPartsFromUrl(rawInput) {
-      let parsedUrl;
-      try {
-        parsedUrl = new URL(normalize(rawInput));
-      } catch {
-        return null;
-      }
-      const direct = await resolveOpenSeaUrlToIpfsParts(parsedUrl);
-      if (direct?.cid) return direct;
-      const fetched = await fetchTextCandidate(parsedUrl.href);
-      if (!fetched?.text) return null;
-      const pageCandidates = fetched.contentType.includes('json')
-        ? (() => {
-            try {
-              return collectIpfsCandidateValues(JSON.parse(fetched.text));
-            } catch {
-              return extractIpfsCandidateValuesFromHtml(fetched.text);
-            }
-          })()
-        : extractIpfsCandidateValuesFromHtml(fetched.text);
-      const pageDirect = pickResolvedIpfsPartsFromCandidates(pageCandidates);
-      if (pageDirect?.cid) return pageDirect;
-      return await resolveMetadataCandidateUrlsToIpfsParts(pageCandidates);
-    }
-
-    async function resolveIpfsPartsFromInput(rawInput) {
-      const direct = extractIpfsPartsFromInput(rawInput);
-      if (direct?.cid) return direct;
-      return await resolveExternalIpfsPartsFromUrl(rawInput);
     }
 
     function setSendEstimate(message) {
@@ -3176,8 +3005,8 @@
     }
 
     async function verifyAndNormalizeIpfsVideoInput(rawInput) {
-      const parsed = await resolveIpfsPartsFromInput(rawInput);
-      if (!parsed?.cid) throw new Error('Invalid IPFS/NFT link. Use IPFS:, ipfs://, /ipfs/CID, a CID-bearing URL, or a direct NFT page URL');
+      const parsed = extractIpfsPartsFromInput(rawInput);
+      if (!parsed?.cid) throw new Error('Use IPFS:CID/file.mp4, ipfs://CID/file.mp4, a gateway /ipfs/CID URL, or a CID-bearing link');
       const candidateUrls = [];
       if (parsed.path) {
         for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, parsed.path, i));
