@@ -1451,7 +1451,7 @@
       if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
       return sanitized.slice(0, maxLength);
     };
-    const cleanInlineDisplayText = (value, maxLength = 220) => cleanDisplayText(value, maxLength).replace(/\s+/g, ' ').trim();
+    const cleanAndCollapseWhitespace = (value, maxLength = 220) => cleanDisplayText(value, maxLength).replace(/\s+/g, ' ').trim();
     const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
     const parseMetricNumber = (value) => {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -1907,11 +1907,11 @@
         const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
         const profileUrn = cleanDisplayText(extractProfileUrn(resolvedProfile), 120);
         const imageUrl = profileImageUrlFromProfile(resolvedProfile);
-        const bio = cleanInlineDisplayText(
+        const bio = cleanAndCollapseWhitespace(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
           180
         );
-        const hometown = cleanInlineDisplayText(
+        const hometown = cleanAndCollapseWhitespace(
           resolvedProfile?.loc || resolvedProfile?.LOC || resolvedProfile?.location || resolvedProfile?.Location || '',
           90
         );
@@ -1921,7 +1921,7 @@
           const pieces = [];
           if (hometown) pieces.push(`Location: ${hometown}`);
           if (resolvedProfile?.website || resolvedProfile?.Website) {
-            pieces.push(cleanInlineDisplayText(resolvedProfile.website || resolvedProfile.Website, 80));
+            pieces.push(cleanAndCollapseWhitespace(resolvedProfile.website || resolvedProfile.Website, 80));
           }
           dom.composeProfileExtra.textContent = pieces.join(' · ');
         }
