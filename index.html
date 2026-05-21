@@ -685,7 +685,8 @@
       border: 1px solid rgba(122, 149, 216, .35);
       background: rgba(7, 14, 28, .95);
       box-shadow: 0 14px 36px rgba(0, 0, 0, .44);
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
       z-index: 12;
       display: none;
     }
@@ -697,6 +698,7 @@
     .compose-grid {
       display: grid;
       gap: .5rem;
+      min-width: 0;
     }
 
     .compose-row {
@@ -768,6 +770,14 @@
       background: rgba(7, 14, 28, .78);
     }
 
+    .attachment-list li span {
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .attachment-list button {
       padding: .14rem .42rem;
       min-width: auto;
@@ -821,6 +831,57 @@
       font-size: .68rem;
       color: #8aaac0;
       line-height: 1.4;
+    }
+
+    #internalActionsRow {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .compose-profile-card {
+      display: none;
+      border: 1px solid rgba(122, 149, 216, .25);
+      border-radius: .56rem;
+      background: rgba(7, 14, 28, .78);
+      padding: .5rem .58rem;
+      gap: .2rem;
+    }
+
+    .compose-profile-card.visible {
+      display: grid;
+    }
+
+    .compose-profile-title {
+      font-size: .78rem;
+      color: #d9ebff;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .compose-profile-meta {
+      font-size: .68rem;
+      color: #9fc0dd;
+      overflow-wrap: anywhere;
+    }
+
+    .compose-wallet-balance {
+      font-size: .72rem;
+      color: #c9ddff;
+      min-height: 1.1rem;
+      overflow-wrap: anywhere;
+    }
+
+    .compose-estimate {
+      border-radius: .58rem;
+      border: 1px solid rgba(132, 157, 217, .36);
+      background: rgba(10, 18, 36, .82);
+      color: #dbe7ff;
+      font: inherit;
+      padding: .48rem .56rem;
+      font-size: .74rem;
+      min-height: 2.1rem;
+      display: flex;
+      align-items: center;
+      overflow-wrap: anywhere;
     }
 
     @media (max-width: 920px) {
@@ -948,9 +1009,10 @@
         <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
       </div>
       <div class="compose-grid">
-        <p class="compose-help">This composer supports only the built-in testnet3 legacy wallet. Add an IPFS video link and message, then Sign + Send via p2fk sendmany.</p>
-        <div class="compose-row">
-          <button type="button" id="connectWalletBtn">Use built-in wallet</button>
+        <p class="compose-help">This composer is for video posts/comments only. Add a playable IPFS video attachment, then Sign + Send via p2fk sendmany.</p>
+        <div class="compose-profile-card" id="composeProfileCard" aria-live="polite">
+          <div class="compose-profile-title" id="composeProfileTitle"></div>
+          <div class="compose-profile-meta" id="composeProfileMeta"></div>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
           <p class="internal-wallet-note">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
@@ -967,11 +1029,15 @@
           </div>
           <div class="compose-row" id="internalActionsRow">
             <button type="button" id="internalLockBtn">Lock</button>
+            <button type="button" id="internalConsolidateBtn">Consolidate change</button>
             <button type="button" id="internalForgetBtn">Forget key</button>
           </div>
         </div>
-        <input id="walletAddress" type="text" placeholder="Connected address" readonly />
-        <input id="postRecipients" type="text" placeholder="Extra recipient addresses (comma/semicolon separated)" />
+        <div class="compose-row">
+          <input id="walletAddress" type="text" placeholder="Connected address" readonly />
+          <button type="button" id="copyWalletAddressBtn">Copy</button>
+        </div>
+        <div class="compose-wallet-balance" id="walletBalance"></div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
         <div class="compose-row">
           <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
@@ -983,7 +1049,7 @@
         </div>
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row">
-          <input id="sendAmount" type="number" min="0.00000001" step="0.00000001" value="0.00000546" />
+          <div class="compose-estimate" id="sendEstimate">Estimated sendmany cost appears after wallet unlock + video attachment.</div>
           <button type="button" id="sendPostBtn">Sign + Send</button>
         </div>
         <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
@@ -1024,16 +1090,19 @@
       waitingA11yText: document.getElementById('waitingA11yText'),
       composePanel: document.getElementById('composePanel'),
       composeCloseBtn: document.getElementById('composeCloseBtn'),
-      connectWalletBtn: document.getElementById('connectWalletBtn'),
+      composeProfileCard: document.getElementById('composeProfileCard'),
+      composeProfileTitle: document.getElementById('composeProfileTitle'),
+      composeProfileMeta: document.getElementById('composeProfileMeta'),
       walletAddress: document.getElementById('walletAddress'),
-      postRecipients: document.getElementById('postRecipients'),
+      copyWalletAddressBtn: document.getElementById('copyWalletAddressBtn'),
+      walletBalance: document.getElementById('walletBalance'),
       postMessage: document.getElementById('postMessage'),
       attachmentInput: document.getElementById('attachmentInput'),
       addAttachmentBtn: document.getElementById('addAttachmentBtn'),
       composePreview: document.getElementById('composePreview'),
       composePreviewVideo: document.getElementById('composePreviewVideo'),
       attachmentList: document.getElementById('attachmentList'),
-      sendAmount: document.getElementById('sendAmount'),
+      sendEstimate: document.getElementById('sendEstimate'),
       sendPostBtn: document.getElementById('sendPostBtn'),
       composeStatus: document.getElementById('composeStatus'),
       internalWalletSection: document.getElementById('internalWalletSection'),
@@ -1047,6 +1116,7 @@
       internalImportBtn: document.getElementById('internalImportBtn'),
       internalUnlockBtn: document.getElementById('internalUnlockBtn'),
       internalLockBtn: document.getElementById('internalLockBtn'),
+      internalConsolidateBtn: document.getElementById('internalConsolidateBtn'),
       internalForgetBtn: document.getElementById('internalForgetBtn')
     };
 
@@ -1107,6 +1177,7 @@
     const INTERNAL_CHANGE_DERIVATION_PREFIX = 'suptv:testnet3:change:';
     const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet/api';
     const BTC_DUST_LIMIT_SAT = 546; // P2PKH dust threshold in satoshis
+    const COMPOSER_AMOUNT_PER_RECIPIENT = BTC_DUST_LIMIT_SAT / 1e8;
     const BTC_DEFAULT_FEE_RATE = 10; // sat/vbyte fallback when fee API is unreachable
     const BTC_MIN_FEE_RATE = 2; // sat/vbyte absolute minimum
     const IPFS_GATEWAY_URLS = [
@@ -1177,6 +1248,8 @@
     let composerPreviewUrl = '';
     let walletSession = { providerId: '', provider: null, address: '' };
     let internalPrivKeyBytes = null;
+    let composeEstimateRefreshTimer = null;
+    let composeEstimateRequestId = 0;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1501,6 +1574,121 @@
       dom.composeStatus.textContent = cleanDisplayText(message || '', 240);
     }
 
+    function setSendEstimate(message) {
+      if (!dom.sendEstimate) return;
+      dom.sendEstimate.textContent = cleanDisplayText(message || '', 220);
+    }
+
+    function clearComposerProfileCard() {
+      if (!dom.composeProfileCard || !dom.composeProfileTitle || !dom.composeProfileMeta) return;
+      dom.composeProfileCard.classList.remove('visible');
+      dom.composeProfileTitle.textContent = '';
+      dom.composeProfileMeta.textContent = '';
+    }
+
+    function setWalletBalanceText(message) {
+      if (!dom.walletBalance) return;
+      dom.walletBalance.textContent = cleanDisplayText(message || '', 220);
+    }
+
+    async function refreshWalletBalance() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        setWalletBalanceText('');
+        return;
+      }
+      setWalletBalanceText('Checking main-address balance…');
+      try {
+        const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(address)}`);
+        if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
+        const payload = await response.json();
+        const chainStats = payload?.chain_stats || {};
+        const mempoolStats = payload?.mempool_stats || {};
+        const confirmedSat = (Number(chainStats.funded_txo_sum || 0) - Number(chainStats.spent_txo_sum || 0));
+        const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
+        const confirmedBtc = (confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION);
+        const pendingText = unconfirmedSat ? ` · pending ${(unconfirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC` : '';
+        setWalletBalanceText(`Main balance: ${confirmedBtc} BTC (${confirmedSat.toLocaleString()} sat)${pendingText}`);
+      } catch (error) {
+        setWalletBalanceText(error?.message || 'Could not load wallet balance');
+      }
+    }
+
+    async function refreshComposerProfileCard() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        clearComposerProfileCard();
+        return;
+      }
+      if (!dom.composeProfileCard || !dom.composeProfileTitle || !dom.composeProfileMeta) return;
+      dom.composeProfileCard.classList.add('visible');
+      dom.composeProfileTitle.textContent = shortTitle(address, 48);
+      dom.composeProfileMeta.textContent = 'Looking up p2fk profile…';
+      try {
+        const byAddress = await getProfileByAddress(address);
+        const urn = extractProfileUrn(byAddress);
+        let resolvedProfile = byAddress;
+        if (urn) {
+          const byUrn = await getProfileByURN(urn);
+          if (byUrn && profileHasCreatorMatch(byUrn, address)) resolvedProfile = byUrn;
+        }
+        const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
+        const profileUrn = extractProfileUrn(resolvedProfile);
+        const bio = cleanDisplayText(
+          resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
+          180
+        );
+        dom.composeProfileTitle.textContent = title;
+        dom.composeProfileMeta.textContent = `${profileUrn || 'No profile URN'} · ${shortTitle(address, 30)}${bio ? ` · ${bio}` : ''}`;
+      } catch {
+        dom.composeProfileTitle.textContent = shortTitle(address, 48);
+        dom.composeProfileMeta.textContent = 'No profile data found for this address';
+      }
+    }
+
+    async function refreshComposerSendEstimate() {
+      const requestId = ++composeEstimateRequestId;
+      const messageText = normalize(dom.postMessage?.value || '');
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setSendEstimate('Unlock/import wallet to calculate sendmany cost estimate.');
+        return;
+      }
+      if (!composerAttachments.length) {
+        setSendEstimate('Add a validated IPFS video attachment to see sendmany cost estimate.');
+        return;
+      }
+      try {
+        const { outputs, cost } = await buildP2fkRecipientsAndCost({
+          messageText,
+          attachments: composerAttachments,
+          extraRecipients: [],
+          fromAddress: walletSession.address,
+          amountPerRecipient: COMPOSER_AMOUNT_PER_RECIPIENT
+        });
+        if (requestId !== composeEstimateRequestId) return;
+        const costSats = Math.round(cost * 1e8);
+        setSendEstimate(`${outputs.length} outputs · ${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC (${costSats.toLocaleString()} sat) + miner fee`);
+      } catch (error) {
+        if (requestId !== composeEstimateRequestId) return;
+        setSendEstimate(error?.message || 'Cost estimate unavailable');
+      }
+    }
+
+    function queueComposerSendEstimateRefresh() {
+      if (composeEstimateRefreshTimer) clearTimeout(composeEstimateRefreshTimer);
+      composeEstimateRefreshTimer = setTimeout(() => {
+        composeEstimateRefreshTimer = null;
+        refreshComposerSendEstimate();
+      }, 220);
+    }
+
+    function syncComposerWalletContext() {
+      if (dom.walletAddress) dom.walletAddress.value = walletSession.address || '';
+      refreshWalletBalance();
+      refreshComposerProfileCard();
+      queueComposerSendEstimateRefresh();
+    }
+
     function populateWalletProviderOptions() {
       walletSession.providerId = INTERNAL_WALLET_ID;
     }
@@ -1510,7 +1698,9 @@
       if (!dom.composePanel) return;
       dom.composePanel.classList.toggle('visible', composePanelOpen);
       dom.composePanel.setAttribute('aria-hidden', composePanelOpen ? 'false' : 'true');
-      if (!composePanelOpen) {
+      if (composePanelOpen) {
+        syncComposerWalletContext();
+      } else {
         setComposeStatus('');
         if (!composerAttachments.length) clearComposerPreview();
       }
@@ -2063,10 +2253,10 @@
         localStorage.setItem(INTERNAL_WALLET_STORAGE_KEY, JSON.stringify(enc));
         internalPrivKeyBytes = privBytes;
         walletSession = { providerId: 'internal', provider: null, address: addr };
-        if (dom.walletAddress) dom.walletAddress.value = addr;
         if (dom.internalWifInput) dom.internalWifInput.value = '';
         if (dom.internalPasswordInput) dom.internalPasswordInput.value = '';
         renderInternalWalletUi();
+        syncComposerWalletContext();
         setComposeStatus(`Imported & unlocked — ${addr}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Import failed');
@@ -2084,9 +2274,9 @@
         const addr = await privKeyToTestnetAddr(privBytes);
         internalPrivKeyBytes = privBytes;
         walletSession = { providerId: 'internal', provider: null, address: addr };
-        if (dom.walletAddress) dom.walletAddress.value = addr;
         if (dom.internalUnlockPassword) dom.internalUnlockPassword.value = '';
         renderInternalWalletUi();
+        syncComposerWalletContext();
         setComposeStatus(`Unlocked — ${addr}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Unlock failed — wrong password?');
@@ -2096,8 +2286,9 @@
     function onInternalLock() {
       internalPrivKeyBytes = null;
       walletSession = { providerId: 'internal', provider: null, address: '' };
-      if (dom.walletAddress) dom.walletAddress.value = '';
       renderInternalWalletUi();
+      syncComposerWalletContext();
+      clearComposerProfileCard();
       setComposeStatus('Wallet locked');
     }
 
@@ -2105,8 +2296,9 @@
       localStorage.removeItem(INTERNAL_WALLET_STORAGE_KEY);
       internalPrivKeyBytes = null;
       walletSession = { providerId: 'internal', provider: null, address: '' };
-      if (dom.walletAddress) dom.walletAddress.value = '';
       renderInternalWalletUi();
+      syncComposerWalletContext();
+      clearComposerProfileCard();
       setComposeStatus('Key removed from browser storage');
     }
 
@@ -2135,7 +2327,7 @@
       if (!internalPrivKeyBytes) throw new Error('Import or unlock the built-in testnet3 wallet first');
       const address = await privKeyToTestnetAddr(internalPrivKeyBytes);
       walletSession = { providerId: 'internal', provider: null, address };
-      dom.walletAddress.value = address;
+      syncComposerWalletContext();
       return walletSession;
     }
 
@@ -2181,6 +2373,7 @@
           composerAttachments = composerAttachments.filter((item) => item !== attachment);
           if (!composerAttachments.length) clearComposerPreview();
           renderComposerAttachments();
+          queueComposerSendEstimateRefresh();
         });
         li.appendChild(label);
         li.appendChild(removeBtn);
@@ -2193,6 +2386,7 @@
       if (!token || composerAttachments.includes(token)) return false;
       composerAttachments.push(token);
       renderComposerAttachments();
+      queueComposerSendEstimateRefresh();
       return true;
     }
 
@@ -2315,7 +2509,7 @@
       return { delimiter, payloadText, unsignedObj };
     }
 
-    async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients, fromAddress, amountPerRecipient }) {
+    async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients = [], fromAddress, amountPerRecipient }) {
       const safeMessageText = sanitizeP2fkMessageText(messageText);
       const unsignedPayload = buildP2fkUnsignedObject(safeMessageText, attachments);
       // SUP/DiscoBall verifies with verifymessage against an uppercase SHA256 hex string.
@@ -2840,16 +3034,6 @@
       loadSearch(searchKeyword, { resetSessionSkips });
     }
 
-    async function onConnectWallet() {
-      setComposeStatus('Checking built-in wallet…');
-      try {
-        await connectSelectedWallet();
-        setComposeStatus(`Connected ${INTERNAL_WALLET_LABEL} as ${shortTitle(walletSession.address, 24)}`);
-      } catch (error) {
-        setComposeStatus(error?.message || 'Wallet connection failed');
-      }
-    }
-
     async function onAddAttachment() {
       const value = normalize(dom.attachmentInput?.value || '');
       if (!value) {
@@ -2862,36 +3046,97 @@
         const added = addComposerAttachment(normalized.urn);
         setComposerPreview(normalized.previewUrl);
         dom.attachmentInput.value = '';
+        queueComposerSendEstimateRefresh();
         setComposeStatus(added ? `Attached ${normalized.urn}` : 'Attachment already added');
       } catch (error) {
         setComposeStatus(error?.message || 'Attachment validation failed');
       }
     }
 
+    async function onCopyWalletAddress() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        setComposeStatus('No connected address to copy');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(address);
+        setComposeStatus(`Copied ${shortTitle(address, 24)}`);
+      } catch {
+        setComposeStatus('Clipboard copy failed');
+      }
+    }
+
+    async function onConsolidateChange() {
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setComposeStatus('Import/unlock the built-in testnet3 wallet first');
+        return;
+      }
+      try {
+        setComposeStatus('Collecting change-address UTXOs…');
+        const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+        const changeSigners = keyring.changeSigners.filter(Boolean);
+        if (!changeSigners.length) throw new Error('Deterministic change keyring is unavailable');
+        const utxoGroups = await Promise.all(changeSigners.map(async (signer) => {
+          const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${signer.address}/utxo`);
+          if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${signer.label}`);
+          return (await utxoResp.json())
+            .filter((utxo) => utxo.status?.confirmed)
+            .map((utxo) => ({ ...utxo, signer }));
+        }));
+        const utxos = utxoGroups.flat();
+        if (!utxos.length) {
+          setComposeStatus('No confirmed change funds to consolidate');
+          return;
+        }
+        let feeRate = BTC_DEFAULT_FEE_RATE;
+        try {
+          const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
+          feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
+        } catch { /* use default */ }
+        const estimateFee = Math.ceil((10 + 148 * utxos.length + 34) * feeRate);
+        const totalSat = utxos.reduce((sum, utxo) => sum + Number(utxo.value || 0), 0);
+        const sendSat = totalSat - estimateFee;
+        if (sendSat < BTC_DUST_LIMIT_SAT) {
+          throw new Error(`Consolidation output would be dust after fee (${sendSat} sat)`);
+        }
+        const rawHex = await buildSignedBtcTx(utxos, [{ address: keyring.main.address, valueSats: sendSat }]);
+        setComposeStatus('Broadcasting consolidation transaction…');
+        const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: rawHex
+        });
+        if (!bcast.ok) {
+          const errText = await bcast.text().catch(() => String(bcast.status));
+          throw new Error(`Broadcast failed: ${errText}`);
+        }
+        const txid = (await bcast.text()).trim() || 'pending';
+        setComposeStatus(`Consolidated ${sendSat.toLocaleString()} sat to ${shortTitle(keyring.main.address, 20)} · tx ${shortTitle(txid, 20)}`);
+        syncComposerWalletContext();
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unable to consolidate change');
+      }
+    }
+
     async function onSendPost() {
       const messageText = normalize(dom.postMessage?.value || '');
-      if (!messageText && !composerAttachments.length) {
-        setComposeStatus('Write a message or add at least one attachment');
+      if (!composerAttachments.length) {
+        setComposeStatus('Add at least one validated IPFS video attachment before sending');
         return;
       }
       if (!walletSession.address || !internalPrivKeyBytes) {
         setComposeStatus('Import/unlock the built-in testnet3 wallet before sending');
         return;
       }
-      const amountPerRecipient = Number(dom.sendAmount?.value || 0);
-      if (!Number.isFinite(amountPerRecipient) || amountPerRecipient <= 0) {
-        setComposeStatus('Enter a valid send amount');
-        return;
-      }
-      const extraRecipients = parseManualRecipients(dom.postRecipients?.value || '');
       try {
         setComposeStatus('Building sendmany outputs…');
         const { outputs, cost } = await buildP2fkRecipientsAndCost({
           messageText,
           attachments: composerAttachments,
-          extraRecipients,
+          extraRecipients: [],
           fromAddress: walletSession.address,
-          amountPerRecipient
+          amountPerRecipient: COMPOSER_AMOUNT_PER_RECIPIENT
         });
         if (!outputs.length) throw new Error('No sendmany outputs were generated');
         const costSats = Math.round(cost * 1e8);
@@ -2906,10 +3151,10 @@
         });
         setComposeStatus(`✓ ${txid}`);
         if (dom.postMessage) dom.postMessage.value = '';
-        if (dom.postRecipients) dom.postRecipients.value = '';
         composerAttachments = [];
         renderComposerAttachments();
         clearComposerPreview();
+        queueComposerSendEstimateRefresh();
       } catch (error) {
         setComposeStatus(error?.message || 'Unable to send post');
       }
@@ -4041,18 +4286,21 @@
         toggleComposePanel();
       });
       dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
-      dom.connectWalletBtn.addEventListener('click', onConnectWallet);
+      dom.copyWalletAddressBtn.addEventListener('click', onCopyWalletAddress);
       dom.internalImportBtn.addEventListener('click', onInternalImport);
       dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
       dom.internalLockBtn.addEventListener('click', onInternalLock);
+      dom.internalConsolidateBtn.addEventListener('click', onConsolidateChange);
       dom.internalForgetBtn.addEventListener('click', onInternalForget);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
+      dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
       dom.attachmentInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
         onAddAttachment();
       });
+      queueComposerSendEstimateRefresh();
       if (dom.uncensoredHint) {
         dom.uncensoredHint.addEventListener('mouseenter', () => {
           uncensoredHintHovered = true;
