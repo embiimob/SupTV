@@ -123,14 +123,12 @@ SupTV now includes a **Compose** panel (✎ in the top bar) so users can contrib
 
 1. Connect a supported browser extension wallet (UniSat, Xverse, Leather, OKX).
 2. Write a post message with `#keywords`.
-3. Add attachments as URL/IPFS values, or upload a file to an IPFS add endpoint.
+3. Add one or more IPFS video links using either:
+   - `IPFS:<cid>/<filename>.mp4` style URNs, or
+   - gateway URLs containing `/ipfs/<cid>/<filename>.mp4`.
+   SupTV verifies the link is reachable/playable, then rewrites it to canonical `IPFS:<cid>/<filename>.ext`.
 4. Click **Sign + Send** to:
    - build a DiscoBall-style p2fk payload,
    - sign the payload hash with the connected wallet,
    - encode it into p2fk chunk addresses,
    - submit a `sendmany` request through the wallet extension.
-
-### IPFS upload endpoint note
-
-The file upload button uses a configurable HTTP endpoint (no default endpoint is prefilled) and expects a CORS-enabled IPFS add API response containing a CID/hash.
-If your chosen public gateway/API does not allow browser CORS uploads, set this field to an endpoint you control or one your wallet extension supports.

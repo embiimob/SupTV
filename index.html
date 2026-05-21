@@ -1129,6 +1129,7 @@
     let uncensoredHintHovered = false;
     let composePanelOpen = false;
     let composerAttachments = [];
+    let composerPreviewUrl = '';
     let walletSession = { providerId: '', provider: null, address: '' };
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -1442,6 +1443,8 @@
     };
     const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/;
     const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
+    const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|ogv|mov|avi|m3u8)$/i;
+    const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -1471,7 +1474,10 @@
       if (!dom.composePanel) return;
       dom.composePanel.classList.toggle('visible', composePanelOpen);
       dom.composePanel.setAttribute('aria-hidden', composePanelOpen ? 'false' : 'true');
-      if (!composePanelOpen) setComposeStatus('');
+      if (!composePanelOpen) {
+        setComposeStatus('');
+        if (!composerAttachments.length) clearComposerPreview();
+      }
     }
 
     function toggleComposePanel() {
@@ -1678,6 +1684,7 @@
         removeBtn.textContent = 'Remove';
         removeBtn.addEventListener('click', () => {
           composerAttachments = composerAttachments.filter((item) => item !== attachment);
+          if (!composerAttachments.length) clearComposerPreview();
           renderComposerAttachments();
         });
         li.appendChild(label);
@@ -1694,40 +1701,109 @@
       return true;
     }
 
-    function extractIpfsCid(rawText = '') {
-      const match = normalize(rawText).match(COMPOSER_CID_REGEX);
-      return match?.[1] || '';
+    function clearComposerPreview() {
+      composerPreviewUrl = '';
+      if (!dom.composePreview || !dom.composePreviewVideo) return;
+      dom.composePreview.classList.remove('visible');
+      dom.composePreviewVideo.removeAttribute('src');
+      dom.composePreviewVideo.load();
     }
 
-    async function uploadComposerFileToIpfs(file, endpoint) {
-      const target = normalize(endpoint);
-      if (!file) throw new Error('Select a file first');
-      if (!target) throw new Error('Set an IPFS upload endpoint first');
-      const formData = new FormData();
-      formData.append('file', file, file.name || 'attachment');
-      let response;
+    function setComposerPreview(url) {
+      composerPreviewUrl = normalize(url);
+      if (!dom.composePreview || !dom.composePreviewVideo || !composerPreviewUrl) return;
+      dom.composePreview.classList.add('visible');
+      dom.composePreviewVideo.src = composerPreviewUrl;
+      dom.composePreviewVideo.load();
+    }
+
+    function extractIpfsPartsFromInput(value) {
+      const input = normalize(value);
+      if (!input) return null;
+      if (/^IPFS:/i.test(input)) {
+        const body = input.replace(/^IPFS:/i, '').replace(/^\/+/, '');
+        const [cidRaw, ...pathParts] = body.split(/[\\/]+/).filter(Boolean);
+        const cid = normalize(cidRaw || '');
+        if (!COMPOSER_CID_REGEX.test(cid)) return null;
+        return { cid, path: pathParts.join('/') };
+      }
+      let parsed;
       try {
-        response = await fetch(target, { method: 'POST', body: formData });
-      } catch (error) {
-        throw new Error(`Upload request failed (network/CORS): ${error?.message || 'request failed'}`);
+        parsed = new URL(input);
+      } catch {
+        return null;
       }
-      if (!response.ok) throw new Error(`IPFS upload failed (${response.status})`);
-      const body = await response.text();
-      let cid = extractIpfsCid(body);
-      if (!cid) {
-        try {
-          const parsed = JSON.parse(body);
-          cid = extractIpfsCid(parsed?.Hash || parsed?.Cid || parsed?.cid || parsed?.value?.cid || '');
-        } catch (error) {
-          console.debug('IPFS upload response was not JSON', error);
-        }
+      const hostIpfsSplit = normalize(parsed.hostname).split('.ipfs.');
+      if (hostIpfsSplit.length > 1 && COMPOSER_CID_REGEX.test(hostIpfsSplit[0])) {
+        return { cid: hostIpfsSplit[0], path: normalize(parsed.pathname).replace(/^\/+/, '') };
       }
-      if (!cid) throw new Error('Unable to parse IPFS CID from upload response');
-      const fileName = normalize(file.name || '')
+      const pathMatch = normalize(parsed.pathname).match(IPFS_PATH_URL_REGEX);
+      if (!pathMatch) return null;
+      const cid = normalize(pathMatch[1] || '');
+      if (!COMPOSER_CID_REGEX.test(cid)) return null;
+      return { cid, path: normalize(pathMatch[2] || '') };
+    }
+
+    function sanitizeVideoFilename(path, contentType = '') {
+      const safeFile = (normalize(path).split('/').pop() || '')
         .replace(UNSAFE_FILENAME_CHARS_REGEX, '')
-        .replace(/\s+/g, ' ')
         .trim();
-      return fileName ? `IPFS:${cid}/${fileName}` : `IPFS:${cid}`;
+      if (VIDEO_FILE_EXTENSION_REGEX.test(safeFile)) return safeFile;
+      const type = normalize(contentType).toLowerCase();
+      if (type.includes('webm')) return 'artifact.webm';
+      if (type.includes('mpegurl') || type.includes('m3u8')) return 'artifact.m3u8';
+      if (type.includes('ogg')) return 'artifact.ogv';
+      if (type.includes('quicktime')) return 'artifact.mov';
+      if (type.includes('avi') || type.includes('msvideo')) return 'artifact.avi';
+      return 'artifact.mp4';
+    }
+
+    function probeVideoUrl(url, timeoutMs = 11000) {
+      return new Promise((resolve) => {
+        const probe = document.createElement('video');
+        let done = false;
+        const finish = (ok) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timeoutId);
+          probe.removeAttribute('src');
+          probe.load();
+          resolve(ok);
+        };
+        const timeoutId = setTimeout(() => finish(false), timeoutMs);
+        probe.preload = 'metadata';
+        probe.muted = true;
+        probe.playsInline = true;
+        probe.addEventListener('loadedmetadata', () => finish(true), { once: true });
+        probe.addEventListener('canplay', () => finish(true), { once: true });
+        probe.addEventListener('error', () => finish(false), { once: true });
+        probe.src = url;
+        try { probe.load(); } catch { finish(false); }
+      });
+    }
+
+    async function verifyAndNormalizeIpfsVideoInput(rawInput) {
+      const parsed = extractIpfsPartsFromInput(rawInput);
+      if (!parsed?.cid) throw new Error('Use IPFS:CID/file.mp4 or a gateway /ipfs/CID/file.mp4 URL');
+      const candidateUrls = [];
+      if (parsed.path) {
+        for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, parsed.path, i));
+      } else {
+        for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, '', i));
+      }
+      const uniqueCandidates = [...new Set(candidateUrls)];
+      for (const candidateUrl of uniqueCandidates) {
+        const isReachableVideo = await probeVideoUrl(candidateUrl);
+        if (!isReachableVideo) continue;
+        let contentType = '';
+        try {
+          const head = await fetch(candidateUrl, { method: 'HEAD', mode: 'cors' });
+          contentType = normalize(head.headers.get('content-type') || '');
+        } catch {}
+        const filename = sanitizeVideoFilename(parsed.path || '', contentType);
+        return { urn: `IPFS:${parsed.cid}/${filename}`, previewUrl: candidateUrl };
+      }
+      throw new Error('Could not find a playable IPFS video at that link');
     }
 
     function buildP2fkUnsignedObject(messageText, attachments) {
@@ -2268,28 +2344,21 @@
       }
     }
 
-    function onAddAttachment() {
+    async function onAddAttachment() {
       const value = normalize(dom.attachmentInput?.value || '');
       if (!value) {
-        setComposeStatus('Enter a URL/IPFS attachment first');
+        setComposeStatus('Enter an IPFS attachment URL/URN first');
         return;
       }
-      const added = addComposerAttachment(value);
-      dom.attachmentInput.value = '';
-      setComposeStatus(added ? 'Attachment added' : 'Attachment is empty or already listed');
-    }
-
-    async function onUploadAttachment() {
-      const file = dom.attachmentFileInput?.files?.[0];
-      const endpoint = normalize(dom.ipfsUploadEndpoint?.value || '');
-      setComposeStatus('Uploading attachment to IPFS…');
+      setComposeStatus('Checking IPFS video link…');
       try {
-        const attachmentToken = await uploadComposerFileToIpfs(file, endpoint);
-        addComposerAttachment(attachmentToken);
-        if (dom.attachmentFileInput) dom.attachmentFileInput.value = '';
-        setComposeStatus(`Uploaded ${shortTitle(attachmentToken, 52)}`);
+        const normalized = await verifyAndNormalizeIpfsVideoInput(value);
+        const added = addComposerAttachment(normalized.urn);
+        setComposerPreview(normalized.previewUrl);
+        dom.attachmentInput.value = '';
+        setComposeStatus(added ? `Attached ${normalized.urn}` : 'Attachment already added');
       } catch (error) {
-        setComposeStatus(error?.message || 'Attachment upload failed');
+        setComposeStatus(error?.message || 'Attachment validation failed');
       }
     }
 
@@ -2333,6 +2402,7 @@
         if (dom.postRecipients) dom.postRecipients.value = '';
         composerAttachments = [];
         renderComposerAttachments();
+        clearComposerPreview();
       } catch (error) {
         setComposeStatus(error?.message || 'Unable to send post');
       }
@@ -3465,7 +3535,6 @@
       dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
       dom.connectWalletBtn.addEventListener('click', onConnectWallet);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
-      dom.uploadAttachmentBtn.addEventListener('click', onUploadAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.attachmentInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
