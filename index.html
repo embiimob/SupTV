@@ -1114,6 +1114,9 @@
     ];
     const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
     const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet4/api';
+    const BTC_DUST_LIMIT_SAT = 546;         // P2PKH dust threshold in satoshis
+    const BTC_DEFAULT_FEE_RATE = 10;        // sat/vbyte fallback when fee API is unreachable
+    const BTC_MIN_FEE_RATE = 2;             // sat/vbyte absolute minimum
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -1624,7 +1627,7 @@
 
     function hexToBytes(hex) {
       const b = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16);
+      for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
       return b;
     }
 
@@ -1793,9 +1796,10 @@
 
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
+      // 0x80 = mainnet WIF prefix, 0xef = testnet WIF prefix
       if (p[0] !== 0x80 && p[0] !== 0xef) throw new Error(`Unexpected WIF prefix 0x${p[0].toString(16)}`);
-      if (p.length === 34) return p.slice(1, 33); // compressed key
-      if (p.length === 33) return p.slice(1);     // uncompressed key
+      if (p.length === 34) return p.slice(1, 33); // compressed key (version + 32 bytes + compression flag)
+      if (p.length === 33) return p.slice(1);     // uncompressed key (version + 32 bytes)
       throw new Error('WIF key has unexpected length');
     }
 
@@ -1872,10 +1876,10 @@
       if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status})`);
       const allUtxos = (await utxoResp.json()).filter(u => u.status?.confirmed);
       if (!allUtxos.length) throw new Error(`No confirmed UTXOs at ${walletSession.address} on testnet4`);
-      let feeRate = 10;
+      let feeRate = BTC_DEFAULT_FEE_RATE;
       try {
         const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
-        feeRate = Math.max(((await fr.json()).halfHourFee) || 10, 2);
+        feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
       } catch { /* use default */ }
       const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
       const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
@@ -1892,7 +1896,7 @@
       const change = selTotal - totalOut - fee;
       if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
       const finalOuts = [...outSats];
-      if (change >= 546) finalOuts.push({ address: walletSession.address, valueSats: change });
+      if (change >= BTC_DUST_LIMIT_SAT) finalOuts.push({ address: walletSession.address, valueSats: change });
       setComposeStatus(`Signing tx (${sel.length} inputs, ${finalOuts.length} outputs, ~${fee} sat fee)…`);
       const rawHex = await buildSignedBtcTx(internalPrivKeyBytes, sel, finalOuts);
       setComposeStatus('Broadcasting transaction…');
@@ -1923,8 +1927,8 @@
       const wif = normalize(dom.internalWifInput?.value || '');
       const pwd = normalize(dom.internalPasswordInput?.value || '');
       if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
-      if (pwd.length < 4) { setComposeStatus('Enter a password (at least 4 chars)'); return; }
-      setComposeStatus('Importing key…');
+      if (pwd.length < 8) { setComposeStatus('Enter a password (at least 8 characters)'); return; }
+      setComposeStatus('Deriving key — this takes a moment…');
       try {
         const privBytes = await wifToPrivKeyBytes(wif);
         const addr = await privKeyToTestnetAddr(privBytes);
@@ -1945,7 +1949,7 @@
     async function onInternalUnlock() {
       const pwd = normalize(dom.internalUnlockPassword?.value || '');
       if (!pwd) { setComposeStatus('Enter your password'); return; }
-      setComposeStatus('Unlocking…');
+      setComposeStatus('Deriving key — this takes a moment…');
       try {
         const stored = JSON.parse(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY) || 'null');
         if (!stored) throw new Error('No key stored — import one first');
