@@ -854,10 +854,9 @@
     }
 
     .compose-profile-header {
-      display: grid;
-      grid-template-columns: 44px minmax(0, 1fr);
+      display: flex;
+      align-items: flex-start;
       gap: .46rem;
-      align-items: center;
       min-width: 0;
     }
 
@@ -868,6 +867,7 @@
       object-fit: cover;
       border: 1px solid rgba(130, 165, 232, .4);
       background: rgba(6, 12, 24, .96);
+      flex-shrink: 0;
       display: none;
     }
 
@@ -877,7 +877,7 @@
 
     .compose-profile-summary {
       min-width: 0;
-      width: 100%;
+      flex: 1;
       display: grid;
       gap: .14rem;
     }
@@ -896,7 +896,7 @@
       width: 100%;
       white-space: normal;
       overflow-wrap: break-word;
-      max-height: 4.2rem;
+      max-height: 3.8rem;
       overflow-y: auto;
       padding-right: .14rem;
     }
@@ -1925,7 +1925,7 @@
         const imageUrl = profileImageUrlFromProfile(resolvedProfile);
         const bio = cleanAndCollapseWhitespace(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
-          180
+          260
         );
         const hometown = cleanAndCollapseWhitespace(
           resolvedProfile?.loc || resolvedProfile?.LOC || resolvedProfile?.location || resolvedProfile?.Location || '',
