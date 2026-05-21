@@ -1777,6 +1777,8 @@
     const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
+    const MAX_URI_DECODE_ITERATIONS = 3;
+    const MAX_METADATA_CANDIDATE_URLS = 4;
     const MEDIA_QUERY_PARAM_NAMES = [
       'filename', 'file', 'name', 'path', 'download', 'media', 'animation_url', 'animation',
       'video', 'img', 'image', 'uri', 'url', 'artifact_uri', 'artifact', 'display_uri', 'display'
@@ -1801,7 +1803,7 @@
     function collectDecodedStringVariants(value) {
       const variants = [];
       let current = normalize(value);
-      for (let i = 0; i < 3 && current; i += 1) {
+      for (let i = 0; i < MAX_URI_DECODE_ITERATIONS && current; i += 1) {
         variants.push(current);
         const next = decodeUriComponentSafely(current);
         if (!next || next === current) break;
@@ -1967,7 +1969,7 @@
         .map((value) => normalize(value))
         .filter((value) => /^https?:\/\//i.test(value))
         .filter((value) => /(metadata|token|asset|nft|json|animation|artifact|media|video|image|uri)/i.test(value))
-        .slice(0, 4))];
+        .slice(0, MAX_METADATA_CANDIDATE_URLS))];
       for (const candidateUrl of urls) {
         const jsonPayload = await fetchJsonCandidate(candidateUrl);
         if (jsonPayload) {
