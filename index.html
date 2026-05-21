@@ -844,6 +844,9 @@
       background: rgba(7, 14, 28, .78);
       padding: .46rem .54rem;
       gap: .32rem;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .compose-profile-card.visible {
@@ -874,6 +877,7 @@
 
     .compose-profile-summary {
       min-width: 0;
+      width: 100%;
       display: grid;
       gap: .14rem;
     }
@@ -888,14 +892,28 @@
     .compose-profile-meta {
       font-size: .68rem;
       color: #9fc0dd;
-      overflow-wrap: anywhere;
+      min-width: 0;
+      width: 100%;
+      white-space: normal;
+      word-break: normal;
+      overflow-wrap: break-word;
+      max-height: 4.2rem;
+      overflow-y: auto;
+      padding-right: .14rem;
     }
 
     .compose-profile-extra {
       font-size: .65rem;
       color: #8eb0d0;
-      overflow-wrap: anywhere;
+      min-width: 0;
+      width: 100%;
+      white-space: normal;
+      word-break: normal;
+      overflow-wrap: break-word;
       line-height: 1.28;
+      max-height: 6rem;
+      overflow-y: auto;
+      padding-right: .14rem;
     }
 
     .compose-profile-addr-row {
