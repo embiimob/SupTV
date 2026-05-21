@@ -922,7 +922,7 @@
     }
 
     .compose-profile-addr-text {
-      font-size: .64rem;
+      font-size: .78rem;
       color: #6a90b4;
       font-family: monospace;
       overflow: hidden;
@@ -1165,7 +1165,7 @@
       <div class="compose-grid">
         <div class="compose-profile-card" id="composeProfileCard" aria-live="polite">
           <div class="compose-profile-header">
-            <img class="compose-profile-avatar" id="composeProfileAvatar" alt="Profile image" loading="lazy" />
+            <img class="compose-profile-avatar" id="composeProfileAvatar" alt="Profile image" referrerpolicy="no-referrer" />
             <div class="compose-profile-summary">
               <div class="compose-profile-title" id="composeProfileTitle"></div>
               <div class="compose-profile-meta" id="composeProfileMeta"></div>
@@ -1211,7 +1211,7 @@
         </div>
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row">
-          <div class="compose-estimate" id="sendEstimate">Estimated sendmany cost appears after wallet unlock + video attachment.</div>
+          <div class="compose-estimate" id="sendEstimate">* Add a IPFS video attachment to see cost estimates.</div>
           <button type="button" id="sendPostBtn">Sign + Send</button>
         </div>
         <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
@@ -1932,7 +1932,9 @@
           90
         );
         dom.composeProfileTitle.textContent = title;
-        dom.composeProfileMeta.textContent = `${profileUrn || 'No profile URN'}${bio ? ` · ${bio}` : ''}`;
+        dom.composeProfileMeta.textContent = profileUrn === title
+          ? (bio || profileUrn || 'No profile URN')
+          : `${profileUrn || 'No profile URN'}${bio ? ` · ${bio}` : ''}`;
         if (dom.composeProfileExtra) {
           const pieces = [];
           if (hometown) pieces.push(`Location: ${hometown}`);
@@ -1943,8 +1945,8 @@
         }
         if (dom.composeProfileAvatar) {
           if (imageUrl) {
+            dom.composeProfileAvatar.classList.remove('visible');
             dom.composeProfileAvatar.src = imageUrl;
-            dom.composeProfileAvatar.classList.add('visible');
           } else {
             dom.composeProfileAvatar.classList.remove('visible');
             dom.composeProfileAvatar.removeAttribute('src');
@@ -1969,7 +1971,7 @@
         return;
       }
       if (!composerAttachments.length) {
-        setSendEstimate('Add a validated IPFS video attachment to see sendmany cost estimate.');
+        setSendEstimate('* Add a IPFS video attachment to see cost estimates.');
         return;
       }
       try {
@@ -4680,6 +4682,9 @@
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
       if (dom.composeProfileAvatar) {
+        dom.composeProfileAvatar.addEventListener('load', () => {
+          dom.composeProfileAvatar.classList.add('visible');
+        });
         dom.composeProfileAvatar.addEventListener('error', () => {
           dom.composeProfileAvatar.classList.remove('visible');
           dom.composeProfileAvatar.removeAttribute('src');
