@@ -1775,7 +1775,7 @@
 
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
-      if (p[0] !== 0xef) throw new Error('Only testnet3 WIF keys are supported');
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF keys are supported (version byte 0xef); received 0x${p[0].toString(16)}`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
@@ -1913,7 +1913,7 @@
       const wif = normalize(dom.internalWifInput?.value || '');
       const pwd = normalize(dom.internalPasswordInput?.value || '');
       if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
-      if (pwd.length < 12) { setComposeStatus('Enter a password (at least 12 characters)'); return; }
+      if (pwd.length < 12) { setComposeStatus('Enter a password (minimum 12 characters for security)'); return; }
       setComposeStatus('Deriving key — this takes a moment…');
       try {
         const privBytes = await wifToPrivKeyBytes(wif);
