@@ -1777,8 +1777,9 @@
     const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
-    const MAX_URI_DECODE_ITERATIONS = 3;
-    const MAX_METADATA_CANDIDATE_URLS = 4;
+    const MAX_URI_DECODE_ITERATIONS = 3; // Enough to unwrap common nested percent-encoded NFT/media URLs without looping excessively.
+    const MAX_METADATA_CANDIDATE_URLS = 4; // Caps follow-up metadata fetches so marketplace/page resolution stays responsive.
+    const MAX_IPFS_CANDIDATE_VALUE_LENGTH = 2000;
     const MEDIA_QUERY_PARAM_NAMES = [
       'filename', 'file', 'name', 'path', 'download', 'media', 'animation_url', 'animation',
       'video', 'img', 'image', 'uri', 'url', 'artifact_uri', 'artifact', 'display_uri', 'display'
@@ -1876,7 +1877,7 @@
 
     function addIpfsCandidateValue(collected, value) {
       const text = normalize(typeof value === 'string' ? value : '');
-      if (!text || text.length > 2000) return;
+      if (!text || text.length > MAX_IPFS_CANDIDATE_VALUE_LENGTH) return;
       if (/^https?:\/\//i.test(text) || /^ipfs:\/\//i.test(text) || /^IPFS:/i.test(text) || MEDIA_VALUE_HINT_REGEX.test(text) || COMPOSER_CID_REGEX.test(text)) {
         collected.push(text);
       }
@@ -3176,7 +3177,7 @@
 
     async function verifyAndNormalizeIpfsVideoInput(rawInput) {
       const parsed = await resolveIpfsPartsFromInput(rawInput);
-      if (!parsed?.cid) throw new Error('Use an IPFS URN, ipfs:// link, gateway /ipfs/CID URL, CID-bearing link, or a direct NFT page that exposes IPFS media');
+      if (!parsed?.cid) throw new Error('Invalid IPFS/NFT link. Use IPFS:, ipfs://, /ipfs/CID, a CID-bearing URL, or a direct NFT page URL');
       const candidateUrls = [];
       if (parsed.path) {
         for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, parsed.path, i));
