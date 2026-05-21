@@ -834,7 +834,7 @@
     }
 
     #internalActionsRow {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .compose-profile-card {
@@ -896,6 +896,33 @@
       color: #8eb0d0;
       overflow-wrap: anywhere;
       line-height: 1.28;
+    }
+
+    .compose-profile-addr-row {
+      display: flex;
+      align-items: center;
+      gap: .34rem;
+      min-width: 0;
+    }
+
+    .compose-profile-addr-text {
+      font-size: .64rem;
+      color: #6a90b4;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+      letter-spacing: .01em;
+    }
+
+    .compose-profile-copy-btn {
+      font-size: .6rem;
+      padding: .18rem .4rem;
+      border-radius: .36rem;
+      flex-shrink: 0;
+      line-height: 1.3;
     }
 
     .compose-wallet-balance {
@@ -1040,7 +1067,7 @@
 
     <section class="compose-panel" id="composePanel" aria-hidden="true">
       <div class="compose-header">
-        <b>Create p2fk post</b>
+        <b>Create testnet3 p2fk post</b>
         <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
       </div>
       <div class="compose-grid">
@@ -1054,12 +1081,17 @@
             </div>
           </div>
           <div class="compose-profile-extra" id="composeProfileExtra"></div>
+          <div class="compose-profile-addr-row" id="composeProfileAddrRow" style="display:none">
+            <span class="compose-profile-addr-text" id="composeProfileAddrText"></span>
+            <button type="button" class="compose-profile-copy-btn" id="composeProfileCopyBtn">Copy</button>
+          </div>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
           <p class="internal-wallet-note" id="internalWalletNote">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
           <div class="compose-row" id="internalImportRow">
             <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
             <button type="button" id="internalImportBtn">Import</button>
+            <button type="button" id="internalGenerateBtn">Generate</button>
           </div>
           <div class="compose-row" id="internalImportPwdRow">
             <input id="internalPasswordInput" type="password" autocomplete="new-password" placeholder="Set encryption password" />
@@ -1071,12 +1103,9 @@
           <div class="compose-row" id="internalActionsRow">
             <button type="button" id="internalLockBtn">Lock</button>
             <button type="button" id="internalConsolidateBtn">Consolidate change</button>
+            <button type="button" id="internalExportKeyBtn">Export key</button>
             <button type="button" id="internalForgetBtn">Forget key</button>
           </div>
-        </div>
-        <div class="compose-row">
-          <input id="walletAddress" type="text" placeholder="Connected address" readonly />
-          <button type="button" id="copyWalletAddressBtn">Copy</button>
         </div>
         <div class="compose-wallet-balance" id="walletBalance"></div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
@@ -1136,8 +1165,9 @@
       composeProfileTitle: document.getElementById('composeProfileTitle'),
       composeProfileMeta: document.getElementById('composeProfileMeta'),
       composeProfileExtra: document.getElementById('composeProfileExtra'),
-      walletAddress: document.getElementById('walletAddress'),
-      copyWalletAddressBtn: document.getElementById('copyWalletAddressBtn'),
+      composeProfileAddrRow: document.getElementById('composeProfileAddrRow'),
+      composeProfileAddrText: document.getElementById('composeProfileAddrText'),
+      composeProfileCopyBtn: document.getElementById('composeProfileCopyBtn'),
       walletBalance: document.getElementById('walletBalance'),
       postMessage: document.getElementById('postMessage'),
       attachmentInput: document.getElementById('attachmentInput'),
@@ -1161,7 +1191,9 @@
       internalUnlockBtn: document.getElementById('internalUnlockBtn'),
       internalLockBtn: document.getElementById('internalLockBtn'),
       internalConsolidateBtn: document.getElementById('internalConsolidateBtn'),
-      internalForgetBtn: document.getElementById('internalForgetBtn')
+      internalExportKeyBtn: document.getElementById('internalExportKeyBtn'),
+      internalForgetBtn: document.getElementById('internalForgetBtn'),
+      internalGenerateBtn: document.getElementById('internalGenerateBtn')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -1633,6 +1665,8 @@
         dom.composeProfileAvatar.classList.remove('visible');
         dom.composeProfileAvatar.removeAttribute('src');
       }
+      if (dom.composeProfileAddrRow) dom.composeProfileAddrRow.style.display = 'none';
+      if (dom.composeProfileAddrText) dom.composeProfileAddrText.textContent = '';
     }
 
     function setWalletBalanceText(message) {
@@ -1673,9 +1707,6 @@
           );
           const unconsolidatedSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.confirmedSat || 0), 0);
           lines.push(`Unconsolidated: ${(unconsolidatedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${unconsolidatedSat.toLocaleString()} sat)`);
-          changeEntries.forEach((entry) => {
-            lines.push(`${entry.signer.label}: ${(entry.stats.confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC`);
-          });
         } else {
           lines.push('Unconsolidated: unlock wallet to calculate change balances');
         }
@@ -1715,6 +1746,9 @@
       dom.composeProfileCard.classList.add('visible');
       dom.composeProfileTitle.textContent = shortTitle(address, 48);
       dom.composeProfileMeta.textContent = 'Looking up p2fk profile…';
+      // Always show address + copy button at the bottom of the profile card
+      if (dom.composeProfileAddrRow) dom.composeProfileAddrRow.style.display = 'flex';
+      if (dom.composeProfileAddrText) dom.composeProfileAddrText.textContent = address;
       try {
         const byAddress = await getProfileByAddress(address);
         const urn = extractProfileUrn(byAddress);
@@ -1735,7 +1769,7 @@
           90
         );
         dom.composeProfileTitle.textContent = title;
-        dom.composeProfileMeta.textContent = `${profileUrn || 'No profile URN'} · ${shortTitle(address, 30)}${bio ? ` · ${bio}` : ''}`;
+        dom.composeProfileMeta.textContent = `${profileUrn || 'No profile URN'}${bio ? ` · ${bio}` : ''}`;
         if (dom.composeProfileExtra) {
           const pieces = [];
           if (hometown) pieces.push(`Location: ${hometown}`);
@@ -1754,8 +1788,8 @@
           }
         }
       } catch {
-        dom.composeProfileTitle.textContent = shortTitle(address, 48);
-        dom.composeProfileMeta.textContent = 'No profile data found for this address';
+        dom.composeProfileTitle.textContent = shortTitle(address, 30);
+        dom.composeProfileMeta.textContent = 'No profile found';
         if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
         if (dom.composeProfileAvatar) {
           dom.composeProfileAvatar.classList.remove('visible');
@@ -1801,7 +1835,6 @@
     }
 
     function syncComposerWalletContext() {
-      if (dom.walletAddress) dom.walletAddress.value = walletSession.address || '';
       refreshWalletBalance();
       refreshComposerProfileCard();
       queueComposerSendEstimateRefresh();
@@ -2120,6 +2153,52 @@
       throw new Error('WIF key has unexpected length');
     }
 
+    async function privKeyToTestnetWif(privBytes) {
+      // Compressed WIF: version byte 0xef + 32-byte key + 0x01 compression flag
+      const wifBytes = new Uint8Array(34);
+      wifBytes[0] = 0xef;
+      wifBytes.set(privBytes, 1);
+      wifBytes[33] = 0x01;
+      return encodeBase58Check(wifBytes);
+    }
+
+    async function onGenerateNewKey() {
+      setComposeStatus('Generating a new testnet3 key…');
+      try {
+        let privBytes;
+        do {
+          privBytes = crypto.getRandomValues(new Uint8Array(32));
+        } while (bytesToBigInt(privBytes) === 0n || bytesToBigInt(privBytes) >= SECP_N);
+        const wif = await privKeyToTestnetWif(privBytes);
+        const addr = await privKeyToTestnetAddr(privBytes);
+        if (dom.internalWifInput) {
+          dom.internalWifInput.value = wif;
+          dom.internalWifInput.type = 'text';
+        }
+        setComposeStatus(`⚠ New key generated for ${addr}. SAVE your WIF above, then set a password and click Import.`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Key generation failed');
+      }
+    }
+
+    async function onExportPrivKey() {
+      if (!internalPrivKeyBytes) {
+        setComposeStatus('Wallet must be unlocked to export the key');
+        return;
+      }
+      try {
+        const wif = await privKeyToTestnetWif(internalPrivKeyBytes);
+        try {
+          await navigator.clipboard.writeText(wif);
+          setComposeStatus(`WIF copied to clipboard — store it somewhere safe!`);
+        } catch {
+          setComposeStatus(`WIF (copy manually): ${wif}`);
+        }
+      } catch (error) {
+        setComposeStatus(error?.message || 'Export failed');
+      }
+    }
+
     async function privKeyToTestnetAddr(privBytes) {
       const pub = secPrivToPub(privBytes);
       const hash = ripemd160(await sha256Bytes(pub));
@@ -2358,6 +2437,7 @@
       if (dom.internalImportPwdRow) dom.internalImportPwdRow.style.display = !hasStored ? '' : 'none';
       if (dom.internalUnlockRow) dom.internalUnlockRow.style.display = hasStored && !unlocked ? '' : 'none';
       if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked ? '' : 'none';
+      if (dom.internalExportKeyBtn) dom.internalExportKeyBtn.style.display = unlocked ? '' : 'none';
     }
 
     async function onInternalImport() {
@@ -4406,12 +4486,14 @@
         toggleComposePanel();
       });
       dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
-      dom.copyWalletAddressBtn.addEventListener('click', onCopyWalletAddress);
+      if (dom.composeProfileCopyBtn) dom.composeProfileCopyBtn.addEventListener('click', onCopyWalletAddress);
       dom.internalImportBtn.addEventListener('click', onInternalImport);
       dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
       dom.internalLockBtn.addEventListener('click', onInternalLock);
       dom.internalConsolidateBtn.addEventListener('click', onConsolidateChange);
+      dom.internalExportKeyBtn.addEventListener('click', onExportPrivKey);
       dom.internalForgetBtn.addEventListener('click', onInternalForget);
+      if (dom.internalGenerateBtn) dom.internalGenerateBtn.addEventListener('click', onGenerateNewKey);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
