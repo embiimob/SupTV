@@ -700,6 +700,11 @@
       min-width: 0;
     }
 
+    .compose-grid > * {
+      width: 100%;
+      max-width: 100%;
+    }
+
     .compose-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -1091,9 +1096,15 @@
         font-size: .95rem;
       }
       .controls .audio-toggle { min-width: 2.55rem; }
+      #internalImportRow,
+      #internalUnlockRow,
+      .compose-attachment-row,
       .compose-send-row {
         grid-template-columns: 1fr;
       }
+      #internalImportRow button,
+      #internalUnlockRow button,
+      .compose-attachment-row button,
       .compose-send-row button {
         width: 100%;
       }
@@ -1211,7 +1222,7 @@
           </div>
         </div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
-        <div class="compose-row">
+        <div class="compose-row compose-attachment-row">
           <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
           <button type="button" id="addAttachmentBtn">Add</button>
         </div>
