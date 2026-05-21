@@ -1885,7 +1885,7 @@
       return raw.replace(/\\+/g, '/');
     }
 
-    function collectProfileImageStrings(value, collected = [], seen = new WeakSet()) {
+    function scanNestedProfileImageStrings(value, collected = [], seen = new WeakSet()) {
       if (typeof value === 'string') {
         const normalized = normalizeProfileImageCandidate(value);
         if (normalized) collected.push(normalized);
@@ -1895,7 +1895,7 @@
       if (seen.has(value)) return collected;
       seen.add(value);
       const entries = Array.isArray(value) ? value : Object.values(value);
-      for (const entry of entries) collectProfileImageStrings(entry, collected, seen);
+      for (const entry of entries) scanNestedProfileImageStrings(entry, collected, seen);
       return collected;
     }
 
@@ -1908,7 +1908,7 @@
       ];
       const candidates = [
         ...directCandidates.map((candidate) => normalizeProfileImageCandidate(candidate)).filter(Boolean),
-        ...collectProfileImageStrings(profile)
+        ...scanNestedProfileImageStrings(profile)
       ];
       for (const raw of [...new Set(candidates)]) {
         if (!raw) continue;
