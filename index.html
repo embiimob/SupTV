@@ -1779,7 +1779,7 @@
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
       // testnet3 uses 0xef for WIF-encoded private keys (distinct from 0x6f address version byte).
-      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF private keys are supported (WIF version byte 0xef); received 0x${p[0].toString(16)}`);
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF private keys are supported (expected version byte 0xef for testnet3 WIF); received 0x${p[0].toString(16)}`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
@@ -1793,17 +1793,25 @@
 
     async function deriveDeterministicInternalPrivKey(basePrivBytes, derivationLabel) {
       const seedPrefix = new TextEncoder().encode(`${INTERNAL_CHANGE_DERIVATION_PREFIX}${normalize(derivationLabel)}:`);
-      const seed = new Uint8Array(seedPrefix.length + basePrivBytes.length);
-      seed.set(seedPrefix, 0);
-      seed.set(basePrivBytes, seedPrefix.length);
-      const tweakHash = await sha256Bytes(seed);
       const baseScalar = bytesToBigInt(basePrivBytes);
-      let tweakScalar = sModN(bytesToBigInt(tweakHash));
-      // secp256k1 private keys must be within [1, n-1], so clamp extremely unlikely zero modulo cases to 1.
-      if (tweakScalar === 0n) tweakScalar = 1n;
-      let derivedScalar = sModN(baseScalar + tweakScalar);
-      if (derivedScalar === 0n) derivedScalar = 1n;
-      return bigIntToBytes32(derivedScalar);
+      const counterBytes = new Uint8Array(4);
+      for (let counter = 0; counter <= 0xffffffff; counter += 1) {
+        counterBytes[0] = (counter >>> 24) & 0xff;
+        counterBytes[1] = (counter >>> 16) & 0xff;
+        counterBytes[2] = (counter >>> 8) & 0xff;
+        counterBytes[3] = counter & 0xff;
+        const seed = new Uint8Array(seedPrefix.length + basePrivBytes.length + counterBytes.length);
+        seed.set(seedPrefix, 0);
+        seed.set(basePrivBytes, seedPrefix.length);
+        seed.set(counterBytes, seedPrefix.length + basePrivBytes.length);
+        const tweakHash = await sha256Bytes(seed);
+        const tweakScalar = sModN(bytesToBigInt(tweakHash));
+        if (tweakScalar === 0n) continue;
+        const derivedScalar = sModN(baseScalar + tweakScalar);
+        if (derivedScalar === 0n) continue;
+        return bigIntToBytes32(derivedScalar);
+      }
+      throw new Error('Unable to deterministically derive a valid change key');
     }
 
     async function buildWalletSignerEntry(privBytes, label) {
@@ -1855,6 +1863,10 @@
         throw new Error(`Address is not a valid testnet3 legacy address: ${cleanDisplayText(address, 64)}`);
       }
       return payload;
+    }
+
+    async function validateLegacyTestnetAddress(address) {
+      await decodeLegacyTestnetAddressPayload(address);
     }
 
     // Bitcoin P2PKH raw transaction builder
@@ -2274,13 +2286,13 @@
       const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
       const recipientSet = new Set(recipients);
 
-      await decodeLegacyTestnetAddressPayload(fromAddress);
+      await validateLegacyTestnetAddress(fromAddress);
 
       for (const keyword of parseHashtagKeywords(messageText)) {
         try {
           const keywordAddress = await getPublicAddressByKeyword(keyword);
           if (keywordAddress) {
-            await decodeLegacyTestnetAddressPayload(keywordAddress);
+            await validateLegacyTestnetAddress(keywordAddress);
             recipientSet.add(keywordAddress);
           }
         } catch (error) {
@@ -2289,7 +2301,7 @@
       }
       for (const address of extraRecipients) {
         if (!address || address === fromAddress) continue;
-        await decodeLegacyTestnetAddressPayload(address);
+        await validateLegacyTestnetAddress(address);
         recipientSet.add(address);
       }
       if (fromAddress) recipientSet.add(fromAddress);
