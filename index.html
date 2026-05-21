@@ -1446,6 +1446,7 @@
     const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|ogv|mov|avi|m3u8)$/i;
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
+    const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -1800,7 +1801,9 @@
         try {
           const head = await fetch(candidateUrl, { method: 'HEAD', mode: 'cors' });
           contentType = normalize(head.headers.get('content-type') || '');
-        } catch {}
+        } catch (error) {
+          console.debug('IPFS HEAD probe failed', candidateUrl, error);
+        }
         const filename = sanitizeVideoFilename(parsed.path || '', contentType);
         return { urn: `IPFS:${parsed.cid}/${filename}`, previewUrl: candidateUrl };
       }
@@ -2389,7 +2392,7 @@
           amountPerRecipient
         });
         if (!outputs.length) throw new Error('No sendmany outputs were generated');
-        setComposeStatus(`Sending ${outputs.length} outputs (${cost.toFixed(8)} BTC + fee)…`);
+        setComposeStatus(`Sending ${outputs.length} outputs (${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC + fee)…`);
         const sendResult = await sendManyWithWallet(outputs);
         const txid = resolveTxidFromSendResult(sendResult) || 'pending';
         setStatus(`Post broadcast: ${txid}`);
