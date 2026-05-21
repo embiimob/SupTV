@@ -20,7 +20,7 @@ SupTV currently has two main roles:
 ## Quick start
 
 1. Clone this repo.
-2. Open `/home/runner/work/SupTV/SupTV/index.html` in a browser.
+2. Open `index.html` in a browser from your cloned repository directory.
 3. Optional: use `?q=keyword` to preload a query, e.g. `index.html?q=mp4`.
 4. Open **✎ Compose** in the top bar to post.
 
