@@ -195,6 +195,13 @@
       min-width: 3rem;
     }
 
+    .controls .compose-inline {
+      background: rgba(13, 21, 41, .78);
+      color: #dbe7ff;
+      border: 1px solid rgba(132, 157, 217, .36);
+      font-weight: 700;
+    }
+
     .side-feed {
       position: absolute;
       right: 1rem;
@@ -667,6 +674,370 @@
       margin-bottom: .08rem;
     }
 
+    .compose-panel {
+      position: absolute;
+      left: 1rem;
+      bottom: 3.4rem;
+      width: min(94vw, 520px);
+      max-height: min(72vh, 680px);
+      padding: .72rem;
+      border-radius: .82rem;
+      border: 1px solid rgba(122, 149, 216, .35);
+      background: rgba(7, 14, 28, .95);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, .44);
+      overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 12;
+      display: none;
+    }
+
+    .compose-panel.visible {
+      display: block;
+    }
+
+    .compose-grid {
+      display: grid;
+      gap: .5rem;
+      min-width: 0;
+    }
+
+    .compose-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: .5rem;
+      align-items: center;
+    }
+
+    .compose-panel input,
+    .compose-panel textarea,
+    .compose-panel select,
+    .compose-panel button {
+      border-radius: .58rem;
+      border: 1px solid rgba(132, 157, 217, .36);
+      background: rgba(10, 18, 36, .82);
+      color: #dbe7ff;
+      font: inherit;
+      padding: .48rem .56rem;
+    }
+
+    .compose-panel textarea {
+      min-height: 5.5rem;
+      resize: vertical;
+    }
+
+    .compose-panel button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .compose-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .5rem;
+    }
+
+    .compose-header b {
+      font-size: .9rem;
+      letter-spacing: .04em;
+    }
+
+    .compose-help {
+      margin: 0;
+      font-size: .72rem;
+      color: #b8ccef;
+      line-height: 1.3;
+    }
+
+    .attachment-list {
+      display: grid;
+      gap: .36rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .attachment-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .4rem;
+      font-size: .74rem;
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .52rem;
+      padding: .34rem .44rem;
+      background: rgba(7, 14, 28, .78);
+    }
+
+    .attachment-list li span {
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .attachment-list button {
+      padding: .14rem .42rem;
+      min-width: auto;
+    }
+
+    .compose-status {
+      font-size: .72rem;
+      color: #c9ddff;
+      min-height: 1.2rem;
+      overflow-wrap: anywhere;
+    }
+
+    .compose-preview {
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .52rem;
+      background: rgba(7, 14, 28, .78);
+      padding: .42rem;
+      display: none;
+      gap: .36rem;
+    }
+
+    .compose-preview.visible {
+      display: grid;
+    }
+
+    .compose-preview b {
+      font-size: .72rem;
+      color: #b8ccef;
+      letter-spacing: .03em;
+    }
+
+    .compose-preview video {
+      width: 100%;
+      max-height: 220px;
+      border-radius: .44rem;
+      background: #000;
+    }
+
+    .internal-wallet-section {
+      display: none;
+      grid-template-columns: 1fr;
+      gap: .48rem;
+      padding: .55rem .65rem;
+      border: 1px solid rgba(100, 149, 237, .22);
+      border-radius: .52rem;
+      background: rgba(5, 10, 24, .6);
+    }
+
+    .internal-wallet-note {
+      margin: 0;
+      font-size: .68rem;
+      color: #8aaac0;
+      line-height: 1.4;
+    }
+
+    #internalActionsRow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .compose-profile-card {
+      display: none;
+      border: 1px solid rgba(122, 149, 216, .25);
+      border-radius: .56rem;
+      background: rgba(7, 14, 28, .78);
+      padding: .46rem .54rem;
+      gap: .32rem;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+
+    .compose-profile-card.visible {
+      display: grid;
+    }
+
+    .compose-profile-header {
+      display: flex;
+      align-items: flex-start;
+      gap: .46rem;
+      min-width: 0;
+    }
+
+    .compose-profile-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: .46rem;
+      object-fit: cover;
+      border: 1px solid rgba(130, 165, 232, .4);
+      background: rgba(6, 12, 24, .96);
+      flex-shrink: 0;
+      display: none;
+    }
+
+    .compose-profile-avatar.visible {
+      display: block;
+    }
+
+    .compose-profile-summary {
+      min-width: 0;
+      flex: 1;
+      display: grid;
+      gap: .14rem;
+    }
+
+    .compose-profile-title {
+      font-size: .78rem;
+      color: #d9ebff;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .compose-profile-meta {
+      font-size: .68rem;
+      color: #9fc0dd;
+      min-width: 0;
+      width: 100%;
+      white-space: normal;
+      overflow-wrap: break-word;
+      max-height: 3.8rem;
+      overflow-y: auto;
+      padding-right: .14rem;
+    }
+
+    .compose-profile-extra {
+      font-size: .65rem;
+      color: #8eb0d0;
+      min-width: 0;
+      width: 100%;
+      white-space: normal;
+      overflow-wrap: break-word;
+      line-height: 1.28;
+      max-height: 6rem;
+      overflow-y: auto;
+      padding-right: .14rem;
+    }
+
+    .compose-profile-addr-row {
+      display: flex;
+      align-items: center;
+      gap: .34rem;
+      min-width: 0;
+    }
+
+    .compose-profile-addr-text {
+      font-size: .78rem;
+      color: #6a90b4;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+      letter-spacing: .01em;
+    }
+
+    .compose-profile-copy-btn {
+      font-size: .6rem;
+      padding: .18rem .4rem;
+      border-radius: .36rem;
+      flex-shrink: 0;
+      line-height: 1.3;
+    }
+
+    .compose-gear-btn {
+      font-size: 1rem;
+      padding: .3rem .46rem;
+      border-radius: .46rem;
+      flex-shrink: 0;
+      line-height: 1;
+      opacity: .72;
+    }
+
+    .compose-gear-btn.active {
+      opacity: 1;
+      background: rgba(100, 149, 237, .22);
+    }
+
+    .compose-wallet-balance {
+      display: grid;
+      gap: .28rem;
+      min-height: 1.1rem;
+    }
+
+    .compose-wallet-summary-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .4rem;
+      font-size: .72rem;
+      color: #c9ddff;
+      background: rgba(8, 15, 30, .72);
+      border: 1px solid rgba(122, 149, 216, .24);
+      border-radius: .44rem;
+      padding: .34rem .44rem;
+      text-align: left;
+    }
+
+    .compose-wallet-summary-btn.pending {
+      color: #ff9b9b;
+      border-color: rgba(255, 129, 129, .46);
+    }
+
+    .compose-wallet-summary-chevron {
+      font-size: .66rem;
+      opacity: .9;
+      flex-shrink: 0;
+    }
+
+    .compose-wallet-details {
+      display: grid;
+      gap: .2rem;
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .44rem;
+      padding: .34rem .44rem;
+      background: rgba(7, 14, 28, .74);
+    }
+
+    .compose-wallet-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: .5rem;
+      font-size: .68rem;
+      color: #b7cff1;
+    }
+
+    .compose-wallet-detail-row strong {
+      font-size: .64rem;
+      letter-spacing: .02em;
+      color: #8fb1d7;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .compose-wallet-detail-row span {
+      overflow-wrap: anywhere;
+      text-align: right;
+      color: #cfe2ff;
+    }
+
+    .compose-wallet-detail-row.pending span {
+      color: #ff9b9b;
+      font-weight: 700;
+    }
+
+    .compose-estimate {
+      border-radius: .58rem;
+      border: 1px solid rgba(132, 157, 217, .36);
+      background: rgba(10, 18, 36, .82);
+      color: #dbe7ff;
+      font: inherit;
+      padding: .48rem .56rem;
+      font-size: .74rem;
+      min-height: 2.1rem;
+      display: flex;
+      align-items: center;
+      overflow-wrap: anywhere;
+    }
+
     @media (max-width: 920px) {
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
@@ -675,6 +1046,11 @@
       .banner-menu {
         left: .65rem;
         right: .65rem;
+      }
+      .compose-panel {
+        left: .65rem;
+        right: .65rem;
+        width: auto;
       }
       .banner-menu-grid {
         grid-template-columns: 1fr;
@@ -736,6 +1112,7 @@
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
+        <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
         <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
@@ -780,6 +1157,67 @@
       </div>
     </section>
 
+    <section class="compose-panel" id="composePanel" aria-hidden="true">
+      <div class="compose-header">
+        <b>Create testnet3 p2fk post</b>
+        <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
+      </div>
+      <div class="compose-grid">
+        <div class="compose-profile-card" id="composeProfileCard" aria-live="polite">
+          <div class="compose-profile-header">
+            <img class="compose-profile-avatar" id="composeProfileAvatar" alt="Profile image" referrerpolicy="no-referrer" />
+            <div class="compose-profile-summary">
+              <div class="compose-profile-title" id="composeProfileTitle"></div>
+              <div class="compose-profile-meta" id="composeProfileMeta"></div>
+            </div>
+          </div>
+          <div class="compose-profile-extra" id="composeProfileExtra"></div>
+          <div class="compose-profile-addr-row" id="composeProfileAddrRow" style="display:none">
+            <span class="compose-profile-addr-text" id="composeProfileAddrText"></span>
+            <button type="button" class="compose-profile-copy-btn" id="composeProfileCopyBtn">Copy</button>
+            <button type="button" class="compose-gear-btn" id="internalGearBtn" aria-label="Wallet settings" title="Wallet settings">⚙</button>
+          </div>
+          <div class="compose-wallet-balance" id="walletBalance"></div>
+        </div>
+        <div class="internal-wallet-section" id="internalWalletSection">
+          <p class="internal-wallet-note" id="internalWalletNote">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
+          <div class="compose-row" id="internalImportRow">
+            <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
+            <button type="button" id="internalImportBtn">Import</button>
+            <button type="button" id="internalGenerateBtn">Generate testnet3 address</button>
+          </div>
+          <div class="compose-row" id="internalImportPwdRow">
+            <input id="internalPasswordInput" type="password" autocomplete="new-password" placeholder="Set encryption password" />
+          </div>
+          <div class="compose-row" id="internalUnlockRow">
+            <input id="internalUnlockPassword" type="password" autocomplete="current-password" placeholder="Password to unlock saved key" />
+            <button type="button" id="internalUnlockBtn">Unlock</button>
+          </div>
+          <div class="compose-row" id="internalActionsRow">
+            <button type="button" id="internalLockBtn">Lock</button>
+            <button type="button" id="internalConsolidateBtn">Consolidate change</button>
+            <button type="button" id="internalExportKeyBtn">Export key</button>
+            <button type="button" id="internalForgetBtn">Forget key</button>
+          </div>
+        </div>
+        <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
+        <div class="compose-row">
+          <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
+          <button type="button" id="addAttachmentBtn">Add</button>
+        </div>
+        <div class="compose-preview" id="composePreview" aria-live="polite">
+          <b>Video preview</b>
+          <video id="composePreviewVideo" controls muted playsinline preload="metadata"></video>
+        </div>
+        <ul class="attachment-list" id="attachmentList"></ul>
+        <div class="compose-row">
+          <div class="compose-estimate" id="sendEstimate">* Add an IPFS video attachment to see cost estimates.</div>
+          <button type="button" id="sendPostBtn">Sign + Send</button>
+        </div>
+        <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
     <div class="status" id="status" role="status" aria-live="polite">Loading…</div>
     <button type="button" class="ticker-wrap" id="tickerWrap" aria-controls="bannerMenu" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
@@ -793,6 +1231,7 @@
       query: document.getElementById('query'),
       searchForm: document.getElementById('searchForm'),
       audioBtn: document.getElementById('audioBtn'),
+      composeBtn: document.getElementById('composeBtn'),
       downloadBtn: document.getElementById('downloadBtn'),
       fullscreenBtn: document.getElementById('fullscreenBtn'),
       skipInlineBtn: document.getElementById('skipInlineBtn'),
@@ -810,7 +1249,44 @@
       offAirScreen: document.getElementById('offAirScreen'),
       waitingOverlay: document.getElementById('waitingOverlay'),
       waitingText: document.getElementById('waitingText'),
-      waitingA11yText: document.getElementById('waitingA11yText')
+      waitingA11yText: document.getElementById('waitingA11yText'),
+      composePanel: document.getElementById('composePanel'),
+      composeCloseBtn: document.getElementById('composeCloseBtn'),
+      composeProfileCard: document.getElementById('composeProfileCard'),
+      composeProfileAvatar: document.getElementById('composeProfileAvatar'),
+      composeProfileTitle: document.getElementById('composeProfileTitle'),
+      composeProfileMeta: document.getElementById('composeProfileMeta'),
+      composeProfileExtra: document.getElementById('composeProfileExtra'),
+      composeProfileAddrRow: document.getElementById('composeProfileAddrRow'),
+      composeProfileAddrText: document.getElementById('composeProfileAddrText'),
+      composeProfileCopyBtn: document.getElementById('composeProfileCopyBtn'),
+      walletBalance: document.getElementById('walletBalance'),
+      postMessage: document.getElementById('postMessage'),
+      attachmentInput: document.getElementById('attachmentInput'),
+      addAttachmentBtn: document.getElementById('addAttachmentBtn'),
+      composePreview: document.getElementById('composePreview'),
+      composePreviewVideo: document.getElementById('composePreviewVideo'),
+      attachmentList: document.getElementById('attachmentList'),
+      sendEstimate: document.getElementById('sendEstimate'),
+      sendPostBtn: document.getElementById('sendPostBtn'),
+      composeStatus: document.getElementById('composeStatus'),
+      internalWalletSection: document.getElementById('internalWalletSection'),
+      internalWalletNote: document.getElementById('internalWalletNote'),
+      internalImportRow: document.getElementById('internalImportRow'),
+      internalImportPwdRow: document.getElementById('internalImportPwdRow'),
+      internalUnlockRow: document.getElementById('internalUnlockRow'),
+      internalActionsRow: document.getElementById('internalActionsRow'),
+      internalWifInput: document.getElementById('internalWifInput'),
+      internalPasswordInput: document.getElementById('internalPasswordInput'),
+      internalUnlockPassword: document.getElementById('internalUnlockPassword'),
+      internalImportBtn: document.getElementById('internalImportBtn'),
+      internalUnlockBtn: document.getElementById('internalUnlockBtn'),
+      internalLockBtn: document.getElementById('internalLockBtn'),
+      internalConsolidateBtn: document.getElementById('internalConsolidateBtn'),
+      internalExportKeyBtn: document.getElementById('internalExportKeyBtn'),
+      internalForgetBtn: document.getElementById('internalForgetBtn'),
+      internalGenerateBtn: document.getElementById('internalGenerateBtn'),
+      internalGearBtn: document.getElementById('internalGearBtn')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -857,6 +1333,22 @@
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
     const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
+    const P2FK_CHUNK_SIZE_BYTES = 20;
+    const P2FK_DEFAULT_VERSION_BYTE = 0x6f;
+    const P2FK_PADDING_CHAR = '#';
+    const P2FK_SIGNATURE_VERSION_MARKER = '88';
+    const INTERNAL_WALLET_ID = 'internal';
+    const INTERNAL_WALLET_LABEL = '🔑 Built-in (testnet3 legacy)';
+    const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
+    const INTERNAL_WALLET_MIN_PASSWORD_LENGTH = 12;
+    const INTERNAL_WALLET_PBKDF2_ITERATIONS = 600000;
+    const INTERNAL_CHANGE_ADDRESS_COUNT = 2;
+    const INTERNAL_CHANGE_DERIVATION_PREFIX = 'suptv:testnet3:change:';
+    const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet/api';
+    const BTC_DUST_LIMIT_SAT = 546; // P2PKH dust threshold in satoshis
+    const COMPOSER_AMOUNT_PER_RECIPIENT = BTC_DUST_LIMIT_SAT / 1e8;
+    const BTC_DEFAULT_FEE_RATE = 10; // sat/vbyte fallback when fee API is unreachable
+    const BTC_MIN_FEE_RATE = 2; // sat/vbyte absolute minimum
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -920,6 +1412,16 @@
     let bannerQueueVisibleCount = BANNER_QUEUE_PAGE_SIZE;
     let uncensoredTooltipTimerId = null;
     let uncensoredHintHovered = false;
+    let composePanelOpen = false;
+    let composerAttachments = [];
+    let composerPreviewUrl = '';
+    let walletSession = { providerId: '', provider: null, address: '' };
+    let internalPrivKeyBytes = null;
+    let walletSettingsOpen = false;
+    let walletBalanceExpanded = false;
+    let walletBalanceState = null;
+    let composeEstimateRefreshTimer = null;
+    let composeEstimateRequestId = 0;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -965,6 +1467,7 @@
       if (!Number.isFinite(maxLength) || maxLength <= 0) return sanitized;
       return sanitized.slice(0, maxLength);
     };
+    const cleanAndCollapseWhitespace = (value, maxLength = 220) => cleanDisplayText(value, maxLength).replace(/\s+/g, ' ').trim();
     const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
     const parseMetricNumber = (value) => {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -1230,6 +1733,1219 @@
       }
       return keywords.slice(0, 5);
     };
+    const COMPOSER_CID_REGEX = /(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/;
+    const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
+    const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|ogv|mov|avi|m3u8)$/i;
+    const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
+    const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
+    const BTC_DECIMAL_PRECISION = 8;
+    const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
+
+    function setComposeStatus(message) {
+      if (!dom.composeStatus) return;
+      dom.composeStatus.textContent = cleanDisplayText(message || '', 240);
+    }
+
+    function setSendEstimate(message) {
+      if (!dom.sendEstimate) return;
+      dom.sendEstimate.textContent = cleanDisplayText(message || '', 220);
+    }
+
+    function clearComposerProfileCard() {
+      if (!dom.composeProfileCard || !dom.composeProfileTitle || !dom.composeProfileMeta) return;
+      dom.composeProfileCard.classList.remove('visible');
+      dom.composeProfileTitle.textContent = '';
+      dom.composeProfileMeta.textContent = '';
+      if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+      if (dom.composeProfileAvatar) {
+        dom.composeProfileAvatar.classList.remove('visible');
+        dom.composeProfileAvatar.removeAttribute('src');
+      }
+      if (dom.composeProfileAddrRow) dom.composeProfileAddrRow.style.display = 'none';
+      if (dom.composeProfileAddrText) dom.composeProfileAddrText.textContent = '';
+      walletBalanceState = null;
+      walletBalanceExpanded = false;
+      if (dom.walletBalance) dom.walletBalance.textContent = '';
+    }
+
+    function formatBtcAndSat(valueSat) {
+      const sat = Number(valueSat || 0);
+      return `${(sat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${sat.toLocaleString()} sat)`;
+    }
+
+    function renderWalletBalance() {
+      if (!dom.walletBalance) return;
+      dom.walletBalance.textContent = '';
+      if (!walletBalanceState) return;
+      if (walletBalanceState.kind === 'message') {
+        dom.walletBalance.textContent = cleanDisplayText(walletBalanceState.message || '', 220);
+        return;
+      }
+
+      const summaryBtn = document.createElement('button');
+      summaryBtn.type = 'button';
+      summaryBtn.className = `compose-wallet-summary-btn${walletBalanceState.pendingSat > 0 ? ' pending' : ''}`;
+      summaryBtn.setAttribute('aria-expanded', walletBalanceExpanded ? 'true' : 'false');
+      const summaryText = document.createElement('span');
+      summaryText.textContent = `Total: ${(Number(walletBalanceState.totalSat || 0) / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC`;
+      const chevron = document.createElement('span');
+      chevron.className = 'compose-wallet-summary-chevron';
+      chevron.textContent = walletBalanceExpanded ? '▾' : '▸';
+      summaryBtn.append(summaryText, chevron);
+      summaryBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        walletBalanceExpanded = !walletBalanceExpanded;
+        renderWalletBalance();
+      });
+      dom.walletBalance.appendChild(summaryBtn);
+      if (!walletBalanceExpanded) return;
+
+      const details = document.createElement('div');
+      details.className = 'compose-wallet-details';
+      const addRow = (label, value, pending = false) => {
+        const row = document.createElement('div');
+        row.className = `compose-wallet-detail-row${pending ? ' pending' : ''}`;
+        const key = document.createElement('strong');
+        key.textContent = label;
+        const data = document.createElement('span');
+        data.textContent = value;
+        row.append(key, data);
+        details.appendChild(row);
+      };
+
+      addRow('Total', formatBtcAndSat(walletBalanceState.totalSat));
+      if (typeof walletBalanceState.unconsolidatedSat === 'number') {
+        addRow('Unconsolidated', formatBtcAndSat(walletBalanceState.unconsolidatedSat));
+      } else {
+        addRow('Unconsolidated', 'Unlock wallet to calculate');
+      }
+      addRow('Pending', formatBtcAndSat(walletBalanceState.pendingSat), walletBalanceState.pendingSat > 0);
+      dom.walletBalance.appendChild(details);
+    }
+
+    function setWalletBalanceText(message) {
+      walletBalanceState = { kind: 'message', message };
+      renderWalletBalance();
+    }
+
+    function hasP2fkDelimiterNumberPair(value) {
+      return /[\\/:*?"|<>][0-9]/.test(cleanDisplayText(value || '', 120));
+    }
+
+    async function getAddressBalanceStats(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0 };
+      const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(cleanAddress)}`);
+      if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
+      const payload = await response.json();
+      const chainStats = payload?.chain_stats || {};
+      const mempoolStats = payload?.mempool_stats || {};
+      const confirmedSat = (Number(chainStats.funded_txo_sum || 0) - Number(chainStats.spent_txo_sum || 0));
+      const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
+      return { confirmedSat, unconfirmedSat };
+    }
+
+    async function refreshWalletBalance() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        walletBalanceExpanded = false;
+        walletBalanceState = null;
+        setWalletBalanceText('');
+        return;
+      }
+      setWalletBalanceText('Checking main + unconsolidated balances…');
+      try {
+        const mainStats = await getAddressBalanceStats(address);
+        let unconsolidatedSat = null;
+        let unconsolidatedPendingSat = 0;
+        if (internalPrivKeyBytes) {
+          const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+          const changeEntries = await Promise.all(
+            keyring.changeSigners.map(async (signer) => ({ signer, stats: await getAddressBalanceStats(signer.address) }))
+          );
+          unconsolidatedSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.confirmedSat || 0), 0);
+          unconsolidatedPendingSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.unconfirmedSat || 0), 0);
+        }
+        walletBalanceState = {
+          kind: 'totals',
+          totalSat: Number(mainStats.confirmedSat || 0) + Number(unconsolidatedSat || 0),
+          unconsolidatedSat,
+          pendingSat: Number(mainStats.unconfirmedSat || 0) + Number(unconsolidatedPendingSat || 0)
+        };
+        renderWalletBalance();
+      } catch (error) {
+        setWalletBalanceText(error?.message || 'Could not load wallet balance');
+      }
+    }
+
+    function normalizeProfileImageCandidate(value) {
+      const raw = cleanDisplayText(unwrapQuotedText(value || ''), 300);
+      if (!raw) return '';
+      return raw.replace(/\\+/g, '/');
+    }
+
+    function scanNestedProfileImageStrings(value, collected = [], seen = new WeakSet()) {
+      if (typeof value === 'string') {
+        const normalized = normalizeProfileImageCandidate(value);
+        if (normalized) collected.push(normalized);
+        return collected;
+      }
+      if (!value || typeof value !== 'object') return collected;
+      if (seen.has(value)) return collected;
+      seen.add(value);
+      const entries = Array.isArray(value) ? value : Object.values(value);
+      for (const entry of entries) scanNestedProfileImageStrings(entry, collected, seen);
+      return collected;
+    }
+
+    function profileImageUrlFromProfile(profile) {
+      if (!profile || typeof profile !== 'object') return '';
+      const directCandidates = [
+        profile.img, profile.IMG, profile.image, profile.Image, profile.imageUrl, profile.ImageUrl,
+        profile.avatar, profile.Avatar, profile.pfp, profile.PFP, profile.photo, profile.Photo,
+        profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
+      ];
+      const candidates = [
+        ...directCandidates.map((candidate) => normalizeProfileImageCandidate(candidate)).filter(Boolean),
+        ...scanNestedProfileImageStrings(profile)
+      ];
+      for (const raw of [...new Set(candidates)]) {
+        if (!raw) continue;
+        if (/^https?:\/\//i.test(raw)) return raw;
+        const parsed = extractIpfsPartsFromInput(raw);
+        if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
+      }
+      return '';
+    }
+
+    async function refreshComposerProfileCard() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        clearComposerProfileCard();
+        return;
+      }
+      if (!dom.composeProfileCard || !dom.composeProfileTitle || !dom.composeProfileMeta) return;
+      dom.composeProfileCard.classList.add('visible');
+      dom.composeProfileTitle.textContent = shortTitle(address, 48);
+      dom.composeProfileMeta.textContent = 'Looking up p2fk profile…';
+      // Always show address + copy button at the bottom of the profile card
+      if (dom.composeProfileAddrRow) dom.composeProfileAddrRow.style.display = 'flex';
+      if (dom.composeProfileAddrText) dom.composeProfileAddrText.textContent = address;
+      try {
+        const byAddress = await getProfileByAddress(address);
+        const urn = extractProfileUrn(byAddress);
+        let resolvedProfile = byAddress;
+        if (urn) {
+          const byUrn = await getProfileByURN(urn);
+          if (byUrn && profileHasCreatorMatch(byUrn, address)) resolvedProfile = byUrn;
+        }
+        const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
+        const profileUrn = cleanDisplayText(extractProfileUrn(resolvedProfile), 120);
+        const imageUrl = profileImageUrlFromProfile(resolvedProfile);
+        const bio = cleanAndCollapseWhitespace(
+          resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
+          260
+        );
+        const hometown = cleanAndCollapseWhitespace(
+          resolvedProfile?.loc || resolvedProfile?.LOC || resolvedProfile?.location || resolvedProfile?.Location || '',
+          90
+        );
+        dom.composeProfileTitle.textContent = title;
+        dom.composeProfileMeta.textContent = profileUrn === title
+          ? (bio || profileUrn || 'No profile URN')
+          : `${profileUrn || 'No profile URN'}${bio ? ` · ${bio}` : ''}`;
+        if (dom.composeProfileExtra) {
+          const pieces = [];
+          if (hometown) pieces.push(`Location: ${hometown}`);
+          if (resolvedProfile?.website || resolvedProfile?.Website) {
+            pieces.push(cleanAndCollapseWhitespace(resolvedProfile.website || resolvedProfile.Website, 80));
+          }
+          dom.composeProfileExtra.textContent = pieces.join(' · ');
+        }
+        if (dom.composeProfileAvatar) {
+          if (imageUrl) {
+            dom.composeProfileAvatar.classList.remove('visible');
+            dom.composeProfileAvatar.src = imageUrl;
+          } else {
+            dom.composeProfileAvatar.classList.remove('visible');
+            dom.composeProfileAvatar.removeAttribute('src');
+          }
+        }
+      } catch {
+        dom.composeProfileTitle.textContent = shortTitle(address, 30);
+        dom.composeProfileMeta.textContent = 'No profile found';
+        if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+        if (dom.composeProfileAvatar) {
+          dom.composeProfileAvatar.classList.remove('visible');
+          dom.composeProfileAvatar.removeAttribute('src');
+        }
+      }
+    }
+
+    async function refreshComposerSendEstimate() {
+      const requestId = ++composeEstimateRequestId;
+      const messageText = normalize(dom.postMessage?.value || '');
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setSendEstimate('Unlock/import wallet to calculate sendmany cost estimate.');
+        return;
+      }
+      if (!composerAttachments.length) {
+        setSendEstimate('* Add an IPFS video attachment to see cost estimates.');
+        return;
+      }
+      try {
+        const { outputs, cost } = await buildP2fkRecipientsAndCost({
+          messageText,
+          attachments: composerAttachments,
+          extraRecipients: [],
+          fromAddress: walletSession.address,
+          amountPerRecipient: COMPOSER_AMOUNT_PER_RECIPIENT
+        });
+        if (requestId !== composeEstimateRequestId) return;
+        const costSats = Math.round(cost * 1e8);
+        setSendEstimate(`${outputs.length} outputs · ${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC (${costSats.toLocaleString()} sat) + miner fee`);
+      } catch (error) {
+        if (requestId !== composeEstimateRequestId) return;
+        setSendEstimate(error?.message || 'Cost estimate unavailable');
+      }
+    }
+
+    function queueComposerSendEstimateRefresh() {
+      if (composeEstimateRefreshTimer) clearTimeout(composeEstimateRefreshTimer);
+      composeEstimateRefreshTimer = setTimeout(() => {
+        composeEstimateRefreshTimer = null;
+        refreshComposerSendEstimate();
+      }, 220);
+    }
+
+    function syncComposerWalletContext() {
+      refreshWalletBalance();
+      refreshComposerProfileCard();
+      queueComposerSendEstimateRefresh();
+    }
+
+    function populateWalletProviderOptions() {
+      walletSession.providerId = INTERNAL_WALLET_ID;
+    }
+
+    function setComposePanelOpen(open) {
+      composePanelOpen = Boolean(open);
+      if (!dom.composePanel) return;
+      dom.composePanel.classList.toggle('visible', composePanelOpen);
+      dom.composePanel.setAttribute('aria-hidden', composePanelOpen ? 'false' : 'true');
+      if (composePanelOpen) {
+        syncComposerWalletContext();
+      } else {
+        setComposeStatus('');
+        if (!composerAttachments.length) clearComposerPreview();
+      }
+    }
+
+    function toggleComposePanel() {
+      setComposePanelOpen(!composePanelOpen);
+      if (composePanelOpen) closeBannerMenu();
+    }
+
+    function pickRandomDelimiter() {
+      const bytes = new Uint8Array(1);
+      const limit = Math.floor(256 / SIGNING_DELIMITERS.length) * SIGNING_DELIMITERS.length;
+      let value = 0;
+      do {
+        crypto.getRandomValues(bytes);
+        value = bytes[0];
+      } while (value >= limit);
+      return SIGNING_DELIMITERS[value % SIGNING_DELIMITERS.length];
+    }
+
+    function createNegativeSalt() {
+      const bytes = new Uint32Array(1);
+      crypto.getRandomValues(bytes);
+      return -(bytes[0] % 100000);
+    }
+
+    function parseHashtagKeywords(message) {
+      const matches = normalize(message).match(/#[^\s]{1,20}/g) || [];
+      return [...new Set(matches.map((token) => token.slice(1).trim()).filter(Boolean))];
+    }
+
+    function sanitizeP2fkMessageText(message) {
+      return decodeHtmlEntities(normalize(message)).replace(/[<>]/g, ' ');
+    }
+
+    function parseManualRecipients(rawText) {
+      return normalize(rawText)
+        .replace(/\s+/g, '')
+        .split(/[;,]/)
+        .map((address) => address.trim())
+        .filter(Boolean);
+    }
+
+    async function sha256Bytes(bytes) {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return new Uint8Array(digest);
+    }
+
+    async function sha256HexFromText(text) {
+      const bytes = new TextEncoder().encode(text);
+      const digest = await sha256Bytes(bytes);
+      return Array.from(digest).map((value) => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    function encodeBitcoinVarInt(value) {
+      if (value < 0xfd) return new Uint8Array([value]);
+      if (value <= 0xffff) return new Uint8Array([0xfd, value & 0xff, (value >> 8) & 0xff]);
+      if (value <= 0xffffffff) {
+        return new Uint8Array([0xfe, value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >>> 24) & 0xff]);
+      }
+      throw new Error('Message is too large to sign');
+    }
+
+    async function hashBitcoinSignedMessage(messageText) {
+      const magic = new TextEncoder().encode('Bitcoin Signed Message:\n');
+      const msg = new TextEncoder().encode(messageText);
+      const msgLen = encodeBitcoinVarInt(msg.length);
+      const envelope = new Uint8Array(1 + magic.length + msgLen.length + msg.length);
+      envelope[0] = magic.length;
+      envelope.set(magic, 1);
+      envelope.set(msgLen, 1 + magic.length);
+      envelope.set(msg, 1 + magic.length + msgLen.length);
+      return sha256Bytes(await sha256Bytes(envelope));
+    }
+
+    function encodeBase58(bytes) {
+      if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+      let zeros = 0;
+      while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1;
+      let value = 0n;
+      for (const byte of bytes) value = (value << 8n) + BigInt(byte);
+      let encoded = '';
+      while (value > 0n) {
+        const remainder = Number(value % 58n);
+        value /= 58n;
+        encoded = BASE58_ALPHABET[remainder] + encoded;
+      }
+      return `${BASE58_ALPHABET[0].repeat(zeros)}${encoded || (zeros ? '' : BASE58_ALPHABET[0])}`;
+    }
+
+    async function encodeBase58Check(bytes) {
+      const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      const first = await sha256Bytes(payload);
+      const second = await sha256Bytes(first);
+      const out = new Uint8Array(payload.length + 4);
+      out.set(payload, 0);
+      out.set(second.slice(0, 4), payload.length);
+      return encodeBase58(out);
+    }
+
+    // ── Inline crypto: secp256k1 + RIPEMD-160 + Bitcoin raw-tx builder ────────
+
+    function bytesToBigInt(bytes) {
+      let v = 0n;
+      for (const b of bytes) v = (v << 8n) | BigInt(b);
+      return v;
+    }
+
+    function bigIntToBytes32(n) {
+      const out = new Uint8Array(32);
+      for (let i = 31; i >= 0; i--) { out[i] = Number(n & 0xffn); n >>= 8n; }
+      return out;
+    }
+
+    function bytesToHex(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function hexToBytes(hex) {
+      const b = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+      return b;
+    }
+
+    // secp256k1 Jacobian arithmetic
+    const SECP_P  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn; // secp256k1 field prime p
+    const SECP_N  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n; // secp256k1 subgroup order n
+    const SECP_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n; // generator point x
+    const SECP_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n; // generator point y
+
+    function sModP(n) { return ((n % SECP_P) + SECP_P) % SECP_P; }
+    function sModN(n) { return ((n % SECP_N) + SECP_N) % SECP_N; }
+    function sInv(a, m) {
+      let [r, s, rr, ss] = [m, 0n, ((a % m) + m) % m, 1n];
+      while (rr !== 0n) { const q = r / rr; [r, s, rr, ss] = [rr, ss, r - q * rr, s - q * ss]; }
+      return ((s % m) + m) % m;
+    }
+
+    function japDouble(X, Y, Z) {
+      if (Y === 0n) return [0n, 1n, 0n];
+      const Y2 = sModP(Y * Y), S = sModP(4n * X * Y2), M = sModP(3n * X * X);
+      const X2 = sModP(M * M - 2n * S);
+      return [X2, sModP(M * (S - X2) - 8n * Y2 * Y2), sModP(2n * Y * Z)];
+    }
+
+    function japAdd(X1, Y1, Z1, X2, Y2, Z2) {
+      if (Z1 === 0n) return [X2, Y2, Z2];
+      if (Z2 === 0n) return [X1, Y1, Z1];
+      const z1s = sModP(Z1 * Z1), z2s = sModP(Z2 * Z2);
+      const U1 = sModP(X1 * z2s), U2 = sModP(X2 * z1s);
+      const S1 = sModP(Y1 * z2s * Z2), S2 = sModP(Y2 * z1s * Z1);
+      const H = sModP(U2 - U1), R = sModP(S2 - S1);
+      if (H === 0n) return R === 0n ? japDouble(X1, Y1, Z1) : [0n, 1n, 0n];
+      const Hs = sModP(H * H), Hc = sModP(H * Hs);
+      const X3 = sModP(R * R - Hc - 2n * U1 * Hs);
+      return [X3, sModP(R * (U1 * Hs - X3) - S1 * Hc), sModP(H * Z1 * Z2)];
+    }
+
+    function japToAff(X, Y, Z) {
+      const zi = sInv(Z, SECP_P), zi2 = sModP(zi * zi);
+      return [sModP(X * zi2), sModP(Y * sModP(zi2 * zi))];
+    }
+
+    function sMul(k) {
+      let [rx, ry, rz] = [0n, 1n, 0n], [ax, ay, az] = [SECP_Gx, SECP_Gy, 1n];
+      let s = ((k % SECP_N) + SECP_N) % SECP_N;
+      while (s > 0n) {
+        if (s & 1n) [rx, ry, rz] = japAdd(rx, ry, rz, ax, ay, az);
+        [ax, ay, az] = japDouble(ax, ay, az);
+        s >>= 1n;
+      }
+      return [rx, ry, rz];
+    }
+
+    function secPrivToPub(privBytes) {
+      const [jx, jy, jz] = sMul(bytesToBigInt(privBytes));
+      const [x, y] = japToAff(jx, jy, jz);
+      return new Uint8Array([(y & 1n) ? 0x03 : 0x02, ...bigIntToBytes32(x)]);
+    }
+
+    async function rfc6979k(privBytes, msgHash) {
+      const hmac = async (K, ...parts) => {
+        const ck = await crypto.subtle.importKey('raw', K, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        let len = 0;
+        for (const p of parts) len += p.length;
+        const buf = new Uint8Array(len);
+        let off = 0;
+        for (const p of parts) { buf.set(p, off); off += p.length; }
+        return new Uint8Array(await crypto.subtle.sign('HMAC', ck, buf));
+      };
+      let V = new Uint8Array(32).fill(1), K = new Uint8Array(32).fill(0);
+      K = await hmac(K, V, new Uint8Array([0]), privBytes, msgHash);
+      V = await hmac(K, V);
+      K = await hmac(K, V, new Uint8Array([1]), privBytes, msgHash);
+      V = await hmac(K, V);
+      for (;;) {
+        V = await hmac(K, V);
+        const k = bytesToBigInt(V);
+        if (k >= 1n && k < SECP_N) return k;
+        K = await hmac(K, V, new Uint8Array([0]));
+        V = await hmac(K, V);
+      }
+    }
+
+    async function ecSign(privBytes, msgHashBytes) {
+      const d = bytesToBigInt(privBytes), z = bytesToBigInt(msgHashBytes);
+      const k = await rfc6979k(privBytes, msgHashBytes);
+      const [rx, ry] = japToAff(...sMul(k));
+      const r = sModN(rx);
+      let s = sModN(sInv(k, SECP_N) * (z + r * d));
+      // recoveryId bit-0 = parity of R.y; bit-1 = whether rx overflowed n (extremely rare on secp256k1)
+      let recoveryId = Number(ry & 1n) | (rx >= SECP_N ? 2 : 0);
+      if (s > SECP_N / 2n) { s = SECP_N - s; recoveryId ^= 1; } // BIP-62 low-S
+      return { r, s, recoveryId };
+    }
+
+    // ASN.1 DER encoding for ECDSA signatures (Bitcoin legacy scriptSig format)
+    function derEncode(r, s) {
+      const mb = (n) => { const b = []; let t = n; while (t > 0n) { b.unshift(Number(t & 0xffn)); t >>= 8n; } if (b[0] & 0x80) b.unshift(0); return b; };
+      const rb = mb(r), sb = mb(s);
+      return new Uint8Array([0x30, rb.length + sb.length + 4, 0x02, rb.length, ...rb, 0x02, sb.length, ...sb]);
+    }
+
+    // RIPEMD-160 — pure JS
+    function ripemd160(data) {
+      const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+      const rl32 = (x, n) => (x << n) | (x >>> (32 - n));
+      const ff = (j, x, y, z) => j < 16 ? x ^ y ^ z : j < 32 ? (x & y) | (~x & z) : j < 48 ? (x | ~y) ^ z : j < 64 ? (x & z) | (y & ~z) : x ^ (y | ~z);
+      const KL = [0, 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xA953FD4E];
+      const KR = [0x50A28BE6, 0x5C4DD124, 0x6D703EF3, 0x7A6D76E9, 0];
+      // RIPEMD-160 message word schedules (RL/RR) and per-round rotation counts (SL/SR)
+      /* eslint-disable no-multi-spaces */
+      const RL = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, 7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8, 3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12, 1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2, 4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13];
+      const RR = [5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12, 6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2, 15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13, 8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14, 12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11];
+      const SL = [11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8, 7,6,8,13,11,9,7,15,7,12,15,9,11,7,13,12, 11,13,6,7,14,9,13,15,14,8,13,6,5,12,7,5, 11,12,14,15,14,15,9,8,9,14,5,6,8,6,5,12, 9,15,5,11,6,8,13,12,5,12,13,14,11,8,5,6];
+      const SR = [8,9,9,11,13,15,15,5,7,7,8,11,14,14,12,6, 9,13,15,7,12,8,9,11,7,7,12,7,6,15,13,11, 9,7,15,11,8,6,6,14,12,13,5,14,13,13,7,5, 15,5,8,11,14,14,6,14,6,9,12,9,12,5,15,8, 8,5,12,9,12,5,14,6,8,13,6,5,15,13,11,11];
+      /* eslint-enable no-multi-spaces */
+      const mlen = bytes.length;
+      const padLen = mlen % 64 < 56 ? 56 - (mlen % 64) : 120 - (mlen % 64);
+      const padded = new Uint8Array(mlen + padLen + 8);
+      padded.set(bytes);
+      padded[mlen] = 0x80;
+      const bl = mlen * 8;
+      for (let i = 0; i < 4; i++) padded[mlen + padLen + i] = (bl >>> (i * 8)) & 0xff;
+      const view = new DataView(padded.buffer);
+      let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+      for (let off = 0; off < padded.length; off += 64) {
+        const X = Array.from({ length: 16 }, (_, i) => view.getUint32(off + i * 4, true));
+        let al = h0, bl2 = h1, cl = h2, dl = h3, el = h4;
+        let ar = h0, br = h1, cr = h2, dr = h3, er = h4;
+        for (let j = 0; j < 80; j++) {
+          const qi = j >> 4;
+          let T = (rl32((al + ff(j, bl2, cl, dl) + X[RL[j]] + KL[qi]) | 0, SL[j]) + el) | 0;
+          al = el; el = dl; dl = rl32(cl, 10); cl = bl2; bl2 = T;
+          T = (rl32((ar + ff(79 - j, br, cr, dr) + X[RR[j]] + KR[qi]) | 0, SR[j]) + er) | 0;
+          ar = er; er = dr; dr = rl32(cr, 10); cr = br; br = T;
+        }
+        const T = (h1 + cl + dr) | 0;
+        h1 = (h2 + dl + er) | 0; h2 = (h3 + el + ar) | 0;
+        h3 = (h4 + al + br) | 0; h4 = (h0 + bl2 + cr) | 0; h0 = T;
+      }
+      const out = new Uint8Array(20);
+      const dv = new DataView(out.buffer);
+      [h0, h1, h2, h3, h4].forEach((h, i) => dv.setUint32(i * 4, h, true));
+      return out;
+    }
+
+    // Base58 decode (inverse of existing encodeBase58)
+    function decodeBase58(str) {
+      let n = 0n;
+      for (const c of str) {
+        const idx = BASE58_ALPHABET.indexOf(c);
+        if (idx < 0) throw new Error(`Invalid Base58 char: ${c}`);
+        n = n * 58n + BigInt(idx);
+      }
+      let zeros = 0;
+      for (const c of str) { if (c !== BASE58_ALPHABET[0]) break; zeros++; }
+      const out = [];
+      while (n > 0n) { out.unshift(Number(n & 0xffn)); n >>= 8n; }
+      return new Uint8Array([...new Array(zeros).fill(0), ...out]);
+    }
+
+    async function decodeBase58Check(str) {
+      const raw = decodeBase58(str);
+      if (raw.length < 5) throw new Error('Base58Check too short');
+      const payload = raw.slice(0, -4), chk = raw.slice(-4);
+      const h2 = await sha256Bytes(await sha256Bytes(payload));
+      for (let i = 0; i < 4; i++) if (chk[i] !== h2[i]) throw new Error('Invalid Base58Check checksum');
+      return payload;
+    }
+
+    async function wifToPrivKeyBytes(wif) {
+      const p = await decodeBase58Check(normalize(wif));
+      // testnet3 uses 0xef for WIF-encoded private keys (distinct from 0x6f address version byte).
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF-encoded private keys are supported (expected WIF version byte 0xef, received 0x${p[0].toString(16)})`);
+      if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
+      if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
+      throw new Error('WIF key has unexpected length');
+    }
+
+    async function privKeyToTestnetWif(privBytes) {
+      // Compressed WIF: version byte 0xef + 32-byte key + 0x01 compression flag
+      const wifBytes = new Uint8Array(34);
+      wifBytes[0] = 0xef;
+      wifBytes.set(privBytes, 1);
+      wifBytes[33] = 0x01;
+      return encodeBase58Check(wifBytes);
+    }
+
+    async function onGenerateNewKey() {
+      setComposeStatus('Generating a testnet3 address…');
+      try {
+        let privBytes;
+        let wif = '';
+        let addr = '';
+        let attempts = 0;
+        do {
+          attempts += 1;
+          privBytes = crypto.getRandomValues(new Uint8Array(32));
+          if (bytesToBigInt(privBytes) === 0n || bytesToBigInt(privBytes) >= SECP_N) continue;
+          wif = await privKeyToTestnetWif(privBytes);
+          addr = await privKeyToTestnetAddr(privBytes);
+        } while (
+          attempts < 64
+          && (!wif || !addr || hasP2fkDelimiterNumberPair(wif) || hasP2fkDelimiterNumberPair(addr))
+        );
+        if (!wif || !addr || hasP2fkDelimiterNumberPair(wif) || hasP2fkDelimiterNumberPair(addr)) {
+          throw new Error('Could not generate a delimiter-safe testnet3 address; try again');
+        }
+        if (dom.internalWifInput) {
+          dom.internalWifInput.value = wif;
+          dom.internalWifInput.type = 'password';
+        }
+        setComposeStatus(`⚠ New testnet3 address generated for ${addr}. Your private key is masked above — set a password and click Import.`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Key generation failed');
+      }
+    }
+
+    async function onExportPrivKey() {
+      if (!internalPrivKeyBytes) {
+        setComposeStatus('Wallet must be unlocked to export the key');
+        return;
+      }
+      try {
+        const wif = await privKeyToTestnetWif(internalPrivKeyBytes);
+        try {
+          await navigator.clipboard.writeText(wif);
+          setComposeStatus(`WIF copied to clipboard — store it somewhere safe!`);
+        } catch {
+          setComposeStatus(`WIF (copy manually): ${wif}`);
+        }
+      } catch (error) {
+        setComposeStatus(error?.message || 'Export failed');
+      }
+    }
+
+    async function privKeyToTestnetAddr(privBytes) {
+      const pub = secPrivToPub(privBytes);
+      const hash = ripemd160(await sha256Bytes(pub));
+      return encodeBase58Check(new Uint8Array([P2FK_DEFAULT_VERSION_BYTE, ...hash])); // 0x6f = testnet legacy P2PKH
+    }
+
+    async function deriveDeterministicInternalPrivKey(basePrivBytes, derivationLabel) {
+      const seedPrefix = new TextEncoder().encode(`${INTERNAL_CHANGE_DERIVATION_PREFIX}${normalize(derivationLabel)}:`);
+      const baseScalar = bytesToBigInt(basePrivBytes);
+      const counterBytes = new Uint8Array(4);
+      // A valid secp256k1 scalar is found almost immediately in practice; in the extreme edge case, this deterministic loop throws.
+      for (let counter = 0; counter <= 0xffffffff; counter += 1) {
+        counterBytes[0] = (counter >>> 24) & 0xff;
+        counterBytes[1] = (counter >>> 16) & 0xff;
+        counterBytes[2] = (counter >>> 8) & 0xff;
+        counterBytes[3] = counter & 0xff;
+        const seed = new Uint8Array(seedPrefix.length + basePrivBytes.length + counterBytes.length);
+        seed.set(seedPrefix, 0);
+        seed.set(basePrivBytes, seedPrefix.length);
+        seed.set(counterBytes, seedPrefix.length + basePrivBytes.length);
+        const tweakHash = await sha256Bytes(seed);
+        const tweakScalar = sModN(bytesToBigInt(tweakHash));
+        if (tweakScalar === 0n) continue;
+        const derivedScalar = sModN(baseScalar + tweakScalar);
+        if (derivedScalar === 0n) continue;
+        return bigIntToBytes32(derivedScalar);
+      }
+      throw new Error('Unable to deterministically derive a valid change key');
+    }
+
+    async function buildWalletSignerEntry(privBytes, label) {
+      const pub = secPrivToPub(privBytes);
+      const hash160 = ripemd160(await sha256Bytes(pub));
+      const address = await encodeBase58Check(new Uint8Array([P2FK_DEFAULT_VERSION_BYTE, ...hash160]));
+      return {
+        label: normalize(label),
+        privBytes,
+        pub,
+        scriptPubKey: buildP2pkhScript(hash160),
+        address
+      };
+    }
+
+    async function buildInternalWalletKeyring(basePrivBytes) {
+      const main = await buildWalletSignerEntry(basePrivBytes, 'main');
+      const changeSigners = [];
+      for (let i = 0; i < INTERNAL_CHANGE_ADDRESS_COUNT; i += 1) {
+        const derivedPrivBytes = await deriveDeterministicInternalPrivKey(basePrivBytes, `slot-${i + 1}`);
+        const signer = await buildWalletSignerEntry(derivedPrivBytes, `change-${i + 1}`);
+        changeSigners.push(signer);
+      }
+      return { main, changeSigners, allSigners: [main, ...changeSigners] };
+    }
+
+    // AES-256-GCM + PBKDF2 wallet key encryption (browser-only, never leaves device)
+    async function encryptPrivKey(privBytes, password) {
+      const salt = crypto.getRandomValues(new Uint8Array(32));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: INTERNAL_WALLET_PBKDF2_ITERATIONS, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+      const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, privBytes);
+      return { salt: Array.from(salt), iv: Array.from(iv), data: Array.from(new Uint8Array(enc)) };
+    }
+
+    async function decryptPrivKey(stored, password) {
+      const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: new Uint8Array(stored.salt), iterations: INTERNAL_WALLET_PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+      );
+      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(stored.iv) }, aesKey, new Uint8Array(stored.data)));
+    }
+
+    async function decodeLegacyTestnetAddressPayload(address) {
+      const payload = await decodeBase58Check(normalize(address));
+      if (payload.length !== 21 || payload[0] !== 0x6f) {
+        throw new Error(`Address is not a valid testnet3 legacy address: ${cleanDisplayText(address, 64)}`);
+      }
+      return payload;
+    }
+
+    async function validateLegacyTestnetAddress(address) {
+      await decodeLegacyTestnetAddressPayload(address);
+    }
+
+    // Bitcoin P2PKH raw transaction builder
+    function buildP2pkhScript(hash160) {
+      return new Uint8Array([0x76, 0xa9, 0x14, ...hash160, 0x88, 0xac]);
+    }
+
+    async function addrToScript(address) {
+      const payload = await decodeLegacyTestnetAddressPayload(address);
+      return buildP2pkhScript(payload.slice(1));
+    }
+
+    function serializeBtcTx(inputs, outputs, sigIdx = -1, sigScript = null) {
+      const u32 = v => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff];
+      const u64 = v => { const n = BigInt(Math.round(v)); return [...u32(Number(n & 0xffffffffn)), ...u32(Number((n >> 32n) & 0xffffffffn))]; };
+      const vi = n => n < 0xfd ? [n] : n <= 0xffff ? [0xfd, n & 0xff, (n >> 8) & 0xff] : [0xfe, n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+      const b = [...u32(1), ...vi(inputs.length)];
+      for (let i = 0; i < inputs.length; i++) {
+        b.push(...Array.from(hexToBytes(inputs[i].txid)).reverse(), ...u32(inputs[i].vout));
+        const sc = sigIdx >= 0 ? (i === sigIdx ? sigScript : new Uint8Array([])) : (inputs[i].scriptSig || new Uint8Array([]));
+        b.push(...vi(sc.length), ...sc, ...u32(0xffffffff));
+      }
+      b.push(...vi(outputs.length));
+      for (const o of outputs) b.push(...u64(o.valueSats), ...vi(o.script.length), ...o.script);
+      b.push(...u32(0));
+      return new Uint8Array(b);
+    }
+
+    async function buildSignedBtcTx(utxos, outputs) {
+      const inps = utxos.map(u => ({ txid: u.txid, vout: u.vout, signer: u.signer, scriptSig: new Uint8Array([]) }));
+      const outs = await Promise.all(outputs.map(async o => ({ valueSats: o.valueSats, script: await addrToScript(o.address) })));
+      for (let i = 0; i < inps.length; i++) {
+        const signer = inps[i].signer;
+        if (!signer?.privBytes || !signer?.pub || !signer?.scriptPubKey) throw new Error('Missing signer metadata for input');
+        const pre = new Uint8Array([...serializeBtcTx(inps, outs, i, signer.scriptPubKey), 1, 0, 0, 0]);
+        const sh = await sha256Bytes(await sha256Bytes(pre));
+        const { r, s } = await ecSign(signer.privBytes, sh);
+        const der = derEncode(r, s);
+        inps[i].scriptSig = new Uint8Array([der.length + 1, ...der, 0x01, signer.pub.length, ...signer.pub]);
+      }
+      return bytesToHex(serializeBtcTx(inps, outs));
+    }
+
+    async function buildAndBroadcastInternalTx(sendManyOutputs) {
+      if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked — import or unlock first');
+      const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+      const byAddress = new Map(keyring.allSigners.map((signer) => [signer.address, signer]));
+      const changeA = keyring.changeSigners[0];
+      const changeB = keyring.changeSigners[1];
+      if (!changeA || !changeB) throw new Error('Internal change-address keyring is unavailable');
+
+      setComposeStatus('Fetching UTXOs from main + derived change addresses…');
+      const utxoGroups = await Promise.all(keyring.allSigners.map(async (signer) => {
+        const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${signer.address}/utxo`);
+        if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${signer.label}`);
+        const list = (await utxoResp.json())
+          .filter(u => u.status?.confirmed)
+          .map((utxo) => ({ ...utxo, sourceAddress: signer.address, signer }));
+        return { signer, list };
+      }));
+      const allUtxos = utxoGroups.flatMap((group) => group.list);
+      if (!allUtxos.length) throw new Error(`No confirmed UTXOs across ${keyring.main.address}, ${changeA.address}, ${changeB.address}`);
+
+      const totalByAddress = keyring.allSigners.reduce((acc, signer) => {
+        acc.set(signer.address, 0);
+        return acc;
+      }, new Map());
+      allUtxos.forEach((utxo) => {
+        totalByAddress.set(utxo.sourceAddress, (totalByAddress.get(utxo.sourceAddress) || 0) + Number(utxo.value || 0));
+      });
+      let feeRate = BTC_DEFAULT_FEE_RATE;
+      try {
+        const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
+        feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
+      } catch { /* use default */ }
+      // Estimated virtual size for legacy P2PKH (standard policy sizing): 10 bytes tx overhead + 148/input + 34/output.
+      const estimateLegacyP2pkhFee = (inputsCount, outputsCount) => Math.ceil((10 + 148 * inputsCount + 34 * outputsCount) * feeRate);
+      const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
+      const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
+
+      const changeATotal = totalByAddress.get(changeA.address) || 0;
+      const changeBTotal = totalByAddress.get(changeB.address) || 0;
+      const mainTotal = totalByAddress.get(keyring.main.address) || 0;
+      const preferredSource = changeATotal >= changeBTotal ? changeA : changeB;
+      const secondarySource = preferredSource.address === changeA.address ? changeB : changeA;
+      const sourceCandidates = [];
+      if ((totalByAddress.get(preferredSource.address) || 0) > 0) sourceCandidates.push(preferredSource);
+      if ((totalByAddress.get(secondarySource.address) || 0) > 0) sourceCandidates.push(secondarySource);
+      if (mainTotal > 0) sourceCandidates.push(keyring.main);
+      if (!sourceCandidates.length) throw new Error('No spendable source address has confirmed UTXOs');
+
+      let selectedSource = null;
+      let sel = [];
+      let selTotal = 0;
+      for (const source of sourceCandidates) {
+        const pool = allUtxos
+          .filter((utxo) => utxo.sourceAddress === source.address)
+          .sort((a, b) => b.value - a.value);
+        const candidateSel = [];
+        let candidateTotal = 0;
+        for (const utxo of pool) {
+          candidateSel.push(utxo);
+          candidateTotal += utxo.value;
+          const estFee = estimateLegacyP2pkhFee(candidateSel.length, outSats.length + 1);
+          if (candidateTotal >= totalOut + estFee) break;
+        }
+        const candidateFee = estimateLegacyP2pkhFee(candidateSel.length, outSats.length + 1);
+        if (candidateSel.length && candidateTotal >= totalOut + candidateFee) {
+          selectedSource = source;
+          sel = candidateSel;
+          selTotal = candidateTotal;
+          break;
+        }
+      }
+      if (!selectedSource) {
+        const availableSat = allUtxos.reduce((sum, utxo) => sum + Number(utxo.value || 0), 0);
+        throw new Error(`Insufficient funds in a single source address for valid sendmany/change routing: need >= ${totalOut} sat + fee, available ${availableSat} sat`);
+      }
+      const fee = estimateLegacyP2pkhFee(sel.length, outSats.length + 1);
+      const change = selTotal - totalOut - fee;
+      if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
+      let changeAddress = preferredSource.address;
+      if (selectedSource.address === changeA.address) {
+        changeAddress = changeB.address;
+      } else if (selectedSource.address === changeB.address) {
+        changeAddress = changeA.address;
+      }
+      const changeSigner = byAddress.get(changeAddress);
+      if (!changeSigner) throw new Error('Could not resolve deterministic change destination');
+      const finalOuts = [...outSats];
+      if (change >= BTC_DUST_LIMIT_SAT) finalOuts.push({ address: changeAddress, valueSats: change });
+      setComposeStatus(`Signing tx (${sel.length} inputs from ${selectedSource.label}, ${finalOuts.length} outputs, ~${fee} sat fee, change → ${changeSigner.label})…`);
+      const rawHex = await buildSignedBtcTx(sel, finalOuts);
+      setComposeStatus('Broadcasting transaction…');
+      const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: rawHex });
+      if (!bcast.ok) {
+        const errText = await bcast.text().catch(() => String(bcast.status));
+        throw new Error(`Broadcast failed: ${errText}`);
+      }
+      return (await bcast.text()).trim();
+    }
+
+    // ── Internal wallet UI handlers ───────────────────────────────────────────
+
+    function renderInternalWalletUi() {
+      if (!dom.internalWalletSection) return;
+      dom.internalWalletSection.style.display = 'grid';
+      const hasStored = Boolean(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY));
+      const unlocked = Boolean(internalPrivKeyBytes);
+      const needsPasswordEntry = !unlocked;
+      if (dom.internalWalletNote) dom.internalWalletNote.style.display = needsPasswordEntry ? '' : 'none';
+      if (dom.internalImportRow) dom.internalImportRow.style.display = !hasStored ? '' : 'none';
+      if (dom.internalImportPwdRow) dom.internalImportPwdRow.style.display = !hasStored ? '' : 'none';
+      if (dom.internalUnlockRow) dom.internalUnlockRow.style.display = hasStored && !unlocked ? '' : 'none';
+      if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked && walletSettingsOpen ? '' : 'none';
+      if (dom.internalExportKeyBtn) dom.internalExportKeyBtn.style.display = unlocked ? '' : 'none';
+      if (dom.internalGearBtn) dom.internalGearBtn.classList.toggle('active', walletSettingsOpen);
+      if (dom.internalWifInput) dom.internalWifInput.type = 'password';
+    }
+
+    function onToggleWalletSettings() {
+      walletSettingsOpen = !walletSettingsOpen;
+      renderInternalWalletUi();
+    }
+
+    async function onInternalImport() {
+      const wif = normalize(dom.internalWifInput?.value || '');
+      const pwd = normalize(dom.internalPasswordInput?.value || '');
+      if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
+      if (pwd.length < INTERNAL_WALLET_MIN_PASSWORD_LENGTH) { setComposeStatus(`Enter a password (minimum ${INTERNAL_WALLET_MIN_PASSWORD_LENGTH} characters for security)`); return; }
+      setComposeStatus('Deriving key — this takes a moment…');
+      try {
+        const privBytes = await wifToPrivKeyBytes(wif);
+        const addr = await privKeyToTestnetAddr(privBytes);
+        const enc = await encryptPrivKey(privBytes, pwd);
+        localStorage.setItem(INTERNAL_WALLET_STORAGE_KEY, JSON.stringify(enc));
+        internalPrivKeyBytes = privBytes;
+        walletSession = { providerId: 'internal', provider: null, address: addr };
+        if (dom.internalWifInput) dom.internalWifInput.value = '';
+        if (dom.internalPasswordInput) dom.internalPasswordInput.value = '';
+        renderInternalWalletUi();
+        syncComposerWalletContext();
+        setComposeStatus(`Imported & unlocked — ${addr}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Import failed');
+      }
+    }
+
+    async function onInternalUnlock() {
+      const pwd = normalize(dom.internalUnlockPassword?.value || '');
+      if (!pwd) { setComposeStatus('Enter your password'); return; }
+      setComposeStatus('Deriving key — this takes a moment…');
+      try {
+        const stored = JSON.parse(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY) || 'null');
+        if (!stored) throw new Error('No key stored — import one first');
+        const privBytes = await decryptPrivKey(stored, pwd);
+        const addr = await privKeyToTestnetAddr(privBytes);
+        internalPrivKeyBytes = privBytes;
+        walletSession = { providerId: 'internal', provider: null, address: addr };
+        if (dom.internalUnlockPassword) dom.internalUnlockPassword.value = '';
+        renderInternalWalletUi();
+        syncComposerWalletContext();
+        setComposeStatus(`Unlocked — ${addr}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unlock failed — wrong password?');
+      }
+    }
+
+    function onInternalLock() {
+      internalPrivKeyBytes = null;
+      walletSession = { providerId: 'internal', provider: null, address: '' };
+      renderInternalWalletUi();
+      syncComposerWalletContext();
+      clearComposerProfileCard();
+      setComposeStatus('Wallet locked');
+    }
+
+    function onInternalForget() {
+      localStorage.removeItem(INTERNAL_WALLET_STORAGE_KEY);
+      internalPrivKeyBytes = null;
+      walletSession = { providerId: 'internal', provider: null, address: '' };
+      renderInternalWalletUi();
+      syncComposerWalletContext();
+      clearComposerProfileCard();
+      setComposeStatus('Key removed from browser storage');
+    }
+
+    async function encodeP2fkAddresses(payloadText, versionByte = P2FK_DEFAULT_VERSION_BYTE) {
+      const payload = new TextEncoder().encode(payloadText);
+      const addresses = [];
+      const seen = new Set();
+      for (let idx = 0; idx < payload.length; idx += P2FK_CHUNK_SIZE_BYTES) {
+        const chunk = payload.slice(idx, idx + P2FK_CHUNK_SIZE_BYTES);
+        const padded = new Uint8Array(P2FK_CHUNK_SIZE_BYTES);
+        padded.fill(P2FK_PADDING_CHAR.charCodeAt(0));
+        padded.set(chunk);
+        const addressBytes = new Uint8Array(1 + P2FK_CHUNK_SIZE_BYTES);
+        addressBytes[0] = versionByte;
+        addressBytes.set(padded, 1);
+        const encoded = await encodeBase58Check(addressBytes);
+        if (!seen.has(encoded)) {
+          seen.add(encoded);
+          addresses.push(encoded);
+        }
+      }
+      return addresses;
+    }
+
+    async function connectSelectedWallet() {
+      if (!internalPrivKeyBytes) throw new Error('Import or unlock the built-in testnet3 wallet first');
+      const address = await privKeyToTestnetAddr(internalPrivKeyBytes);
+      walletSession = { providerId: 'internal', provider: null, address };
+      syncComposerWalletContext();
+      return walletSession;
+    }
+
+    async function signWithWallet(messageText) {
+      if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
+      // Match bitcoin-cli signmessage/verifymessage semantics used by DiscoBall (SUP Root.cs).
+      const messageDigest = await hashBitcoinSignedMessage(messageText);
+      const { r, s, recoveryId } = await ecSign(internalPrivKeyBytes, messageDigest);
+      // DiscoBall p2fk expects a compact 65-byte Bitcoin message signature encoded as base64:
+      // [recoveryByte (1), r (32), s (32)] where recoveryByte = 27 + 4 (compressed) + recoveryId
+      const compact = new Uint8Array(65);
+      compact[0] = 27 + 4 + recoveryId;
+      compact.set(bigIntToBytes32(r), 1);
+      compact.set(bigIntToBytes32(s), 33);
+      return btoa(String.fromCharCode.apply(null, compact));
+    }
+
+    async function sendManyWithWallet(outputs) {
+      return buildAndBroadcastInternalTx(outputs);
+    }
+
+    function resolveTxidFromSendResult(result) {
+      if (!result) return '';
+      if (typeof result === 'string') return normalize(result);
+      if (Array.isArray(result)) return resolveTxidFromSendResult(result[0] || '');
+      if (typeof result === 'object') {
+        return normalize(result.txid || result.txHash || result.transactionHash || result.result || '');
+      }
+      return '';
+    }
+
+    function renderComposerAttachments() {
+      if (!dom.attachmentList) return;
+      dom.attachmentList.replaceChildren();
+      composerAttachments.forEach((attachment) => {
+        const li = document.createElement('li');
+        const label = document.createElement('span');
+        label.textContent = cleanDisplayText(attachment || '', 110);
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          composerAttachments = composerAttachments.filter((item) => item !== attachment);
+          if (!composerAttachments.length) clearComposerPreview();
+          renderComposerAttachments();
+          queueComposerSendEstimateRefresh();
+        });
+        li.appendChild(label);
+        li.appendChild(removeBtn);
+        dom.attachmentList.appendChild(li);
+      });
+    }
+
+    function addComposerAttachment(value) {
+      const token = cleanDisplayText(normalize(value), 260);
+      if (!token || composerAttachments.includes(token)) return false;
+      composerAttachments.push(token);
+      renderComposerAttachments();
+      queueComposerSendEstimateRefresh();
+      return true;
+    }
+
+    function clearComposerPreview() {
+      composerPreviewUrl = '';
+      if (!dom.composePreview || !dom.composePreviewVideo) return;
+      dom.composePreview.classList.remove('visible');
+      dom.composePreviewVideo.removeAttribute('src');
+      dom.composePreviewVideo.load();
+    }
+
+    function setComposerPreview(url) {
+      composerPreviewUrl = normalize(url);
+      if (!dom.composePreview || !dom.composePreviewVideo || !composerPreviewUrl) return;
+      dom.composePreview.classList.add('visible');
+      dom.composePreviewVideo.src = composerPreviewUrl;
+      dom.composePreviewVideo.load();
+    }
+
+    function extractIpfsPartsFromInput(value) {
+      const input = normalize(value);
+      if (!input) return null;
+      if (/^IPFS:/i.test(input)) {
+        const body = input.replace(/^IPFS:/i, '').replace(/^\/+/, '');
+        const [cidRaw, ...pathParts] = body.split(/[\\/]+/).filter(Boolean);
+        const cid = normalize(cidRaw || '');
+        if (!COMPOSER_CID_REGEX.test(cid)) return null;
+        return { cid, path: pathParts.join('/') };
+      }
+      let parsed;
+      try {
+        parsed = new URL(input);
+      } catch {
+        return null;
+      }
+      const hostIpfsSplit = normalize(parsed.hostname).split('.ipfs.');
+      if (hostIpfsSplit.length > 1 && COMPOSER_CID_REGEX.test(hostIpfsSplit[0])) {
+        return { cid: hostIpfsSplit[0], path: normalize(parsed.pathname).replace(/^\/+/, '') };
+      }
+      const pathMatch = normalize(parsed.pathname).match(IPFS_PATH_URL_REGEX);
+      if (!pathMatch) return null;
+      const cid = normalize(pathMatch[1] || '');
+      if (!COMPOSER_CID_REGEX.test(cid)) return null;
+      return { cid, path: normalize(pathMatch[2] || '') };
+    }
+
+    function sanitizeVideoFilename(path, contentType = '') {
+      const safeFile = (normalize(path).split('/').pop() || '')
+        .replace(UNSAFE_FILENAME_CHARS_REGEX, '')
+        .trim();
+      if (VIDEO_FILE_EXTENSION_REGEX.test(safeFile)) return safeFile;
+      const type = normalize(contentType).toLowerCase();
+      if (type.includes('webm')) return 'artifact.webm';
+      if (type.includes('mpegurl') || type.includes('m3u8')) return 'artifact.m3u8';
+      if (type.includes('ogg')) return 'artifact.ogv';
+      if (type.includes('quicktime')) return 'artifact.mov';
+      if (type.includes('avi') || type.includes('msvideo')) return 'artifact.avi';
+      return 'artifact.mp4';
+    }
+
+    function probeVideoUrl(url, timeoutMs = IPFS_VIDEO_PROBE_TIMEOUT_MS) {
+      return new Promise((resolve) => {
+        const probe = document.createElement('video');
+        let done = false;
+        const finish = (ok) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timeoutId);
+          probe.removeAttribute('src');
+          probe.load();
+          resolve(ok);
+        };
+        const timeoutId = setTimeout(() => finish(false), timeoutMs);
+        probe.preload = 'metadata';
+        probe.muted = true;
+        probe.playsInline = true;
+        probe.addEventListener('loadedmetadata', () => finish(true), { once: true });
+        probe.addEventListener('canplay', () => finish(true), { once: true });
+        probe.addEventListener('error', () => finish(false), { once: true });
+        probe.src = url;
+        try { probe.load(); } catch { finish(false); }
+      });
+    }
+
+    async function verifyAndNormalizeIpfsVideoInput(rawInput) {
+      const parsed = extractIpfsPartsFromInput(rawInput);
+      if (!parsed?.cid) throw new Error('Use IPFS:CID/file.mp4 or a gateway /ipfs/CID/file.mp4 URL');
+      const candidateUrls = [];
+      if (parsed.path) {
+        for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, parsed.path, i));
+      } else {
+        for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, '', i));
+      }
+      const uniqueCandidates = [...new Set(candidateUrls)];
+      for (const candidateUrl of uniqueCandidates) {
+        const isReachableVideo = await probeVideoUrl(candidateUrl);
+        if (!isReachableVideo) continue;
+        let contentType = '';
+        try {
+          const head = await fetch(candidateUrl, { method: 'HEAD', mode: 'cors' });
+          contentType = normalize(head.headers.get('content-type') || '');
+        } catch (error) {
+          console.debug('IPFS HEAD probe failed', candidateUrl, error);
+        }
+        const filename = sanitizeVideoFilename(parsed.path || '', contentType);
+        return { urn: `IPFS:${parsed.cid}/${filename}`, previewUrl: candidateUrl };
+      }
+      throw new Error('Could not find a playable IPFS video at that link');
+    }
+
+    function buildP2fkUnsignedObject(messageText, attachments) {
+      const delimiter = pickRandomDelimiter();
+      // Mirror legacy DiscoBall-compatible p2fk message structure:
+      // "<delimiter><byteLength><delimiter><message><<attachment>>...<<negativeSalt>>"
+      // negativeSalt is a random negative integer marker used to keep payload instances unique.
+      // Use UTF-8 byte length (not JS character count) to match DiscoBall parsing behavior.
+      const payloadText = normalize(messageText) + attachments.map((value) => `<<${value}>>`).join('') + `<<${createNegativeSalt()}>>`;
+      const payloadLength = new TextEncoder().encode(payloadText).length;
+      const unsignedObj = `${delimiter}${payloadLength}${delimiter}${payloadText}`;
+      return { delimiter, payloadText, unsignedObj };
+    }
+
+    async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients = [], fromAddress, amountPerRecipient }) {
+      const safeMessageText = sanitizeP2fkMessageText(messageText);
+      const unsignedPayload = buildP2fkUnsignedObject(safeMessageText, attachments);
+      // SUP/DiscoBall verifies with verifymessage against an uppercase SHA256 hex string.
+      const signedHashHex = (await sha256HexFromText(unsignedPayload.unsignedObj)).toUpperCase();
+      const signature = await signWithWallet(signedHashHex);
+      const signedObj = `SIG${unsignedPayload.delimiter}${P2FK_SIGNATURE_VERSION_MARKER}${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
+      const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
+      const recipientSet = new Set(recipients);
+
+      await validateLegacyTestnetAddress(fromAddress);
+
+      for (const keyword of parseHashtagKeywords(safeMessageText)) {
+        try {
+          const keywordAddress = await getPublicAddressByKeyword(keyword);
+          if (keywordAddress) {
+            await validateLegacyTestnetAddress(keywordAddress);
+            recipientSet.add(keywordAddress);
+          }
+        } catch (error) {
+          console.debug('Unable to encode keyword address', keyword, error);
+        }
+      }
+      for (const address of extraRecipients) {
+        if (!address || address === fromAddress) continue;
+        await validateLegacyTestnetAddress(address);
+        recipientSet.add(address);
+      }
+      if (fromAddress) recipientSet.add(fromAddress);
+      const recipientList = [...recipientSet];
+      const outputs = recipientList.map((address) => ({ address, amount: amountPerRecipient }));
+      const cost = amountPerRecipient * outputs.length;
+      return { outputs, cost };
+    }
 
     function triggerKeywordSearch(keyword) {
       dom.query.value = keyword;
@@ -1719,6 +3435,132 @@
       if (setInput) dom.query.value = searchKeyword;
       closeBannerMenu();
       loadSearch(searchKeyword, { resetSessionSkips });
+    }
+
+    async function onAddAttachment() {
+      const value = normalize(dom.attachmentInput?.value || '');
+      if (!value) {
+        setComposeStatus('Enter an IPFS attachment URL/URN first');
+        return;
+      }
+      setComposeStatus('Checking IPFS video link…');
+      try {
+        const normalized = await verifyAndNormalizeIpfsVideoInput(value);
+        const added = addComposerAttachment(normalized.urn);
+        setComposerPreview(normalized.previewUrl);
+        dom.attachmentInput.value = '';
+        queueComposerSendEstimateRefresh();
+        setComposeStatus(added ? `Attached ${normalized.urn}` : 'Attachment already added');
+      } catch (error) {
+        setComposeStatus(error?.message || 'Attachment validation failed');
+      }
+    }
+
+    async function onCopyWalletAddress() {
+      const address = cleanDisplayText(walletSession.address || '');
+      if (!address) {
+        setComposeStatus('No connected address to copy');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(address);
+        setComposeStatus(`Copied ${shortTitle(address, 24)}`);
+      } catch {
+        setComposeStatus('Clipboard copy failed');
+      }
+    }
+
+    async function onConsolidateChange() {
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setComposeStatus('Import/unlock the built-in testnet3 wallet first');
+        return;
+      }
+      try {
+        setComposeStatus('Collecting change-address UTXOs…');
+        const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+        const changeSigners = keyring.changeSigners.filter(Boolean);
+        if (!changeSigners.length) throw new Error('Deterministic change keyring is unavailable');
+        const utxoGroups = await Promise.all(changeSigners.map(async (signer) => {
+          const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${signer.address}/utxo`);
+          if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${signer.label}`);
+          return (await utxoResp.json())
+            .filter((utxo) => utxo.status?.confirmed)
+            .map((utxo) => ({ ...utxo, signer }));
+        }));
+        const utxos = utxoGroups.flat();
+        if (!utxos.length) {
+          setComposeStatus('No confirmed change funds to consolidate');
+          return;
+        }
+        let feeRate = BTC_DEFAULT_FEE_RATE;
+        try {
+          const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
+          feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
+        } catch { /* use default */ }
+        const estimateFee = Math.ceil((10 + 148 * utxos.length + 34) * feeRate);
+        const totalSat = utxos.reduce((sum, utxo) => sum + Number(utxo.value || 0), 0);
+        const sendSat = totalSat - estimateFee;
+        if (sendSat < BTC_DUST_LIMIT_SAT) {
+          throw new Error(`Consolidation output would be dust after fee (${sendSat} sat)`);
+        }
+        const rawHex = await buildSignedBtcTx(utxos, [{ address: keyring.main.address, valueSats: sendSat }]);
+        setComposeStatus('Broadcasting consolidation transaction…');
+        const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: rawHex
+        });
+        if (!bcast.ok) {
+          const errText = await bcast.text().catch(() => String(bcast.status));
+          throw new Error(`Broadcast failed: ${errText}`);
+        }
+        const txid = (await bcast.text()).trim() || 'pending';
+        setComposeStatus(`Consolidated ${sendSat.toLocaleString()} sat to ${shortTitle(keyring.main.address, 20)} · tx ${shortTitle(txid, 20)}`);
+        syncComposerWalletContext();
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unable to consolidate change');
+      }
+    }
+
+    async function onSendPost() {
+      const messageText = normalize(dom.postMessage?.value || '');
+      if (!composerAttachments.length) {
+        setComposeStatus('Add at least one validated IPFS video attachment before sending');
+        return;
+      }
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setComposeStatus('Import/unlock the built-in testnet3 wallet before sending');
+        return;
+      }
+      try {
+        setComposeStatus('Building sendmany outputs…');
+        const { outputs, cost } = await buildP2fkRecipientsAndCost({
+          messageText,
+          attachments: composerAttachments,
+          extraRecipients: [],
+          fromAddress: walletSession.address,
+          amountPerRecipient: COMPOSER_AMOUNT_PER_RECIPIENT
+        });
+        if (!outputs.length) throw new Error('No sendmany outputs were generated');
+        const costSats = Math.round(cost * 1e8);
+        setComposeStatus(`${outputs.length} outputs · ${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC (${costSats.toLocaleString()} sat) + fee — signing…`);
+        const sendResult = await sendManyWithWallet(outputs);
+        const txid = resolveTxidFromSendResult(sendResult) || 'pending';
+        setStatus(`Post broadcast: ${txid}`);
+        addMessage({
+          title: 'Post broadcast',
+          meta: `writer · ${shortTitle(walletSession.address, 18)}`,
+          body: `Sent p2fk post in ${outputs.length} outputs. txid: ${txid}`
+        });
+        setComposeStatus(`✓ ${txid}`);
+        if (dom.postMessage) dom.postMessage.value = '';
+        composerAttachments = [];
+        renderComposerAttachments();
+        clearComposerPreview();
+        queueComposerSendEstimateRefresh();
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unable to send post');
+      }
     }
 
     function onDocumentClickCloseBanner(event) {
@@ -2823,6 +4665,9 @@
       const initial = normalize(urlQuery);
       // Keep the input blank so the UI starts clean while using trending defaults when no ?q is provided.
       dom.query.value = '';
+      populateWalletProviderOptions();
+      renderComposerAttachments();
+      renderInternalWalletUi();
       syncAudioUi();
 
       dom.searchForm.addEventListener('submit', (event) => {
@@ -2839,6 +4684,38 @@
       dom.brandBtn.addEventListener('click', () => {
         runSearch('', { resetSessionSkips: false, setInput: true });
       });
+      dom.composeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleComposePanel();
+      });
+      dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
+      if (dom.composeProfileCopyBtn) dom.composeProfileCopyBtn.addEventListener('click', onCopyWalletAddress);
+      dom.internalImportBtn.addEventListener('click', onInternalImport);
+      dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
+      dom.internalLockBtn.addEventListener('click', onInternalLock);
+      dom.internalConsolidateBtn.addEventListener('click', onConsolidateChange);
+      dom.internalExportKeyBtn.addEventListener('click', onExportPrivKey);
+      dom.internalForgetBtn.addEventListener('click', onInternalForget);
+      if (dom.internalGenerateBtn) dom.internalGenerateBtn.addEventListener('click', onGenerateNewKey);
+      if (dom.internalGearBtn) dom.internalGearBtn.addEventListener('click', onToggleWalletSettings);
+      dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
+      dom.sendPostBtn.addEventListener('click', onSendPost);
+      dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
+      if (dom.composeProfileAvatar) {
+        dom.composeProfileAvatar.addEventListener('load', () => {
+          dom.composeProfileAvatar.classList.add('visible');
+        });
+        dom.composeProfileAvatar.addEventListener('error', () => {
+          dom.composeProfileAvatar.classList.remove('visible');
+          dom.composeProfileAvatar.removeAttribute('src');
+        });
+      }
+      dom.attachmentInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onAddAttachment();
+      });
+      queueComposerSendEstimateRefresh();
       if (dom.uncensoredHint) {
         dom.uncensoredHint.addEventListener('mouseenter', () => {
           uncensoredHintHovered = true;
@@ -2889,6 +4766,10 @@
         if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
         if (event.key.toLowerCase() === 'f') requestFullscreen();
         if (event.key === 'Escape') {
+          if (composePanelOpen) {
+            setComposePanelOpen(false);
+            return;
+          }
           if (bannerMenuOpen) {
             closeBannerMenu();
             return;
@@ -2902,6 +4783,12 @@
         }
       });
       dom.app.addEventListener('click', showHudTemporarily);
+      document.addEventListener('click', (event) => {
+        if (!composePanelOpen) return;
+        const target = event.target;
+        if (dom.composePanel.contains(target) || dom.composeBtn.contains(target)) return;
+        setComposePanelOpen(false);
+      });
       dom.app.addEventListener('touchstart', showHudTemporarily, { passive: true });
       const clearSwipeTug = (animate = true) => {
         if (swipeTugResetTimeoutId) {

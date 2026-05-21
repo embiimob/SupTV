@@ -116,3 +116,21 @@ Example:
 ```js
 ${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}
 ```
+
+## Create and publish posts (write flow)
+
+SupTV now includes a **Compose** panel (✎ in the top bar) so users can contribute posts that SupTV indexers can discover:
+
+1. Use the built-in wallet only (testnet3 legacy P2PKH): import/unlock a testnet3 WIF key in the composer.
+2. Write a post message with `#keywords`.
+3. Add one or more IPFS video links using either:
+   - `IPFS:<cid>/<filename>.mp4` style URNs, or
+   - gateway URLs containing `/ipfs/<cid>/<filename>.mp4`.
+   SupTV verifies the link is reachable/playable, then rewrites it to canonical `IPFS:<cid>/<filename>.ext`.
+4. Click **Sign + Send** to:
+   - build a DiscoBall-style p2fk payload,
+   - sign the payload hash with the connected wallet,
+   - encode it into p2fk chunk addresses,
+   - build/sign/broadcast a legacy testnet3 transaction directly in-browser.
+   - route change using two deterministic legacy testnet3 change addresses derived from the same WIF key.
+   - when one derived address funds inputs, change is sent to the opposite one so both remain reclaimable from the same root WIF.
