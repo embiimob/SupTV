@@ -2318,6 +2318,7 @@
     async function buildP2fkRecipientsAndCost({ messageText, attachments, extraRecipients, fromAddress, amountPerRecipient }) {
       const safeMessageText = sanitizeP2fkMessageText(messageText);
       const unsignedPayload = buildP2fkUnsignedObject(safeMessageText, attachments);
+      // SUP/DiscoBall verifies with verifymessage against an uppercase SHA256 hex string.
       const signedHashHex = (await sha256HexFromText(unsignedPayload.unsignedObj)).toUpperCase();
       const signature = await signWithWallet(signedHashHex);
       const signedObj = `SIG${unsignedPayload.delimiter}${P2FK_SIGNATURE_VERSION_MARKER}${unsignedPayload.delimiter}${signature}${unsignedPayload.unsignedObj}`;
