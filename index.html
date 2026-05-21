@@ -1098,10 +1098,10 @@
     const P2FK_DEFAULT_VERSION_BYTE = 0x6f;
     const P2FK_PADDING_CHAR = '#';
     const P2FK_SIGNATURE_VERSION_MARKER = '88';
-    const WALLET_EXTENSIONS = [
-      { id: 'internal', name: '🔑 Built-in (testnet3 legacy)' }
-    ];
+    const INTERNAL_WALLET_ID = 'internal';
+    const INTERNAL_WALLET_LABEL = '🔑 Built-in (testnet3 legacy)';
     const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
+    const INTERNAL_WALLET_PBKDF2_ITERATIONS = 600000;
     const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet/api';
     const BTC_DUST_LIMIT_SAT = 546;         // P2PKH dust threshold in satoshis
     const BTC_DEFAULT_FEE_RATE = 10;        // sat/vbyte fallback when fee API is unreachable
@@ -1499,7 +1499,7 @@
     }
 
     function populateWalletProviderOptions() {
-      walletSession.providerId = WALLET_EXTENSIONS[0]?.id || 'internal';
+      walletSession.providerId = INTERNAL_WALLET_ID;
     }
 
     function setComposePanelOpen(open) {
@@ -1609,10 +1609,10 @@
     }
 
     // secp256k1 Jacobian arithmetic
-    const SECP_P  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
-    const SECP_N  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
-    const SECP_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n;
-    const SECP_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n;
+    const SECP_P  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn; // secp256k1 field prime p
+    const SECP_N  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n; // secp256k1 subgroup order n
+    const SECP_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n; // generator point x
+    const SECP_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n; // generator point y
 
     function sModP(n) { return ((n % SECP_P) + SECP_P) % SECP_P; }
     function sModN(n) { return ((n % SECP_N) + SECP_N) % SECP_N; }
@@ -1698,6 +1698,7 @@
       return { r, s };
     }
 
+    // ASN.1 DER encoding for ECDSA signatures (Bitcoin legacy scriptSig format)
     function derEncode(r, s) {
       const mb = (n) => { const b = []; let t = n; while (t > 0n) { b.unshift(Number(t & 0xffn)); t >>= 8n; } if (b[0] & 0x80) b.unshift(0); return b; };
       const rb = mb(r), sb = mb(s);
@@ -1711,6 +1712,7 @@
       const ff = (j, x, y, z) => j < 16 ? x ^ y ^ z : j < 32 ? (x & y) | (~x & z) : j < 48 ? (x | ~y) ^ z : j < 64 ? (x & z) | (y & ~z) : x ^ (y | ~z);
       const KL = [0, 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xA953FD4E];
       const KR = [0x50A28BE6, 0x5C4DD124, 0x6D703EF3, 0x7A6D76E9, 0];
+      // RIPEMD-160 message word schedules (RL/RR) and per-round rotation counts (SL/SR)
       /* eslint-disable no-multi-spaces */
       const RL = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, 7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8, 3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12, 1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2, 4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13];
       const RR = [5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12, 6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2, 15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13, 8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14, 12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11];
@@ -1774,8 +1776,8 @@
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
       if (p[0] !== 0xef) throw new Error('Only testnet3 WIF keys are supported');
-      if (p.length === 34) return p.slice(1, 33); // compressed key (version + 32 bytes + compression flag)
-      if (p.length === 33) return p.slice(1);     // uncompressed key (version + 32 bytes)
+      if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
+      if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
     }
 
@@ -1790,7 +1792,7 @@
       const salt = crypto.getRandomValues(new Uint8Array(32));
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
-      const aesKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+      const aesKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: INTERNAL_WALLET_PBKDF2_ITERATIONS, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
       const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, privBytes);
       return { salt: Array.from(salt), iv: Array.from(iv), data: Array.from(new Uint8Array(enc)) };
     }
@@ -1798,7 +1800,7 @@
     async function decryptPrivKey(stored, password) {
       const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
       const aesKey = await crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: new Uint8Array(stored.salt), iterations: 250000, hash: 'SHA-256' },
+        { name: 'PBKDF2', salt: new Uint8Array(stored.salt), iterations: INTERNAL_WALLET_PBKDF2_ITERATIONS, hash: 'SHA-256' },
         km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
       );
       return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(stored.iv) }, aesKey, new Uint8Array(stored.data)));
@@ -1873,9 +1875,11 @@
       for (const u of sorted) {
         sel.push(u);
         selTotal += u.value;
+        // Estimated virtual size for legacy P2PKH: 10 bytes tx overhead + 148/input + 34/output
         const estFee = Math.ceil((10 + 148 * sel.length + 34 * (outSats.length + 1)) * feeRate);
         if (selTotal >= totalOut + estFee) break;
       }
+      // Same vsize model used for final fee after input selection stabilizes.
       const fee = Math.ceil((10 + 148 * sel.length + 34 * (outSats.length + 1)) * feeRate);
       const change = selTotal - totalOut - fee;
       if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
@@ -1909,7 +1913,7 @@
       const wif = normalize(dom.internalWifInput?.value || '');
       const pwd = normalize(dom.internalPasswordInput?.value || '');
       if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
-      if (pwd.length < 8) { setComposeStatus('Enter a password (at least 8 characters)'); return; }
+      if (pwd.length < 12) { setComposeStatus('Enter a password (at least 12 characters)'); return; }
       setComposeStatus('Deriving key — this takes a moment…');
       try {
         const privBytes = await wifToPrivKeyBytes(wif);
@@ -2688,7 +2692,7 @@
       setComposeStatus('Checking built-in wallet…');
       try {
         const session = await connectSelectedWallet();
-        setComposeStatus(`Connected built-in testnet3 wallet as ${shortTitle(session.address, 24)}`);
+      setComposeStatus(`Connected ${INTERNAL_WALLET_LABEL} as ${shortTitle(session.address, 24)}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Wallet connection failed');
       }
