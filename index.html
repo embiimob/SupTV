@@ -1776,7 +1776,8 @@
       chevron.className = 'compose-wallet-summary-chevron';
       chevron.textContent = walletBalanceExpanded ? '▾' : '▸';
       summaryBtn.append(summaryText, chevron);
-      summaryBtn.addEventListener('click', () => {
+      summaryBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
         walletBalanceExpanded = !walletBalanceExpanded;
         renderWalletBalance();
       });
