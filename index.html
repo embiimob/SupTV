@@ -1211,7 +1211,7 @@
         </div>
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row">
-          <div class="compose-estimate" id="sendEstimate">* Add a IPFS video attachment to see cost estimates.</div>
+          <div class="compose-estimate" id="sendEstimate">* Add an IPFS video attachment to see cost estimates.</div>
           <button type="button" id="sendPostBtn">Sign + Send</button>
         </div>
         <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
@@ -1887,14 +1887,14 @@
         profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
       ];
       for (const candidate of candidates) {
-        const raw = cleanDisplayText(candidate || '', 300);
+        const raw = cleanDisplayText(candidate || '', 300).replace(/\\/g, '/');
         if (!raw) continue;
         if (/^https?:\/\//i.test(raw)) return raw;
         const parsed = extractIpfsPartsFromInput(raw);
         if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
       }
-      const serialized = JSON.stringify(profile);
-      const ipfsMatch = serialized.match(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^"'<>\s]+?\.(?:png|jpe?g|gif|webp|avif)))?/i);
+      const serialized = JSON.stringify(profile).replace(/\\\\/g, '/');
+      const ipfsMatch = serialized.match(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[/]+([^"'<>\s]+?\.(?:png|jpe?g|gif|webp|avif)))?/i);
       if (!ipfsMatch) return '';
       return buildIpfsPathUrl(ipfsMatch[1], normalize(ipfsMatch[2] || ''), 0);
     }
@@ -1971,7 +1971,7 @@
         return;
       }
       if (!composerAttachments.length) {
-        setSendEstimate('* Add a IPFS video attachment to see cost estimates.');
+        setSendEstimate('* Add an IPFS video attachment to see cost estimates.');
         return;
       }
       try {
