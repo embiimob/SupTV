@@ -1,136 +1,117 @@
 # SupTV
 
-SupTV is a browser-based video player UI for p2fk data.  
-It is software you run yourself (`index.html`) — **not** a streaming company or hosted platform.
+SupTV is a local-first, single-file web app (`index.html`) for discovering, playing, and now **posting** p2fk/IPFS video content.
 
 - p2fk.io: https://p2fk.io  
 - SupTV repository: https://github.com/embiimob/SupTV  
 - Live demo: https://supgalaxy.org/TV
 
-> The demo URL is just a convenient host for the same client app. SupTV itself is not a service business; it is a local-first app you can run anywhere.
+SupTV is software you run yourself, not a hosted streaming company.
 
-## What SupTV is (and is not)
+## What SupTV is now
 
-SupTV is:
-- A single-page web app (`index.html`)
-- A player + queue + search UI over p2fk/IPFS-linked media
-- Open software you can run locally
+SupTV currently has two main roles:
 
-SupTV is **not**:
-- A streaming CDN
-- A centralized content platform
-- A company or subscription service
+1. **Viewer mode**  
+   Searches p2fk data, builds queues, and streams playable media through IPFS gateways.
+2. **Poster mode (Compose)**  
+   Lets you create signed p2fk-compatible posts from the browser using a built-in **testnet3 legacy wallet flow**.
 
-## Quick start (local)
+## Quick start
 
 1. Clone this repo.
-2. Open `index.html` in a browser.
-3. Optional: use `?q=keyword` to start with a specific query (example: `index.html?q=mp4`).
+2. Open `/home/runner/work/SupTV/SupTV/index.html` in a browser.
+3. Optional: use `?q=keyword` to preload a query, e.g. `index.html?q=mp4`.
+4. Open **✎ Compose** in the top bar to post.
 
-## Technical overview
+## Runtime behavior (viewer/search side)
 
-At runtime, SupTV does this:
+At runtime SupTV:
 
-1. **Loads trending terms** from `GetTrendingRootSearches?qty=100` (`TRENDING_STATS_LIMIT`).
-2. Selects up to **20 unique keywords** (`TRENDING_KEYWORD_LIMIT`).
-3. Fetches per-keyword results with bounded concurrency (**4 at a time**, `TRENDING_KEYWORD_FETCH_CONCURRENCY`):
-   - keyword channel messages (`GetPublicAddressByKeyword` + `GetPublicMessagesByAddress`)
-   - text search results (`GetKnownRootsBySearchString`) using `TRENDING_SEARCH_QTY` rows per keyword (default 200)
-4. Uses a **fast-start** model: playback begins as soon as first keyword results are ready.
-5. Builds a trending queue using **round-robin batching** (5-per-keyword batches, `TRENDING_KEYWORD_BATCH_SIZE`) with dedupe.
-6. Caps trending queue size at **500** (`TRENDING_MAX_PLAYLIST_ITEMS`).
-7. If trending is empty/unavailable, falls back to `mp4` (`DEFAULT_KEYWORD`).
-8. Shows queue status, ticker stats, clickable queue items, and top trending searches in the banner panel.
+1. Loads trending search stats from `GetTrendingRootSearches`.
+2. Picks up to 20 unique keywords.
+3. Fetches keyword-channel messages + search results per keyword.
+4. Merges/dedupes by txid and builds a round-robin queue.
+5. Starts playback as soon as enough early results arrive (fast-start behavior).
+6. Falls back to default keyword (`mp4`) if trending data is empty/unavailable.
 
-For direct keyword search, SupTV combines:
-- keyword-channel messages, and
-- paged search-window results (up to `STANDARD_SEARCH_QTY`, default 200)
+SupTV displays p2fk trending output; it does not compute its own trend score model.
 
-## Trending logic (verified from p2fk.io source)
+## Posting flow (Compose)
 
-SupTV does **not** compute trending scores.  
-SupTV only requests `GetTrendingRootSearches` and displays the returned `rank`, `searchString`, and metrics.
+The new Compose flow is designed for p2fk-compatible posting with browser-side signing:
 
-Based on `embiimob/p2fk.io` code:
-- Trending events are recorded from `GetKnownRootsBySearchString` **only when a search returns at least one result**.
-- Empty queries and wildcard `*` are excluded from trending tracking.
-- Search strings are normalized (trim + whitespace collapse).
-- Entries expire after 24 hours of inactivity.
-- Ranking score combines:
-  - **freshness** (recent searches rank higher),
-  - **result signal** (weighted `maxResultCount` and `averageResultCount`), and
-  - **search signal** (`successfulSearchCount`),
-  with logarithmic scaling to damp repeated spammy calls.
-- Output quantity is clamped to `1..100`.
+1. **Import/unlock wallet**  
+   - Uses built-in wallet mode only (`🔑 Built-in (testnet3 legacy)`).
+   - Accepts **testnet3 legacy WIF** private keys.
+   - Derives a legacy testnet3 sender address.
+2. **Create post content**  
+   - Enter message text (hashtags supported).
+   - Add IPFS video attachment input(s).
+   - SupTV validates attachment reachability and canonicalizes to `IPFS:<cid>/<filename.ext>`.
+3. **Build sendmany payload**  
+   - Converts post body into DiscoBall/p2fk sendmany-compatible recipient outputs.
+   - Signs the required payload hash in-browser.
+4. **Build and broadcast BTC tx (testnet3)**  
+   - Pulls confirmed UTXOs.
+   - Estimates fee rate.
+   - Builds/signs legacy P2PKH tx.
+   - Broadcasts raw hex.
 
-Why this is relatively fair/unbiased:
-- No manual curation list in SupTV; ordering comes from p2fk scoring.
-- Scoring uses objective, measurable signals (recency + successful usage + result volume).
-- Log-based weighting gives diminishing returns to repeated identical searches.
+## Testnet3 wallet-like behavior (important)
 
-Important limits (for accuracy):
-- This is **spam-resistant**, not perfect Sybil-proof fairness: there is no per-user identity weighting in this path.
-- SupTV still applies its own queue round-robin/dedupe for playback diversity after receiving p2fk trends.
+SupTV’s built-in wallet behavior is intentionally constrained:
 
-Operational characteristic:
-- Trending state is in-memory in the API process, so results are instance-local and reset on restart.
+- **Network:** testnet3 only (`USE_P2FK_MAINNET = false` by default)
+- **Address type:** legacy P2PKH
+- **Key type:** WIF private key import/unlock
+- **Change model:** two deterministic change addresses are derived from the same root WIF
+- **Routing rule:** when a derived change address is the source of selected UTXOs, change is sent to the *opposite* derived address
+- **Consolidation support:** change UTXOs can be consolidated back to main address from Compose controls
 
-## Censorship resistance when running locally
+This keeps the posting flow recoverable from a single root WIF while separating change paths.
 
-Running SupTV locally reduces central control because the player is just static client code.
+## API calls SupTV uses and why
 
-For strongest censorship resistance and privacy, run your own stack:
-- a local/self-hosted p2fk-compatible API (`P2FK_BASE_URL`)
-- your own trusted IPFS gateway (or node)
+### p2fk API (read/search/trending)
 
-When search/API infrastructure is self-hosted, query behavior is controlled by you, and search processing stays in your environment instead of a third-party hosted endpoint.
+| Endpoint | Purpose in SupTV |
+|---|---|
+| `GET /GetTrendingRootSearches?qty=<n>` | Fetches trending search terms + stats used for trending UI and queue seed keywords. |
+| `GET /GetPublicAddressByKeyword/<keyword>?mainnet=false` | Resolves keyword-channel address for that keyword. |
+| `GET /GetPublicMessagesByAddress/<address>?skip=<n>&qty=<n>&mainnet=false` | Pulls public channel messages for keyword/address timelines. |
+| `GET /GetKnownRootsBySearchString?searchString=<term>&skip=<n>&qty=<n>&mainnet=false&showSystemFiles=false` | Main searchable roots/messages query used by manual search and trending keyword expansion. |
 
-## Privacy & security recommendations
+### testnet3 chain API (wallet/tx side via mempool.space)
 
-Because media is fetched from IPFS gateways (default list includes `ipfs.io`), consider:
+`MEMPOOL_TESTNET_API` default: `https://mempool.space/testnet/api`
 
-- **Use a VPN** to reduce IP-based correlation by public gateways.
-- **Self-host an IPFS gateway/node** and update `IPFS_GATEWAY_URLS` to trusted endpoints.
-- **Self-host the p2fk API** and set `P2FK_BASE_URL` to your local endpoint.
-- **Serve SupTV over HTTPS** (or local trusted origin) to prevent network tampering.
-- **Use a hardened browser profile** (strict tracking protection, minimal extensions).
-- **Segment network context** (separate browser/container/VM for media browsing).
+| Endpoint | Purpose in SupTV |
+|---|---|
+| `GET /address/<addr>` | Reads confirmed/unconfirmed balance stats for composer wallet panels. |
+| `GET /address/<addr>/utxo` | Fetches spendable UTXOs for main + derived change addresses. |
+| `GET /v1/fees/recommended` | Gets fee estimates (falls back to default fee rate if unavailable). |
+| `POST /tx` (body=`raw tx hex`) | Broadcasts signed legacy transaction for post send or consolidation. |
 
-## Configure local API endpoint
+### IPFS/gateway checks
 
-Edit `index.html` constants near the top of the script:
+| Behavior | Purpose in SupTV |
+|---|---|
+| `HEAD` request to candidate gateway URL | Validates that an attachment URL/URN resolves and is reachable before adding to post. |
+
+## Key configuration constants
+
+In `index.html`, adjust:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`)
-- `TRENDING_STATS_LIMIT` (default: `100`) for `GetTrendingRootSearches?qty=...`
-- `TRENDING_SEARCH_QTY` (default: `200`) controls the maximum results fetched per keyword during trending queue assembly (single request, no paging, via `GetKnownRootsBySearchString`)
+- `MEMPOOL_TESTNET_API` (default: `https://mempool.space/testnet/api`)
+- `TRENDING_STATS_LIMIT` (default: `100`)
+- `TRENDING_SEARCH_QTY` (default: `200`)
 - `STANDARD_SEARCH_QTY` (default: `200`)
+- `IPFS_GATEWAY_URLS` (gateway list used for media resolution/verification)
 
-Example:
+## Security and usage notes
 
-- `P2FK_BASE_URL = 'http://localhost:5000'`
-- `TRENDING_STATS_LIMIT = 100`
-- `TRENDING_SEARCH_QTY = 200` *(per-keyword search result limit when building the trending queue, not the trending-stats list size)*
-
-`TRENDING_SEARCHES_ENDPOINT` is derived as:
-
-```js
-${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}
-```
-
-## Create and publish posts (write flow)
-
-SupTV now includes a **Compose** panel (✎ in the top bar) so users can contribute posts that SupTV indexers can discover:
-
-1. Use the built-in wallet only (testnet3 legacy P2PKH): import/unlock a testnet3 WIF key in the composer.
-2. Write a post message with `#keywords`.
-3. Add one or more IPFS video links using either:
-   - `IPFS:<cid>/<filename>.mp4` style URNs, or
-   - gateway URLs containing `/ipfs/<cid>/<filename>.mp4`.
-   SupTV verifies the link is reachable/playable, then rewrites it to canonical `IPFS:<cid>/<filename>.ext`.
-4. Click **Sign + Send** to:
-   - build a DiscoBall-style p2fk payload,
-   - sign the payload hash with the connected wallet,
-   - encode it into p2fk chunk addresses,
-   - build/sign/broadcast a legacy testnet3 transaction directly in-browser.
-   - route change using two deterministic legacy testnet3 change addresses derived from the same WIF key.
-   - when one derived address funds inputs, change is sent to the opposite one so both remain reclaimable from the same root WIF.
+- Treat the built-in wallet as a convenience feature for **testnet3** posting workflow, not a production custody solution.
+- Use your own trusted API/gateway endpoints if you need stronger privacy/censorship resistance.
+- Public gateways and public APIs can see request metadata; self-hosting reduces third-party visibility.
