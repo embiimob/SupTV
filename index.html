@@ -953,7 +953,7 @@
           <button type="button" id="connectWalletBtn">Use built-in wallet</button>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
-          <p class="internal-wallet-note">Testnet3 legacy (m/n) only. Keys are AES-256-GCM encrypted with your password and stored only in this browser — nothing is ever sent to any server.</p>
+          <p class="internal-wallet-note">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
           <div class="compose-row" id="internalImportRow">
             <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
             <button type="button" id="internalImportBtn">Import</button>
@@ -1775,7 +1775,7 @@
 
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
-      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF keys are supported (version byte 0xef); received 0x${p[0].toString(16)}`);
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF private keys are supported (WIF version byte 0xef); received 0x${p[0].toString(16)}`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
@@ -1784,7 +1784,7 @@
     async function privKeyToTestnetAddr(privBytes) {
       const pub = secPrivToPub(privBytes);
       const hash = ripemd160(await sha256Bytes(pub));
-      return encodeBase58Check(new Uint8Array([0x6f, ...hash])); // 0x6f = testnet P2PKH
+      return encodeBase58Check(new Uint8Array([P2FK_DEFAULT_VERSION_BYTE, ...hash])); // 0x6f = testnet legacy P2PKH
     }
 
     // AES-256-GCM + PBKDF2 wallet key encryption (browser-only, never leaves device)
@@ -2691,8 +2691,8 @@
     async function onConnectWallet() {
       setComposeStatus('Checking built-in wallet…');
       try {
-        const session = await connectSelectedWallet();
-      setComposeStatus(`Connected ${INTERNAL_WALLET_LABEL} as ${shortTitle(session.address, 24)}`);
+        await connectSelectedWallet();
+        setComposeStatus(`Connected ${INTERNAL_WALLET_LABEL} as ${shortTitle(walletSession.address, 24)}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Wallet connection failed');
       }
