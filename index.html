@@ -925,6 +925,20 @@
       line-height: 1.3;
     }
 
+    .compose-gear-btn {
+      font-size: 1rem;
+      padding: .3rem .46rem;
+      border-radius: .46rem;
+      flex-shrink: 0;
+      line-height: 1;
+      opacity: .72;
+    }
+
+    .compose-gear-btn.active {
+      opacity: 1;
+      background: rgba(100, 149, 237, .22);
+    }
+
     .compose-wallet-balance {
       font-size: .72rem;
       color: #c9ddff;
@@ -1084,7 +1098,9 @@
           <div class="compose-profile-addr-row" id="composeProfileAddrRow" style="display:none">
             <span class="compose-profile-addr-text" id="composeProfileAddrText"></span>
             <button type="button" class="compose-profile-copy-btn" id="composeProfileCopyBtn">Copy</button>
+            <button type="button" class="compose-gear-btn" id="internalGearBtn" aria-label="Wallet settings" title="Wallet settings">⚙</button>
           </div>
+          <div class="compose-wallet-balance" id="walletBalance"></div>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
           <p class="internal-wallet-note" id="internalWalletNote">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
@@ -1107,7 +1123,6 @@
             <button type="button" id="internalForgetBtn">Forget key</button>
           </div>
         </div>
-        <div class="compose-wallet-balance" id="walletBalance"></div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
         <div class="compose-row">
           <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
@@ -1193,7 +1208,8 @@
       internalConsolidateBtn: document.getElementById('internalConsolidateBtn'),
       internalExportKeyBtn: document.getElementById('internalExportKeyBtn'),
       internalForgetBtn: document.getElementById('internalForgetBtn'),
-      internalGenerateBtn: document.getElementById('internalGenerateBtn')
+      internalGenerateBtn: document.getElementById('internalGenerateBtn'),
+      internalGearBtn: document.getElementById('internalGearBtn')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -1324,6 +1340,7 @@
     let composerPreviewUrl = '';
     let walletSession = { providerId: '', provider: null, address: '' };
     let internalPrivKeyBytes = null;
+    let walletSettingsOpen = false;
     let composeEstimateRefreshTimer = null;
     let composeEstimateRequestId = 0;
 
@@ -2436,8 +2453,14 @@
       if (dom.internalImportRow) dom.internalImportRow.style.display = !hasStored ? '' : 'none';
       if (dom.internalImportPwdRow) dom.internalImportPwdRow.style.display = !hasStored ? '' : 'none';
       if (dom.internalUnlockRow) dom.internalUnlockRow.style.display = hasStored && !unlocked ? '' : 'none';
-      if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked ? '' : 'none';
+      if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked && walletSettingsOpen ? '' : 'none';
       if (dom.internalExportKeyBtn) dom.internalExportKeyBtn.style.display = unlocked ? '' : 'none';
+      if (dom.internalGearBtn) dom.internalGearBtn.classList.toggle('active', walletSettingsOpen);
+    }
+
+    function onToggleWalletSettings() {
+      walletSettingsOpen = !walletSettingsOpen;
+      renderInternalWalletUi();
     }
 
     async function onInternalImport() {
@@ -4494,6 +4517,7 @@
       dom.internalExportKeyBtn.addEventListener('click', onExportPrivKey);
       dom.internalForgetBtn.addEventListener('click', onInternalForget);
       if (dom.internalGenerateBtn) dom.internalGenerateBtn.addEventListener('click', onGenerateNewKey);
+      if (dom.internalGearBtn) dom.internalGearBtn.addEventListener('click', onToggleWalletSettings);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
