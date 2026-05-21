@@ -1106,9 +1106,9 @@
     const INTERNAL_CHANGE_ADDRESS_COUNT = 2;
     const INTERNAL_CHANGE_DERIVATION_PREFIX = 'suptv:testnet3:change:';
     const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet/api';
-    const BTC_DUST_LIMIT_SAT = 546;         // P2PKH dust threshold in satoshis
-    const BTC_DEFAULT_FEE_RATE = 10;        // sat/vbyte fallback when fee API is unreachable
-    const BTC_MIN_FEE_RATE = 2;             // sat/vbyte absolute minimum
+    const BTC_DUST_LIMIT_SAT = 546; // P2PKH dust threshold in satoshis
+    const BTC_DEFAULT_FEE_RATE = 10; // sat/vbyte fallback when fee API is unreachable
+    const BTC_MIN_FEE_RATE = 2; // sat/vbyte absolute minimum
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -1779,7 +1779,7 @@
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
       // testnet3 uses 0xef for WIF-encoded private keys (distinct from 0x6f address version byte).
-      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF-encoded private keys are supported (expected WIF payload prefix 0xef); received 0x${p[0].toString(16)}`);
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF-encoded private keys are supported (expected WIF payload prefix 0xef, received 0x${p[0].toString(16)})`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
@@ -2272,6 +2272,7 @@
       const delimiter = pickRandomDelimiter();
       // Mirror DiscoBall message structure:
       // "<delimiter><byteLength><delimiter><message><<attachment>>...<<negativeSalt>>"
+      // negativeSalt is a random negative integer marker used to keep payload instances unique.
       // Use UTF-8 byte length (not JS character count) to match DiscoBall parsing behavior.
       const payloadText = normalize(messageText) + attachments.map((value) => `<<${value}>>`).join('') + `<<${createNegativeSalt()}>>`;
       const payloadLength = new TextEncoder().encode(payloadText).length;

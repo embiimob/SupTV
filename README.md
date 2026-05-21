@@ -132,4 +132,5 @@ SupTV now includes a **Compose** panel (✎ in the top bar) so users can contrib
    - sign the payload hash with the connected wallet,
    - encode it into p2fk chunk addresses,
    - build/sign/broadcast a legacy testnet3 transaction directly in-browser.
-   - route change using two deterministic legacy testnet3 change addresses derived from the same WIF key; when one funds inputs, change is sent to the opposite one so both remain reclaimable from the same root WIF.
+   - route change using two deterministic legacy testnet3 change addresses derived from the same WIF key.
+   - when one derived address funds inputs, change is sent to the opposite one so both remain reclaimable from the same root WIF.
