@@ -806,6 +806,23 @@
       background: #000;
     }
 
+    .internal-wallet-section {
+      display: none;
+      grid-template-columns: 1fr;
+      gap: .48rem;
+      padding: .55rem .65rem;
+      border: 1px solid rgba(100, 149, 237, .22);
+      border-radius: .52rem;
+      background: rgba(5, 10, 24, .6);
+    }
+
+    .internal-wallet-note {
+      margin: 0;
+      font-size: .68rem;
+      color: #8aaac0;
+      line-height: 1.4;
+    }
+
     @media (max-width: 920px) {
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
@@ -931,7 +948,7 @@
         <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
       </div>
       <div class="compose-grid">
-        <p class="compose-help">Connect a wallet extension, then add a valid IPFS video link (or IPFS URN) to post it via sendmany.</p>
+        <p class="compose-help">Choose a wallet, add a valid IPFS video link and a message, then Sign + Send via p2fk sendmany. The built-in wallet runs entirely in your browser.</p>
         <div class="compose-row">
           <select id="walletProvider">
             <option value="unisat">UniSat</option>
@@ -940,6 +957,24 @@
             <option value="okx">OKX</option>
           </select>
           <button type="button" id="connectWalletBtn">Connect</button>
+        </div>
+        <div class="internal-wallet-section" id="internalWalletSection">
+          <p class="internal-wallet-note">Keys are AES-256-GCM encrypted with your password and stored only in this browser — nothing is ever sent to any server.</p>
+          <div class="compose-row" id="internalImportRow">
+            <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet4)" />
+            <button type="button" id="internalImportBtn">Import</button>
+          </div>
+          <div class="compose-row" id="internalImportPwdRow">
+            <input id="internalPasswordInput" type="password" autocomplete="new-password" placeholder="Set encryption password" />
+          </div>
+          <div class="compose-row" id="internalUnlockRow">
+            <input id="internalUnlockPassword" type="password" autocomplete="current-password" placeholder="Password to unlock saved key" />
+            <button type="button" id="internalUnlockBtn">Unlock</button>
+          </div>
+          <div class="compose-row" id="internalActionsRow">
+            <button type="button" id="internalLockBtn">Lock</button>
+            <button type="button" id="internalForgetBtn">Forget key</button>
+          </div>
         </div>
         <input id="walletAddress" type="text" placeholder="Connected address" readonly />
         <input id="postRecipients" type="text" placeholder="Extra recipient addresses (comma/semicolon separated)" />
@@ -1007,7 +1042,19 @@
       attachmentList: document.getElementById('attachmentList'),
       sendAmount: document.getElementById('sendAmount'),
       sendPostBtn: document.getElementById('sendPostBtn'),
-      composeStatus: document.getElementById('composeStatus')
+      composeStatus: document.getElementById('composeStatus'),
+      internalWalletSection: document.getElementById('internalWalletSection'),
+      internalImportRow: document.getElementById('internalImportRow'),
+      internalImportPwdRow: document.getElementById('internalImportPwdRow'),
+      internalUnlockRow: document.getElementById('internalUnlockRow'),
+      internalActionsRow: document.getElementById('internalActionsRow'),
+      internalWifInput: document.getElementById('internalWifInput'),
+      internalPasswordInput: document.getElementById('internalPasswordInput'),
+      internalUnlockPassword: document.getElementById('internalUnlockPassword'),
+      internalImportBtn: document.getElementById('internalImportBtn'),
+      internalUnlockBtn: document.getElementById('internalUnlockBtn'),
+      internalLockBtn: document.getElementById('internalLockBtn'),
+      internalForgetBtn: document.getElementById('internalForgetBtn')
     };
 
     const DEFAULT_KEYWORD = 'mp4';
@@ -1062,8 +1109,11 @@
       { id: 'unisat', name: 'UniSat' },
       { id: 'xverse', name: 'Xverse' },
       { id: 'leather', name: 'Leather' },
-      { id: 'okx', name: 'OKX' }
+      { id: 'okx', name: 'OKX' },
+      { id: 'internal', name: '🔑 Built-in (testnet4)' }
     ];
+    const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
+    const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet4/api';
     const IPFS_GATEWAY_URLS = [
       'https://ipfs.io/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
@@ -1131,6 +1181,7 @@
     let composerAttachments = [];
     let composerPreviewUrl = '';
     let walletSession = { providerId: '', provider: null, address: '' };
+    let internalPrivKeyBytes = null;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1553,6 +1604,381 @@
       return encodeBase58(out);
     }
 
+    // ── Inline crypto: secp256k1 + RIPEMD-160 + Bitcoin raw-tx builder ────────
+
+    function bytesToBigInt(bytes) {
+      let v = 0n;
+      for (const b of bytes) v = (v << 8n) | BigInt(b);
+      return v;
+    }
+
+    function bigIntToBytes32(n) {
+      const out = new Uint8Array(32);
+      for (let i = 31; i >= 0; i--) { out[i] = Number(n & 0xffn); n >>= 8n; }
+      return out;
+    }
+
+    function bytesToHex(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function hexToBytes(hex) {
+      const b = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16);
+      return b;
+    }
+
+    // secp256k1 Jacobian arithmetic
+    const SECP_P  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
+    const SECP_N  = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+    const SECP_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n;
+    const SECP_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n;
+
+    function sModP(n) { return ((n % SECP_P) + SECP_P) % SECP_P; }
+    function sModN(n) { return ((n % SECP_N) + SECP_N) % SECP_N; }
+    function sInv(a, m) {
+      let [r, s, rr, ss] = [m, 0n, ((a % m) + m) % m, 1n];
+      while (rr !== 0n) { const q = r / rr; [r, s, rr, ss] = [rr, ss, r - q * rr, s - q * ss]; }
+      return ((s % m) + m) % m;
+    }
+
+    function japDouble(X, Y, Z) {
+      if (Y === 0n) return [0n, 1n, 0n];
+      const Y2 = sModP(Y * Y), S = sModP(4n * X * Y2), M = sModP(3n * X * X);
+      const X2 = sModP(M * M - 2n * S);
+      return [X2, sModP(M * (S - X2) - 8n * Y2 * Y2), sModP(2n * Y * Z)];
+    }
+
+    function japAdd(X1, Y1, Z1, X2, Y2, Z2) {
+      if (Z1 === 0n) return [X2, Y2, Z2];
+      if (Z2 === 0n) return [X1, Y1, Z1];
+      const z1s = sModP(Z1 * Z1), z2s = sModP(Z2 * Z2);
+      const U1 = sModP(X1 * z2s), U2 = sModP(X2 * z1s);
+      const S1 = sModP(Y1 * z2s * Z2), S2 = sModP(Y2 * z1s * Z1);
+      const H = sModP(U2 - U1), R = sModP(S2 - S1);
+      if (H === 0n) return R === 0n ? japDouble(X1, Y1, Z1) : [0n, 1n, 0n];
+      const Hs = sModP(H * H), Hc = sModP(H * Hs);
+      const X3 = sModP(R * R - Hc - 2n * U1 * Hs);
+      return [X3, sModP(R * (U1 * Hs - X3) - S1 * Hc), sModP(H * Z1 * Z2)];
+    }
+
+    function japToAff(X, Y, Z) {
+      const zi = sInv(Z, SECP_P), zi2 = sModP(zi * zi);
+      return [sModP(X * zi2), sModP(Y * sModP(zi2 * zi))];
+    }
+
+    function sMul(k) {
+      let [rx, ry, rz] = [0n, 1n, 0n], [ax, ay, az] = [SECP_Gx, SECP_Gy, 1n];
+      let s = ((k % SECP_N) + SECP_N) % SECP_N;
+      while (s > 0n) {
+        if (s & 1n) [rx, ry, rz] = japAdd(rx, ry, rz, ax, ay, az);
+        [ax, ay, az] = japDouble(ax, ay, az);
+        s >>= 1n;
+      }
+      return [rx, ry, rz];
+    }
+
+    function secPrivToPub(privBytes) {
+      const [jx, jy, jz] = sMul(bytesToBigInt(privBytes));
+      const [x, y] = japToAff(jx, jy, jz);
+      return new Uint8Array([(y & 1n) ? 0x03 : 0x02, ...bigIntToBytes32(x)]);
+    }
+
+    async function rfc6979k(privBytes, msgHash) {
+      const hmac = async (K, ...parts) => {
+        const ck = await crypto.subtle.importKey('raw', K, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        let len = 0;
+        for (const p of parts) len += p.length;
+        const buf = new Uint8Array(len);
+        let off = 0;
+        for (const p of parts) { buf.set(p, off); off += p.length; }
+        return new Uint8Array(await crypto.subtle.sign('HMAC', ck, buf));
+      };
+      let V = new Uint8Array(32).fill(1), K = new Uint8Array(32).fill(0);
+      K = await hmac(K, V, new Uint8Array([0]), privBytes, msgHash);
+      V = await hmac(K, V);
+      K = await hmac(K, V, new Uint8Array([1]), privBytes, msgHash);
+      V = await hmac(K, V);
+      for (;;) {
+        V = await hmac(K, V);
+        const k = bytesToBigInt(V);
+        if (k >= 1n && k < SECP_N) return k;
+        K = await hmac(K, V, new Uint8Array([0]));
+        V = await hmac(K, V);
+      }
+    }
+
+    async function ecSign(privBytes, msgHashBytes) {
+      const d = bytesToBigInt(privBytes), z = bytesToBigInt(msgHashBytes);
+      const k = await rfc6979k(privBytes, msgHashBytes);
+      const [rx] = japToAff(...sMul(k));
+      const r = sModN(rx);
+      let s = sModN(sInv(k, SECP_N) * (z + r * d));
+      if (s > SECP_N / 2n) s = SECP_N - s; // BIP-62 low-S
+      return { r, s };
+    }
+
+    function derEncode(r, s) {
+      const mb = (n) => { const b = []; let t = n; while (t > 0n) { b.unshift(Number(t & 0xffn)); t >>= 8n; } if (b[0] & 0x80) b.unshift(0); return b; };
+      const rb = mb(r), sb = mb(s);
+      return new Uint8Array([0x30, rb.length + sb.length + 4, 0x02, rb.length, ...rb, 0x02, sb.length, ...sb]);
+    }
+
+    // RIPEMD-160 — pure JS
+    function ripemd160(data) {
+      const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+      const rl32 = (x, n) => (x << n) | (x >>> (32 - n));
+      const ff = (j, x, y, z) => j < 16 ? x ^ y ^ z : j < 32 ? (x & y) | (~x & z) : j < 48 ? (x | ~y) ^ z : j < 64 ? (x & z) | (y & ~z) : x ^ (y | ~z);
+      const KL = [0, 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xA953FD4E];
+      const KR = [0x50A28BE6, 0x5C4DD124, 0x6D703EF3, 0x7A6D76E9, 0];
+      /* eslint-disable no-multi-spaces */
+      const RL = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, 7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8, 3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12, 1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2, 4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13];
+      const RR = [5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12, 6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2, 15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13, 8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14, 12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11];
+      const SL = [11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8, 7,6,8,13,11,9,7,15,7,12,15,9,11,7,13,12, 11,13,6,7,14,9,13,15,14,8,13,6,5,12,7,5, 11,12,14,15,14,15,9,8,9,14,5,6,8,6,5,12, 9,15,5,11,6,8,13,12,5,12,13,14,11,8,5,6];
+      const SR = [8,9,9,11,13,15,15,5,7,7,8,11,14,14,12,6, 9,13,15,7,12,8,9,11,7,7,12,7,6,15,13,11, 9,7,15,11,8,6,6,14,12,13,5,14,13,13,7,5, 15,5,8,11,14,14,6,14,6,9,12,9,12,5,15,8, 8,5,12,9,12,5,14,6,8,13,6,5,15,13,11,11];
+      /* eslint-enable no-multi-spaces */
+      const mlen = bytes.length;
+      const padLen = mlen % 64 < 56 ? 56 - (mlen % 64) : 120 - (mlen % 64);
+      const padded = new Uint8Array(mlen + padLen + 8);
+      padded.set(bytes);
+      padded[mlen] = 0x80;
+      const bl = mlen * 8;
+      for (let i = 0; i < 4; i++) padded[mlen + padLen + i] = (bl >>> (i * 8)) & 0xff;
+      const view = new DataView(padded.buffer);
+      let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+      for (let off = 0; off < padded.length; off += 64) {
+        const X = Array.from({ length: 16 }, (_, i) => view.getUint32(off + i * 4, true));
+        let al = h0, bl2 = h1, cl = h2, dl = h3, el = h4;
+        let ar = h0, br = h1, cr = h2, dr = h3, er = h4;
+        for (let j = 0; j < 80; j++) {
+          const qi = j >> 4;
+          let T = (rl32((al + ff(j, bl2, cl, dl) + X[RL[j]] + KL[qi]) | 0, SL[j]) + el) | 0;
+          al = el; el = dl; dl = rl32(cl, 10); cl = bl2; bl2 = T;
+          T = (rl32((ar + ff(79 - j, br, cr, dr) + X[RR[j]] + KR[qi]) | 0, SR[j]) + er) | 0;
+          ar = er; er = dr; dr = rl32(cr, 10); cr = br; br = T;
+        }
+        const T = (h1 + cl + dr) | 0;
+        h1 = (h2 + dl + er) | 0; h2 = (h3 + el + ar) | 0;
+        h3 = (h4 + al + br) | 0; h4 = (h0 + bl2 + cr) | 0; h0 = T;
+      }
+      const out = new Uint8Array(20);
+      const dv = new DataView(out.buffer);
+      [h0, h1, h2, h3, h4].forEach((h, i) => dv.setUint32(i * 4, h, true));
+      return out;
+    }
+
+    // Base58 decode (inverse of existing encodeBase58)
+    function decodeBase58(str) {
+      let n = 0n;
+      for (const c of str) {
+        const idx = BASE58_ALPHABET.indexOf(c);
+        if (idx < 0) throw new Error(`Invalid Base58 char: ${c}`);
+        n = n * 58n + BigInt(idx);
+      }
+      let zeros = 0;
+      for (const c of str) { if (c !== BASE58_ALPHABET[0]) break; zeros++; }
+      const out = [];
+      while (n > 0n) { out.unshift(Number(n & 0xffn)); n >>= 8n; }
+      return new Uint8Array([...new Array(zeros).fill(0), ...out]);
+    }
+
+    async function decodeBase58Check(str) {
+      const raw = decodeBase58(str);
+      if (raw.length < 5) throw new Error('Base58Check too short');
+      const payload = raw.slice(0, -4), chk = raw.slice(-4);
+      const h2 = await sha256Bytes(await sha256Bytes(payload));
+      for (let i = 0; i < 4; i++) if (chk[i] !== h2[i]) throw new Error('Invalid Base58Check checksum');
+      return payload;
+    }
+
+    async function wifToPrivKeyBytes(wif) {
+      const p = await decodeBase58Check(normalize(wif));
+      if (p[0] !== 0x80 && p[0] !== 0xef) throw new Error(`Unexpected WIF prefix 0x${p[0].toString(16)}`);
+      if (p.length === 34) return p.slice(1, 33); // compressed key
+      if (p.length === 33) return p.slice(1);     // uncompressed key
+      throw new Error('WIF key has unexpected length');
+    }
+
+    async function privKeyToTestnetAddr(privBytes) {
+      const pub = secPrivToPub(privBytes);
+      const hash = ripemd160(await sha256Bytes(pub));
+      return encodeBase58Check(new Uint8Array([0x6f, ...hash])); // 0x6f = testnet P2PKH
+    }
+
+    // AES-256-GCM + PBKDF2 wallet key encryption (browser-only, never leaves device)
+    async function encryptPrivKey(privBytes, password) {
+      const salt = crypto.getRandomValues(new Uint8Array(32));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+      const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, privBytes);
+      return { salt: Array.from(salt), iv: Array.from(iv), data: Array.from(new Uint8Array(enc)) };
+    }
+
+    async function decryptPrivKey(stored, password) {
+      const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: new Uint8Array(stored.salt), iterations: 250000, hash: 'SHA-256' },
+        km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+      );
+      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(stored.iv) }, aesKey, new Uint8Array(stored.data)));
+    }
+
+    // Bitcoin P2PKH raw transaction builder
+    function buildP2pkhScript(hash160) {
+      return new Uint8Array([0x76, 0xa9, 0x14, ...hash160, 0x88, 0xac]);
+    }
+
+    async function addrToScript(address) {
+      const p = await decodeBase58Check(address);
+      return buildP2pkhScript(p.slice(1));
+    }
+
+    function serializeBtcTx(inputs, outputs, sigIdx = -1, sigScript = null) {
+      const u32 = v => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff];
+      const u64 = v => { const n = BigInt(Math.round(v)); return [...u32(Number(n & 0xffffffffn)), ...u32(Number((n >> 32n) & 0xffffffffn))]; };
+      const vi = n => n < 0xfd ? [n] : n <= 0xffff ? [0xfd, n & 0xff, (n >> 8) & 0xff] : [0xfe, n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+      const b = [...u32(1), ...vi(inputs.length)];
+      for (let i = 0; i < inputs.length; i++) {
+        b.push(...Array.from(hexToBytes(inputs[i].txid)).reverse(), ...u32(inputs[i].vout));
+        const sc = sigIdx >= 0 ? (i === sigIdx ? sigScript : new Uint8Array([])) : (inputs[i].scriptSig || new Uint8Array([]));
+        b.push(...vi(sc.length), ...sc, ...u32(0xffffffff));
+      }
+      b.push(...vi(outputs.length));
+      for (const o of outputs) b.push(...u64(o.valueSats), ...vi(o.script.length), ...o.script);
+      b.push(...u32(0));
+      return new Uint8Array(b);
+    }
+
+    async function buildSignedBtcTx(privBytes, utxos, outputs) {
+      const pub = secPrivToPub(privBytes);
+      const spk = buildP2pkhScript(ripemd160(await sha256Bytes(pub)));
+      const inps = utxos.map(u => ({ txid: u.txid, vout: u.vout, scriptSig: new Uint8Array([]) }));
+      const outs = await Promise.all(outputs.map(async o => ({ valueSats: o.valueSats, script: await addrToScript(o.address) })));
+      for (let i = 0; i < inps.length; i++) {
+        const pre = new Uint8Array([...serializeBtcTx(inps, outs, i, spk), 1, 0, 0, 0]);
+        const sh = await sha256Bytes(await sha256Bytes(pre));
+        const { r, s } = await ecSign(privBytes, sh);
+        const der = derEncode(r, s);
+        inps[i].scriptSig = new Uint8Array([der.length + 1, ...der, 0x01, pub.length, ...pub]);
+      }
+      return bytesToHex(serializeBtcTx(inps, outs));
+    }
+
+    async function buildAndBroadcastInternalTx(sendManyOutputs) {
+      if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked — import or unlock first');
+      setComposeStatus('Fetching UTXOs…');
+      const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${walletSession.address}/utxo`);
+      if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status})`);
+      const allUtxos = (await utxoResp.json()).filter(u => u.status?.confirmed);
+      if (!allUtxos.length) throw new Error(`No confirmed UTXOs at ${walletSession.address} on testnet4`);
+      let feeRate = 10;
+      try {
+        const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
+        feeRate = Math.max(((await fr.json()).halfHourFee) || 10, 2);
+      } catch { /* use default */ }
+      const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
+      const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
+      const sorted = [...allUtxos].sort((a, b) => b.value - a.value);
+      const sel = [];
+      let selTotal = 0;
+      for (const u of sorted) {
+        sel.push(u);
+        selTotal += u.value;
+        const estFee = Math.ceil((10 + 148 * sel.length + 34 * (outSats.length + 1)) * feeRate);
+        if (selTotal >= totalOut + estFee) break;
+      }
+      const fee = Math.ceil((10 + 148 * sel.length + 34 * (outSats.length + 1)) * feeRate);
+      const change = selTotal - totalOut - fee;
+      if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
+      const finalOuts = [...outSats];
+      if (change >= 546) finalOuts.push({ address: walletSession.address, valueSats: change });
+      setComposeStatus(`Signing tx (${sel.length} inputs, ${finalOuts.length} outputs, ~${fee} sat fee)…`);
+      const rawHex = await buildSignedBtcTx(internalPrivKeyBytes, sel, finalOuts);
+      setComposeStatus('Broadcasting transaction…');
+      const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: rawHex });
+      if (!bcast.ok) {
+        const errText = await bcast.text().catch(() => String(bcast.status));
+        throw new Error(`Broadcast failed: ${errText}`);
+      }
+      return (await bcast.text()).trim();
+    }
+
+    // ── Internal wallet UI handlers ───────────────────────────────────────────
+
+    function renderInternalWalletUi() {
+      if (!dom.internalWalletSection) return;
+      const isInternal = normalize(dom.walletProvider?.value) === 'internal';
+      dom.internalWalletSection.style.display = isInternal ? 'grid' : 'none';
+      if (!isInternal) return;
+      const hasStored = Boolean(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY));
+      const unlocked = Boolean(internalPrivKeyBytes);
+      if (dom.internalImportRow) dom.internalImportRow.style.display = !hasStored ? '' : 'none';
+      if (dom.internalImportPwdRow) dom.internalImportPwdRow.style.display = !hasStored ? '' : 'none';
+      if (dom.internalUnlockRow) dom.internalUnlockRow.style.display = hasStored && !unlocked ? '' : 'none';
+      if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked ? '' : 'none';
+    }
+
+    async function onInternalImport() {
+      const wif = normalize(dom.internalWifInput?.value || '');
+      const pwd = normalize(dom.internalPasswordInput?.value || '');
+      if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
+      if (pwd.length < 4) { setComposeStatus('Enter a password (at least 4 chars)'); return; }
+      setComposeStatus('Importing key…');
+      try {
+        const privBytes = await wifToPrivKeyBytes(wif);
+        const addr = await privKeyToTestnetAddr(privBytes);
+        const enc = await encryptPrivKey(privBytes, pwd);
+        localStorage.setItem(INTERNAL_WALLET_STORAGE_KEY, JSON.stringify(enc));
+        internalPrivKeyBytes = privBytes;
+        walletSession = { providerId: 'internal', provider: null, address: addr };
+        if (dom.walletAddress) dom.walletAddress.value = addr;
+        if (dom.internalWifInput) dom.internalWifInput.value = '';
+        if (dom.internalPasswordInput) dom.internalPasswordInput.value = '';
+        renderInternalWalletUi();
+        setComposeStatus(`Imported & unlocked — ${addr}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Import failed');
+      }
+    }
+
+    async function onInternalUnlock() {
+      const pwd = normalize(dom.internalUnlockPassword?.value || '');
+      if (!pwd) { setComposeStatus('Enter your password'); return; }
+      setComposeStatus('Unlocking…');
+      try {
+        const stored = JSON.parse(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY) || 'null');
+        if (!stored) throw new Error('No key stored — import one first');
+        const privBytes = await decryptPrivKey(stored, pwd);
+        const addr = await privKeyToTestnetAddr(privBytes);
+        internalPrivKeyBytes = privBytes;
+        walletSession = { providerId: 'internal', provider: null, address: addr };
+        if (dom.walletAddress) dom.walletAddress.value = addr;
+        if (dom.internalUnlockPassword) dom.internalUnlockPassword.value = '';
+        renderInternalWalletUi();
+        setComposeStatus(`Unlocked — ${addr}`);
+      } catch (error) {
+        setComposeStatus(error?.message || 'Unlock failed — wrong password?');
+      }
+    }
+
+    function onInternalLock() {
+      internalPrivKeyBytes = null;
+      walletSession = { providerId: 'internal', provider: null, address: '' };
+      if (dom.walletAddress) dom.walletAddress.value = '';
+      renderInternalWalletUi();
+      setComposeStatus('Wallet locked');
+    }
+
+    function onInternalForget() {
+      localStorage.removeItem(INTERNAL_WALLET_STORAGE_KEY);
+      internalPrivKeyBytes = null;
+      walletSession = { providerId: 'internal', provider: null, address: '' };
+      if (dom.walletAddress) dom.walletAddress.value = '';
+      renderInternalWalletUi();
+      setComposeStatus('Key removed from browser storage');
+    }
+
     async function encodeP2fkAddresses(payloadText, versionByte = P2FK_DEFAULT_VERSION_BYTE) {
       const payload = new TextEncoder().encode(payloadText);
       const addresses = [];
@@ -1611,6 +2037,10 @@
 
     async function connectSelectedWallet() {
       const providerId = normalize(dom.walletProvider?.value || '');
+      if (providerId === 'internal') {
+        if (!internalPrivKeyBytes) throw new Error('Import or unlock the built-in wallet using the fields above');
+        return walletSession;
+      }
       const provider = getWalletProvider(providerId);
       if (!provider) {
         throw new Error(`${providerId || 'Selected'} wallet extension is not detected`);
@@ -1630,6 +2060,11 @@
     }
 
     async function signWithWallet(messageHashHex) {
+      if (walletSession.providerId === 'internal') {
+        if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
+        const { r, s } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
+        return bytesToHex(derEncode(r, s));
+      }
       const provider = walletSession.provider;
       if (!provider || !walletSession.address) throw new Error('Connect a wallet before signing');
       if (typeof provider.signMessage === 'function') {
@@ -1650,6 +2085,9 @@
     }
 
     async function sendManyWithWallet(outputs) {
+      if (walletSession.providerId === 'internal') {
+        return buildAndBroadcastInternalTx(outputs);
+      }
       const provider = walletSession.provider;
       if (!provider) throw new Error('Connect a wallet before sending');
       if (typeof provider.sendMany === 'function') {
@@ -2372,7 +2810,8 @@
         setComposeStatus('Write a message or add at least one attachment');
         return;
       }
-      if (!walletSession.address || !walletSession.provider) {
+      const isInternal = walletSession.providerId === 'internal';
+      if (!walletSession.address || (!walletSession.provider && !isInternal)) {
         setComposeStatus('Connect a wallet before sending');
         return;
       }
@@ -2383,7 +2822,7 @@
       }
       const extraRecipients = parseManualRecipients(dom.postRecipients?.value || '');
       try {
-        setComposeStatus('Signing and building sendmany outputs…');
+        setComposeStatus('Building sendmany outputs…');
         const { outputs, cost } = await buildP2fkRecipientsAndCost({
           messageText,
           attachments: composerAttachments,
@@ -2392,7 +2831,8 @@
           amountPerRecipient
         });
         if (!outputs.length) throw new Error('No sendmany outputs were generated');
-        setComposeStatus(`Sending ${outputs.length} outputs (${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC + fee)…`);
+        const costSats = Math.round(cost * 1e8);
+        setComposeStatus(`${outputs.length} outputs · ${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC (${costSats.toLocaleString()} sat) + fee — signing…`);
         const sendResult = await sendManyWithWallet(outputs);
         const txid = resolveTxidFromSendResult(sendResult) || 'pending';
         setStatus(`Post broadcast: ${txid}`);
@@ -2401,7 +2841,7 @@
           meta: `writer · ${shortTitle(walletSession.address, 18)}`,
           body: `Sent p2fk post in ${outputs.length} outputs. txid: ${txid}`
         });
-        setComposeStatus(`Success: ${txid}`);
+        setComposeStatus(`✓ ${txid}`);
         if (dom.postMessage) dom.postMessage.value = '';
         if (dom.postRecipients) dom.postRecipients.value = '';
         composerAttachments = [];
@@ -3516,6 +3956,7 @@
       dom.query.value = '';
       populateWalletProviderOptions();
       renderComposerAttachments();
+      renderInternalWalletUi();
       syncAudioUi();
 
       dom.searchForm.addEventListener('submit', (event) => {
@@ -3538,6 +3979,11 @@
       });
       dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
       dom.connectWalletBtn.addEventListener('click', onConnectWallet);
+      dom.walletProvider.addEventListener('change', renderInternalWalletUi);
+      dom.internalImportBtn.addEventListener('click', onInternalImport);
+      dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
+      dom.internalLockBtn.addEventListener('click', onInternalLock);
+      dom.internalForgetBtn.addEventListener('click', onInternalForget);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.attachmentInput.addEventListener('keydown', (event) => {
