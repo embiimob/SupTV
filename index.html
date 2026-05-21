@@ -24,6 +24,8 @@
       --panel: rgba(5, 8, 18, 0.62);
       --accent: #41d1ff;
       --accent-2: #b18fff;
+      --topbar-button-bg: #8fdcff;
+      --topbar-button-border: rgba(191, 235, 255, .95);
       --text: #f4f7ff;
       --muted: #a4b1d8;
       --swipe-tug-transition-ms: 180ms;
@@ -169,11 +171,11 @@
     }
 
     .controls button {
-      border: none;
+      border: 1px solid var(--topbar-button-border);
       border-radius: .7rem;
       padding: .65rem .9rem;
       color: #00131f;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      background: var(--topbar-button-bg);
       font-weight: 700;
       font-size: 1.05rem;
       cursor: pointer;
@@ -181,25 +183,22 @@
     }
 
     .controls .skip-inline {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
     }
 
     .controls .audio-toggle {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
       min-width: 3rem;
     }
 
     .controls .compose-inline {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
     }
 
     .side-feed {
@@ -703,9 +702,13 @@
 
     .compose-row {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: .5rem;
       align-items: center;
+    }
+
+    .compose-row > * {
+      min-width: 0;
     }
 
     .compose-panel input,
@@ -1036,6 +1039,7 @@
       display: flex;
       align-items: center;
       overflow-wrap: anywhere;
+      min-width: 0;
     }
 
     @media (max-width: 920px) {
@@ -1087,6 +1091,12 @@
         font-size: .95rem;
       }
       .controls .audio-toggle { min-width: 2.55rem; }
+      .compose-send-row {
+        grid-template-columns: 1fr;
+      }
+      .compose-send-row button {
+        width: 100%;
+      }
       .side-feed {
         right: .62rem;
         width: calc(100vw - 1.24rem);
@@ -1110,7 +1120,7 @@
         <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
       </div>
       <form class="controls" id="searchForm" autocomplete="off">
-        <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
+        <input id="query" type="text" placeholder="Search p2fk video by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
         <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
         <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
@@ -1210,7 +1220,7 @@
           <video id="composePreviewVideo" controls muted playsinline preload="metadata"></video>
         </div>
         <ul class="attachment-list" id="attachmentList"></ul>
-        <div class="compose-row">
+        <div class="compose-row compose-send-row">
           <div class="compose-estimate" id="sendEstimate">* Add an IPFS video attachment to see cost estimates.</div>
           <button type="button" id="sendPostBtn">Sign + Send</button>
         </div>
