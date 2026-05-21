@@ -780,6 +780,32 @@
       overflow-wrap: anywhere;
     }
 
+    .compose-preview {
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .52rem;
+      background: rgba(7, 14, 28, .78);
+      padding: .42rem;
+      display: none;
+      gap: .36rem;
+    }
+
+    .compose-preview.visible {
+      display: grid;
+    }
+
+    .compose-preview b {
+      font-size: .72rem;
+      color: #b8ccef;
+      letter-spacing: .03em;
+    }
+
+    .compose-preview video {
+      width: 100%;
+      max-height: 220px;
+      border-radius: .44rem;
+      background: #000;
+    }
+
     @media (max-width: 920px) {
       .side-feed { width: calc(100vw - 2rem); top: auto; bottom: 7.3rem; max-height: min(44vh, 440px); }
       .controls { width: min(72vw, 560px); }
@@ -905,7 +931,7 @@
         <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
       </div>
       <div class="compose-grid">
-        <p class="compose-help">Connect a wallet extension, build a DiscoBall-style message, upload files to IPFS, then send a sendmany transaction.</p>
+        <p class="compose-help">Connect a wallet extension, then add a valid IPFS video link (or IPFS URN) to post it via sendmany.</p>
         <div class="compose-row">
           <select id="walletProvider">
             <option value="unisat">UniSat</option>
@@ -922,11 +948,10 @@
           <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
           <button type="button" id="addAttachmentBtn">Add</button>
         </div>
-        <div class="compose-row">
-          <input id="ipfsUploadEndpoint" type="text" placeholder="IPFS upload endpoint (CORS-enabled add API)" />
-          <button type="button" id="uploadAttachmentBtn">Upload file</button>
+        <div class="compose-preview" id="composePreview" aria-live="polite">
+          <b>Video preview</b>
+          <video id="composePreviewVideo" controls muted playsinline preload="metadata"></video>
         </div>
-        <input id="attachmentFileInput" type="file" accept="video/*,image/*,audio/*,.json,.txt,.pdf,.zip" />
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row">
           <input id="sendAmount" type="number" min="0.00000001" step="0.00000001" value="0.00000546" />
@@ -977,9 +1002,8 @@
       postMessage: document.getElementById('postMessage'),
       attachmentInput: document.getElementById('attachmentInput'),
       addAttachmentBtn: document.getElementById('addAttachmentBtn'),
-      ipfsUploadEndpoint: document.getElementById('ipfsUploadEndpoint'),
-      uploadAttachmentBtn: document.getElementById('uploadAttachmentBtn'),
-      attachmentFileInput: document.getElementById('attachmentFileInput'),
+      composePreview: document.getElementById('composePreview'),
+      composePreviewVideo: document.getElementById('composePreviewVideo'),
       attachmentList: document.getElementById('attachmentList'),
       sendAmount: document.getElementById('sendAmount'),
       sendPostBtn: document.getElementById('sendPostBtn'),
