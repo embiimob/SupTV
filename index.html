@@ -1101,6 +1101,7 @@
     const INTERNAL_WALLET_ID = 'internal';
     const INTERNAL_WALLET_LABEL = '🔑 Built-in (testnet3 legacy)';
     const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
+    const INTERNAL_WALLET_MIN_PASSWORD_LENGTH = 12;
     const INTERNAL_WALLET_PBKDF2_ITERATIONS = 600000;
     const INTERNAL_CHANGE_ADDRESS_COUNT = 2;
     const INTERNAL_CHANGE_DERIVATION_PREFIX = 'suptv:testnet3:change:';
@@ -1777,6 +1778,7 @@
 
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
+      // testnet3 uses 0xef for WIF-encoded private keys (distinct from 0x6f address version byte).
       if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF private keys are supported (WIF version byte 0xef); received 0x${p[0].toString(16)}`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
@@ -1797,6 +1799,7 @@
       const tweakHash = await sha256Bytes(seed);
       const baseScalar = bytesToBigInt(basePrivBytes);
       let tweakScalar = sModN(bytesToBigInt(tweakHash));
+      // secp256k1 private keys must be within [1, n-1], so clamp extremely unlikely zero modulo cases to 1.
       if (tweakScalar === 0n) tweakScalar = 1n;
       let derivedScalar = sModN(baseScalar + tweakScalar);
       if (derivedScalar === 0n) derivedScalar = 1n;
@@ -1820,8 +1823,8 @@
       const main = await buildWalletSignerEntry(basePrivBytes, 'main');
       const changeSigners = [];
       for (let i = 0; i < INTERNAL_CHANGE_ADDRESS_COUNT; i += 1) {
-        const derivedPriv = await deriveDeterministicInternalPrivKey(basePrivBytes, `slot-${i + 1}`);
-        const signer = await buildWalletSignerEntry(derivedPriv, `change-${i + 1}`);
+        const derivedPrivBytes = await deriveDeterministicInternalPrivKey(basePrivBytes, `slot-${i + 1}`);
+        const signer = await buildWalletSignerEntry(derivedPrivBytes, `change-${i + 1}`);
         changeSigners.push(signer);
       }
       return { main, changeSigners, allSigners: [main, ...changeSigners] };
@@ -1927,6 +1930,7 @@
         const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
         feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
       } catch { /* use default */ }
+      // Estimated virtual size for legacy P2PKH: 10 bytes tx overhead + 148/input + 34/output.
       const estimateLegacyP2pkhFee = (inputsCount, outputsCount) => Math.ceil((10 + 148 * inputsCount + 34 * outputsCount) * feeRate);
       const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
       const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
@@ -1972,11 +1976,12 @@
       const fee = estimateLegacyP2pkhFee(sel.length, outSats.length + 1);
       const change = selTotal - totalOut - fee;
       if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
-      const changeAddress = selectedSource.address === changeA.address
-        ? changeB.address
-        : selectedSource.address === changeB.address
-          ? changeA.address
-          : preferredSource.address;
+      let changeAddress = preferredSource.address;
+      if (selectedSource.address === changeA.address) {
+        changeAddress = changeB.address;
+      } else if (selectedSource.address === changeB.address) {
+        changeAddress = changeA.address;
+      }
       const changeSigner = byAddress.get(changeAddress);
       if (!changeSigner) throw new Error('Could not resolve deterministic change destination');
       const finalOuts = [...outSats];
@@ -2009,7 +2014,7 @@
       const wif = normalize(dom.internalWifInput?.value || '');
       const pwd = normalize(dom.internalPasswordInput?.value || '');
       if (!wif) { setComposeStatus('Enter your WIF private key'); return; }
-      if (pwd.length < 12) { setComposeStatus('Enter a password (minimum 12 characters for security)'); return; }
+      if (pwd.length < INTERNAL_WALLET_MIN_PASSWORD_LENGTH) { setComposeStatus(`Enter a password (minimum ${INTERNAL_WALLET_MIN_PASSWORD_LENGTH} characters for security)`); return; }
       setComposeStatus('Deriving key — this takes a moment…');
       try {
         const privBytes = await wifToPrivKeyBytes(wif);
