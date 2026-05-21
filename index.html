@@ -940,10 +940,72 @@
     }
 
     .compose-wallet-balance {
+      display: grid;
+      gap: .28rem;
+      min-height: 1.1rem;
+    }
+
+    .compose-wallet-summary-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .4rem;
       font-size: .72rem;
       color: #c9ddff;
-      min-height: 1.1rem;
+      background: rgba(8, 15, 30, .72);
+      border: 1px solid rgba(122, 149, 216, .24);
+      border-radius: .44rem;
+      padding: .34rem .44rem;
+      text-align: left;
+    }
+
+    .compose-wallet-summary-btn.pending {
+      color: #ff9b9b;
+      border-color: rgba(255, 129, 129, .46);
+    }
+
+    .compose-wallet-summary-chevron {
+      font-size: .66rem;
+      opacity: .9;
+      flex-shrink: 0;
+    }
+
+    .compose-wallet-details {
+      display: grid;
+      gap: .2rem;
+      border: 1px solid rgba(122, 149, 216, .2);
+      border-radius: .44rem;
+      padding: .34rem .44rem;
+      background: rgba(7, 14, 28, .74);
+    }
+
+    .compose-wallet-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: .5rem;
+      font-size: .68rem;
+      color: #b7cff1;
+    }
+
+    .compose-wallet-detail-row strong {
+      font-size: .64rem;
+      letter-spacing: .02em;
+      color: #8fb1d7;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .compose-wallet-detail-row span {
       overflow-wrap: anywhere;
+      text-align: right;
+      color: #cfe2ff;
+    }
+
+    .compose-wallet-detail-row.pending span {
+      color: #ff9b9b;
+      font-weight: 700;
     }
 
     .compose-estimate {
@@ -1106,7 +1168,7 @@
           <div class="compose-row" id="internalImportRow">
             <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
             <button type="button" id="internalImportBtn">Import</button>
-            <button type="button" id="internalGenerateBtn">Generate</button>
+            <button type="button" id="internalGenerateBtn">Generate testnet3 address</button>
           </div>
           <div class="compose-row" id="internalImportPwdRow">
             <input id="internalPasswordInput" type="password" autocomplete="new-password" placeholder="Set encryption password" />
@@ -1340,6 +1402,8 @@
     let walletSession = { providerId: '', provider: null, address: '' };
     let internalPrivKeyBytes = null;
     let walletSettingsOpen = false;
+    let walletBalanceExpanded = false;
+    let walletBalanceState = null;
     let composeEstimateRefreshTimer = null;
     let composeEstimateRequestId = 0;
 
@@ -1683,11 +1747,72 @@
       }
       if (dom.composeProfileAddrRow) dom.composeProfileAddrRow.style.display = 'none';
       if (dom.composeProfileAddrText) dom.composeProfileAddrText.textContent = '';
+      walletBalanceState = null;
+      walletBalanceExpanded = false;
+      if (dom.walletBalance) dom.walletBalance.textContent = '';
+    }
+
+    function formatBtcAndSat(valueSat) {
+      const sat = Number(valueSat || 0);
+      return `${(sat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${sat.toLocaleString()} sat)`;
+    }
+
+    function renderWalletBalance() {
+      if (!dom.walletBalance) return;
+      dom.walletBalance.textContent = '';
+      if (!walletBalanceState) return;
+      if (walletBalanceState.kind === 'message') {
+        dom.walletBalance.textContent = cleanDisplayText(walletBalanceState.message || '', 220);
+        return;
+      }
+
+      const summaryBtn = document.createElement('button');
+      summaryBtn.type = 'button';
+      summaryBtn.className = `compose-wallet-summary-btn${walletBalanceState.pendingSat > 0 ? ' pending' : ''}`;
+      summaryBtn.setAttribute('aria-expanded', walletBalanceExpanded ? 'true' : 'false');
+      const summaryText = document.createElement('span');
+      summaryText.textContent = `Total: ${(Number(walletBalanceState.totalSat || 0) / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC`;
+      const chevron = document.createElement('span');
+      chevron.className = 'compose-wallet-summary-chevron';
+      chevron.textContent = walletBalanceExpanded ? '▾' : '▸';
+      summaryBtn.append(summaryText, chevron);
+      summaryBtn.addEventListener('click', () => {
+        walletBalanceExpanded = !walletBalanceExpanded;
+        renderWalletBalance();
+      });
+      dom.walletBalance.appendChild(summaryBtn);
+      if (!walletBalanceExpanded) return;
+
+      const details = document.createElement('div');
+      details.className = 'compose-wallet-details';
+      const addRow = (label, value, pending = false) => {
+        const row = document.createElement('div');
+        row.className = `compose-wallet-detail-row${pending ? ' pending' : ''}`;
+        const key = document.createElement('strong');
+        key.textContent = label;
+        const data = document.createElement('span');
+        data.textContent = value;
+        row.append(key, data);
+        details.appendChild(row);
+      };
+
+      addRow('Total', formatBtcAndSat(walletBalanceState.totalSat));
+      if (typeof walletBalanceState.unconsolidatedSat === 'number') {
+        addRow('Unconsolidated', formatBtcAndSat(walletBalanceState.unconsolidatedSat));
+      } else {
+        addRow('Unconsolidated', 'Unlock wallet to calculate');
+      }
+      addRow('Pending', formatBtcAndSat(walletBalanceState.pendingSat), walletBalanceState.pendingSat > 0);
+      dom.walletBalance.appendChild(details);
     }
 
     function setWalletBalanceText(message) {
-      if (!dom.walletBalance) return;
-      dom.walletBalance.textContent = cleanDisplayText(message || '', 220);
+      walletBalanceState = { kind: 'message', message };
+      renderWalletBalance();
+    }
+
+    function hasP2fkDelimiterNumberPair(value) {
+      return /[\\/:*?"|<>][0-9]/.test(cleanDisplayText(value || '', 120));
     }
 
     async function getAddressBalanceStats(address) {
@@ -1706,27 +1831,31 @@
     async function refreshWalletBalance() {
       const address = cleanDisplayText(walletSession.address || '');
       if (!address) {
+        walletBalanceExpanded = false;
+        walletBalanceState = null;
         setWalletBalanceText('');
         return;
       }
       setWalletBalanceText('Checking main + unconsolidated balances…');
       try {
         const mainStats = await getAddressBalanceStats(address);
-        const lines = [];
-        const pendingText = mainStats.unconfirmedSat ? ` · pending ${(mainStats.unconfirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC` : '';
-        lines.push(`Main: ${(mainStats.confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${mainStats.confirmedSat.toLocaleString()} sat)${pendingText}`);
-
+        let unconsolidatedSat = null;
+        let unconsolidatedPendingSat = 0;
         if (internalPrivKeyBytes) {
           const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
           const changeEntries = await Promise.all(
             keyring.changeSigners.map(async (signer) => ({ signer, stats: await getAddressBalanceStats(signer.address) }))
           );
-          const unconsolidatedSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.confirmedSat || 0), 0);
-          lines.push(`Unconsolidated: ${(unconsolidatedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${unconsolidatedSat.toLocaleString()} sat)`);
-        } else {
-          lines.push('Unconsolidated: unlock wallet to calculate change balances');
+          unconsolidatedSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.confirmedSat || 0), 0);
+          unconsolidatedPendingSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.unconfirmedSat || 0), 0);
         }
-        setWalletBalanceText(lines.join(' · '));
+        walletBalanceState = {
+          kind: 'totals',
+          totalSat: Number(mainStats.confirmedSat || 0) + Number(unconsolidatedSat || 0),
+          unconsolidatedSat,
+          pendingSat: Number(mainStats.unconfirmedSat || 0) + Number(unconsolidatedPendingSat || 0)
+        };
+        renderWalletBalance();
       } catch (error) {
         setWalletBalanceText(error?.message || 'Could not load wallet balance');
       }
@@ -2179,19 +2308,30 @@
     }
 
     async function onGenerateNewKey() {
-      setComposeStatus('Generating a new testnet3 key…');
+      setComposeStatus('Generating a testnet3 address…');
       try {
         let privBytes;
+        let wif = '';
+        let addr = '';
+        let attempts = 0;
         do {
+          attempts += 1;
           privBytes = crypto.getRandomValues(new Uint8Array(32));
-        } while (bytesToBigInt(privBytes) === 0n || bytesToBigInt(privBytes) >= SECP_N);
-        const wif = await privKeyToTestnetWif(privBytes);
-        const addr = await privKeyToTestnetAddr(privBytes);
+          if (bytesToBigInt(privBytes) === 0n || bytesToBigInt(privBytes) >= SECP_N) continue;
+          wif = await privKeyToTestnetWif(privBytes);
+          addr = await privKeyToTestnetAddr(privBytes);
+        } while (
+          attempts < 64
+          && (!wif || !addr || hasP2fkDelimiterNumberPair(wif) || hasP2fkDelimiterNumberPair(addr))
+        );
+        if (!wif || !addr || hasP2fkDelimiterNumberPair(wif) || hasP2fkDelimiterNumberPair(addr)) {
+          throw new Error('Could not generate a delimiter-safe testnet3 address; try again');
+        }
         if (dom.internalWifInput) {
           dom.internalWifInput.value = wif;
-          dom.internalWifInput.type = 'text';
+          dom.internalWifInput.type = 'password';
         }
-        setComposeStatus(`⚠ New key generated for ${addr}. SAVE your WIF above, then set a password and click Import.`);
+        setComposeStatus(`⚠ New testnet3 address generated for ${addr}. Your private key is masked above — set a password and click Import.`);
       } catch (error) {
         setComposeStatus(error?.message || 'Key generation failed');
       }
@@ -2455,6 +2595,7 @@
       if (dom.internalActionsRow) dom.internalActionsRow.style.display = unlocked && walletSettingsOpen ? '' : 'none';
       if (dom.internalExportKeyBtn) dom.internalExportKeyBtn.style.display = unlocked ? '' : 'none';
       if (dom.internalGearBtn) dom.internalGearBtn.classList.toggle('active', walletSettingsOpen);
+      if (dom.internalWifInput) dom.internalWifInput.type = 'password';
     }
 
     function onToggleWalletSettings() {
