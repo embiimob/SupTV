@@ -1445,6 +1445,7 @@
     const UNSAFE_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\u0000-\u001f]/g;
     const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|ogv|mov|avi|m3u8)$/i;
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
+    const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -1499,7 +1500,7 @@
     function createNegativeSalt() {
       const bytes = new Uint32Array(1);
       crypto.getRandomValues(bytes);
-      return -Math.abs(bytes[0] % 100000);
+      return -(bytes[0] % 100000);
     }
 
     function parseHashtagKeywords(message) {
@@ -1758,7 +1759,7 @@
       return 'artifact.mp4';
     }
 
-    function probeVideoUrl(url, timeoutMs = 11000) {
+    function probeVideoUrl(url, timeoutMs = IPFS_VIDEO_PROBE_TIMEOUT_MS) {
       return new Promise((resolve) => {
         const probe = document.createElement('video');
         let done = false;
@@ -2390,7 +2391,7 @@
         if (!outputs.length) throw new Error('No sendmany outputs were generated');
         setComposeStatus(`Sending ${outputs.length} outputs (${cost.toFixed(8)} BTC + fee)…`);
         const sendResult = await sendManyWithWallet(outputs);
-        const txid = resolveTxidFromSendResult(sendResult) || 'submitted';
+        const txid = resolveTxidFromSendResult(sendResult) || 'pending';
         setStatus(`Post broadcast: ${txid}`);
         addMessage({
           title: 'Post broadcast',
