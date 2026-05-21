@@ -842,12 +842,40 @@
       border: 1px solid rgba(122, 149, 216, .25);
       border-radius: .56rem;
       background: rgba(7, 14, 28, .78);
-      padding: .5rem .58rem;
-      gap: .2rem;
+      padding: .46rem .54rem;
+      gap: .32rem;
     }
 
     .compose-profile-card.visible {
       display: grid;
+    }
+
+    .compose-profile-header {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: .46rem;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .compose-profile-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: .46rem;
+      object-fit: cover;
+      border: 1px solid rgba(130, 165, 232, .4);
+      background: rgba(6, 12, 24, .96);
+      display: none;
+    }
+
+    .compose-profile-avatar.visible {
+      display: block;
+    }
+
+    .compose-profile-summary {
+      min-width: 0;
+      display: grid;
+      gap: .14rem;
     }
 
     .compose-profile-title {
@@ -861,6 +889,13 @@
       font-size: .68rem;
       color: #9fc0dd;
       overflow-wrap: anywhere;
+    }
+
+    .compose-profile-extra {
+      font-size: .65rem;
+      color: #8eb0d0;
+      overflow-wrap: anywhere;
+      line-height: 1.28;
     }
 
     .compose-wallet-balance {
@@ -1011,11 +1046,17 @@
       <div class="compose-grid">
         <p class="compose-help">This composer is for video posts/comments only. Add a playable IPFS video attachment, then Sign + Send via p2fk sendmany.</p>
         <div class="compose-profile-card" id="composeProfileCard" aria-live="polite">
-          <div class="compose-profile-title" id="composeProfileTitle"></div>
-          <div class="compose-profile-meta" id="composeProfileMeta"></div>
+          <div class="compose-profile-header">
+            <img class="compose-profile-avatar" id="composeProfileAvatar" alt="Profile image" loading="lazy" />
+            <div class="compose-profile-summary">
+              <div class="compose-profile-title" id="composeProfileTitle"></div>
+              <div class="compose-profile-meta" id="composeProfileMeta"></div>
+            </div>
+          </div>
+          <div class="compose-profile-extra" id="composeProfileExtra"></div>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
-          <p class="internal-wallet-note">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
+          <p class="internal-wallet-note" id="internalWalletNote">Testnet3 legacy (m/n) only. Password minimum is 12 characters. Keys are AES-256-GCM encrypted and stored only in this browser — nothing is ever sent to any server.</p>
           <div class="compose-row" id="internalImportRow">
             <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
             <button type="button" id="internalImportBtn">Import</button>
@@ -1091,8 +1132,10 @@
       composePanel: document.getElementById('composePanel'),
       composeCloseBtn: document.getElementById('composeCloseBtn'),
       composeProfileCard: document.getElementById('composeProfileCard'),
+      composeProfileAvatar: document.getElementById('composeProfileAvatar'),
       composeProfileTitle: document.getElementById('composeProfileTitle'),
       composeProfileMeta: document.getElementById('composeProfileMeta'),
+      composeProfileExtra: document.getElementById('composeProfileExtra'),
       walletAddress: document.getElementById('walletAddress'),
       copyWalletAddressBtn: document.getElementById('copyWalletAddressBtn'),
       walletBalance: document.getElementById('walletBalance'),
@@ -1106,6 +1149,7 @@
       sendPostBtn: document.getElementById('sendPostBtn'),
       composeStatus: document.getElementById('composeStatus'),
       internalWalletSection: document.getElementById('internalWalletSection'),
+      internalWalletNote: document.getElementById('internalWalletNote'),
       internalImportRow: document.getElementById('internalImportRow'),
       internalImportPwdRow: document.getElementById('internalImportPwdRow'),
       internalUnlockRow: document.getElementById('internalUnlockRow'),
@@ -1584,11 +1628,29 @@
       dom.composeProfileCard.classList.remove('visible');
       dom.composeProfileTitle.textContent = '';
       dom.composeProfileMeta.textContent = '';
+      if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+      if (dom.composeProfileAvatar) {
+        dom.composeProfileAvatar.classList.remove('visible');
+        dom.composeProfileAvatar.removeAttribute('src');
+      }
     }
 
     function setWalletBalanceText(message) {
       if (!dom.walletBalance) return;
       dom.walletBalance.textContent = cleanDisplayText(message || '', 220);
+    }
+
+    async function getAddressBalanceStats(address) {
+      const cleanAddress = cleanDisplayText(address || '');
+      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0 };
+      const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(cleanAddress)}`);
+      if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
+      const payload = await response.json();
+      const chainStats = payload?.chain_stats || {};
+      const mempoolStats = payload?.mempool_stats || {};
+      const confirmedSat = (Number(chainStats.funded_txo_sum || 0) - Number(chainStats.spent_txo_sum || 0));
+      const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
+      return { confirmedSat, unconfirmedSat };
     }
 
     async function refreshWalletBalance() {
@@ -1597,21 +1659,50 @@
         setWalletBalanceText('');
         return;
       }
-      setWalletBalanceText('Checking main-address balance…');
+      setWalletBalanceText('Checking main + unconsolidated balances…');
       try {
-        const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(address)}`);
-        if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
-        const payload = await response.json();
-        const chainStats = payload?.chain_stats || {};
-        const mempoolStats = payload?.mempool_stats || {};
-        const confirmedSat = (Number(chainStats.funded_txo_sum || 0) - Number(chainStats.spent_txo_sum || 0));
-        const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
-        const confirmedBtc = (confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION);
-        const pendingText = unconfirmedSat ? ` · pending ${(unconfirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC` : '';
-        setWalletBalanceText(`Main balance: ${confirmedBtc} BTC (${confirmedSat.toLocaleString()} sat)${pendingText}`);
+        const mainStats = await getAddressBalanceStats(address);
+        const lines = [];
+        const pendingText = mainStats.unconfirmedSat ? ` · pending ${(mainStats.unconfirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC` : '';
+        lines.push(`Main: ${(mainStats.confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${mainStats.confirmedSat.toLocaleString()} sat)${pendingText}`);
+
+        if (internalPrivKeyBytes) {
+          const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+          const changeEntries = await Promise.all(
+            keyring.changeSigners.map(async (signer) => ({ signer, stats: await getAddressBalanceStats(signer.address) }))
+          );
+          const unconsolidatedSat = changeEntries.reduce((sum, entry) => sum + Number(entry.stats.confirmedSat || 0), 0);
+          lines.push(`Unconsolidated: ${(unconsolidatedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC (${unconsolidatedSat.toLocaleString()} sat)`);
+          changeEntries.forEach((entry) => {
+            lines.push(`${entry.signer.label}: ${(entry.stats.confirmedSat / 1e8).toFixed(BTC_DECIMAL_PRECISION)} BTC`);
+          });
+        } else {
+          lines.push('Unconsolidated: unlock wallet to calculate change balances');
+        }
+        setWalletBalanceText(lines.join(' · '));
       } catch (error) {
         setWalletBalanceText(error?.message || 'Could not load wallet balance');
       }
+    }
+
+    function profileImageUrlFromProfile(profile) {
+      if (!profile || typeof profile !== 'object') return '';
+      const candidates = [
+        profile.img, profile.IMG, profile.image, profile.Image, profile.imageUrl, profile.ImageUrl,
+        profile.avatar, profile.Avatar, profile.pfp, profile.PFP, profile.photo, profile.Photo,
+        profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
+      ];
+      for (const candidate of candidates) {
+        const raw = cleanDisplayText(candidate || '', 300);
+        if (!raw) continue;
+        if (/^https?:\/\//i.test(raw)) return raw;
+        const parsed = extractIpfsPartsFromInput(raw);
+        if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
+      }
+      const serialized = JSON.stringify(profile);
+      const ipfsMatch = serialized.match(/IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^"'<>\s]+?\.(?:png|jpe?g|gif|webp|avif)))?/i);
+      if (!ipfsMatch) return '';
+      return buildIpfsPathUrl(ipfsMatch[1], normalize(ipfsMatch[2] || ''), 0);
     }
 
     async function refreshComposerProfileCard() {
@@ -1634,15 +1725,42 @@
         }
         const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
         const profileUrn = extractProfileUrn(resolvedProfile);
+        const imageUrl = profileImageUrlFromProfile(resolvedProfile);
         const bio = cleanDisplayText(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
           180
         );
+        const hometown = cleanDisplayText(
+          resolvedProfile?.loc || resolvedProfile?.LOC || resolvedProfile?.location || resolvedProfile?.Location || '',
+          90
+        );
         dom.composeProfileTitle.textContent = title;
         dom.composeProfileMeta.textContent = `${profileUrn || 'No profile URN'} · ${shortTitle(address, 30)}${bio ? ` · ${bio}` : ''}`;
+        if (dom.composeProfileExtra) {
+          const pieces = [];
+          if (hometown) pieces.push(`Location: ${hometown}`);
+          if (resolvedProfile?.website || resolvedProfile?.Website) {
+            pieces.push(cleanDisplayText(resolvedProfile.website || resolvedProfile.Website, 80));
+          }
+          dom.composeProfileExtra.textContent = pieces.join(' · ');
+        }
+        if (dom.composeProfileAvatar) {
+          if (imageUrl) {
+            dom.composeProfileAvatar.src = imageUrl;
+            dom.composeProfileAvatar.classList.add('visible');
+          } else {
+            dom.composeProfileAvatar.classList.remove('visible');
+            dom.composeProfileAvatar.removeAttribute('src');
+          }
+        }
       } catch {
         dom.composeProfileTitle.textContent = shortTitle(address, 48);
         dom.composeProfileMeta.textContent = 'No profile data found for this address';
+        if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+        if (dom.composeProfileAvatar) {
+          dom.composeProfileAvatar.classList.remove('visible');
+          dom.composeProfileAvatar.removeAttribute('src');
+        }
       }
     }
 
@@ -2234,6 +2352,8 @@
       dom.internalWalletSection.style.display = 'grid';
       const hasStored = Boolean(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY));
       const unlocked = Boolean(internalPrivKeyBytes);
+      const needsPasswordEntry = !unlocked;
+      if (dom.internalWalletNote) dom.internalWalletNote.style.display = needsPasswordEntry ? '' : 'none';
       if (dom.internalImportRow) dom.internalImportRow.style.display = !hasStored ? '' : 'none';
       if (dom.internalImportPwdRow) dom.internalImportPwdRow.style.display = !hasStored ? '' : 'none';
       if (dom.internalUnlockRow) dom.internalUnlockRow.style.display = hasStored && !unlocked ? '' : 'none';
@@ -4295,6 +4415,12 @@
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
+      if (dom.composeProfileAvatar) {
+        dom.composeProfileAvatar.addEventListener('error', () => {
+          dom.composeProfileAvatar.classList.remove('visible');
+          dom.composeProfileAvatar.removeAttribute('src');
+        });
+      }
       dom.attachmentInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
