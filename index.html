@@ -948,20 +948,14 @@
         <button type="button" id="composeCloseBtn" aria-label="Close composer">✕</button>
       </div>
       <div class="compose-grid">
-        <p class="compose-help">Choose a wallet, add a valid IPFS video link and a message, then Sign + Send via p2fk sendmany. The built-in wallet runs entirely in your browser.</p>
+        <p class="compose-help">This composer supports only the built-in testnet3 legacy wallet. Add an IPFS video link and message, then Sign + Send via p2fk sendmany.</p>
         <div class="compose-row">
-          <select id="walletProvider">
-            <option value="unisat">UniSat</option>
-            <option value="xverse">Xverse</option>
-            <option value="leather">Leather</option>
-            <option value="okx">OKX</option>
-          </select>
-          <button type="button" id="connectWalletBtn">Connect</button>
+          <button type="button" id="connectWalletBtn">Use built-in wallet</button>
         </div>
         <div class="internal-wallet-section" id="internalWalletSection">
-          <p class="internal-wallet-note">Keys are AES-256-GCM encrypted with your password and stored only in this browser — nothing is ever sent to any server.</p>
+          <p class="internal-wallet-note">Testnet3 legacy (m/n) only. Keys are AES-256-GCM encrypted with your password and stored only in this browser — nothing is ever sent to any server.</p>
           <div class="compose-row" id="internalImportRow">
-            <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet4)" />
+            <input id="internalWifInput" type="password" autocomplete="off" placeholder="WIF private key (testnet3)" />
             <button type="button" id="internalImportBtn">Import</button>
           </div>
           <div class="compose-row" id="internalImportPwdRow">
@@ -1030,7 +1024,6 @@
       waitingA11yText: document.getElementById('waitingA11yText'),
       composePanel: document.getElementById('composePanel'),
       composeCloseBtn: document.getElementById('composeCloseBtn'),
-      walletProvider: document.getElementById('walletProvider'),
       connectWalletBtn: document.getElementById('connectWalletBtn'),
       walletAddress: document.getElementById('walletAddress'),
       postRecipients: document.getElementById('postRecipients'),
@@ -1102,18 +1095,14 @@
     const P2FK_BASE_URL = 'https://p2fk.io';
     const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
     const P2FK_CHUNK_SIZE_BYTES = 20;
-    const P2FK_DEFAULT_VERSION_BYTE = 0;
+    const P2FK_DEFAULT_VERSION_BYTE = 0x6f;
     const P2FK_PADDING_CHAR = '#';
     const P2FK_SIGNATURE_VERSION_MARKER = '88';
     const WALLET_EXTENSIONS = [
-      { id: 'unisat', name: 'UniSat' },
-      { id: 'xverse', name: 'Xverse' },
-      { id: 'leather', name: 'Leather' },
-      { id: 'okx', name: 'OKX' },
-      { id: 'internal', name: '🔑 Built-in (testnet4)' }
+      { id: 'internal', name: '🔑 Built-in (testnet3 legacy)' }
     ];
     const INTERNAL_WALLET_STORAGE_KEY = 'suptv_iw_v1';
-    const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet4/api';
+    const MEMPOOL_TESTNET_API = 'https://mempool.space/testnet/api';
     const BTC_DUST_LIMIT_SAT = 546;         // P2PKH dust threshold in satoshis
     const BTC_DEFAULT_FEE_RATE = 10;        // sat/vbyte fallback when fee API is unreachable
     const BTC_MIN_FEE_RATE = 2;             // sat/vbyte absolute minimum
@@ -1510,19 +1499,7 @@
     }
 
     function populateWalletProviderOptions() {
-      if (!dom.walletProvider) return;
-      const fallbackWalletId = WALLET_EXTENSIONS.length ? WALLET_EXTENSIONS[0].id : '';
-      const selected = normalize(dom.walletProvider.value || fallbackWalletId || '');
-      dom.walletProvider.replaceChildren();
-      WALLET_EXTENSIONS.forEach(({ id, name }) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = name;
-        dom.walletProvider.appendChild(option);
-      });
-      dom.walletProvider.value = WALLET_EXTENSIONS.some((wallet) => wallet.id === selected)
-        ? selected
-        : fallbackWalletId;
+      walletSession.providerId = WALLET_EXTENSIONS[0]?.id || 'internal';
     }
 
     function setComposePanelOpen(open) {
@@ -1796,8 +1773,7 @@
 
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
-      // 0x80 = mainnet WIF prefix, 0xef = testnet WIF prefix
-      if (p[0] !== 0x80 && p[0] !== 0xef) throw new Error(`Unexpected WIF prefix 0x${p[0].toString(16)}`);
+      if (p[0] !== 0xef) throw new Error('Only testnet3 WIF keys are supported');
       if (p.length === 34) return p.slice(1, 33); // compressed key (version + 32 bytes + compression flag)
       if (p.length === 33) return p.slice(1);     // uncompressed key (version + 32 bytes)
       throw new Error('WIF key has unexpected length');
@@ -1828,14 +1804,22 @@
       return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(stored.iv) }, aesKey, new Uint8Array(stored.data)));
     }
 
+    async function decodeLegacyTestnetAddressPayload(address) {
+      const payload = await decodeBase58Check(normalize(address));
+      if (payload.length !== 21 || payload[0] !== 0x6f) {
+        throw new Error(`Address is not a valid testnet3 legacy address: ${cleanDisplayText(address, 64)}`);
+      }
+      return payload;
+    }
+
     // Bitcoin P2PKH raw transaction builder
     function buildP2pkhScript(hash160) {
       return new Uint8Array([0x76, 0xa9, 0x14, ...hash160, 0x88, 0xac]);
     }
 
     async function addrToScript(address) {
-      const p = await decodeBase58Check(address);
-      return buildP2pkhScript(p.slice(1));
+      const payload = await decodeLegacyTestnetAddressPayload(address);
+      return buildP2pkhScript(payload.slice(1));
     }
 
     function serializeBtcTx(inputs, outputs, sigIdx = -1, sigScript = null) {
@@ -1875,7 +1859,7 @@
       const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${walletSession.address}/utxo`);
       if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status})`);
       const allUtxos = (await utxoResp.json()).filter(u => u.status?.confirmed);
-      if (!allUtxos.length) throw new Error(`No confirmed UTXOs at ${walletSession.address} on testnet4`);
+      if (!allUtxos.length) throw new Error(`No confirmed UTXOs at ${walletSession.address} on testnet3`);
       let feeRate = BTC_DEFAULT_FEE_RATE;
       try {
         const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
@@ -1912,9 +1896,7 @@
 
     function renderInternalWalletUi() {
       if (!dom.internalWalletSection) return;
-      const isInternal = normalize(dom.walletProvider?.value) === 'internal';
-      dom.internalWalletSection.style.display = isInternal ? 'grid' : 'none';
-      if (!isInternal) return;
+      dom.internalWalletSection.style.display = 'grid';
       const hasStored = Boolean(localStorage.getItem(INTERNAL_WALLET_STORAGE_KEY));
       const unlocked = Boolean(internalPrivKeyBytes);
       if (dom.internalImportRow) dom.internalImportRow.style.display = !hasStored ? '' : 'none';
@@ -2004,106 +1986,22 @@
       return addresses;
     }
 
-    function getWalletProvider(providerId) {
-      if (providerId === 'unisat') return window.unisat || null;
-      if (providerId === 'xverse') return window.BitcoinProvider || window.XverseProviders?.BitcoinProvider || window.xverse?.bitcoin || null;
-      if (providerId === 'leather') return window.btc || window.LeatherProvider || null;
-      if (providerId === 'okx') return window.okxwallet?.bitcoin || window.okxwallet || null;
-      return null;
-    }
-
-    async function callProviderRequest(provider, method, params) {
-      if (!provider) return null;
-      if (typeof provider.request === 'function') {
-        try { return await provider.request({ method, params }); } catch (error) { console.debug('Wallet request style 1 failed', method, error); }
-        try { return await provider.request(method, params); } catch (error) { console.debug('Wallet request style 2 failed', method, error); }
-      }
-      return null;
-    }
-
-    function firstAddressFromValue(value) {
-      if (!value) return '';
-      if (typeof value === 'string') return normalize(value);
-      if (Array.isArray(value)) return firstAddressFromValue(value[0] || '');
-      if (typeof value === 'object') {
-        return normalize(
-          value.address
-          || value.paymentAddress
-          || value.ordinalsAddress
-          || value.accounts?.[0]
-          || value.result?.[0]
-          || value.result
-          || ''
-        );
-      }
-      return '';
-    }
-
     async function connectSelectedWallet() {
-      const providerId = normalize(dom.walletProvider?.value || '');
-      if (providerId === 'internal') {
-        if (!internalPrivKeyBytes) throw new Error('Import or unlock the built-in wallet using the fields above');
-        return walletSession;
-      }
-      const provider = getWalletProvider(providerId);
-      if (!provider) {
-        throw new Error(`${providerId || 'Selected'} wallet extension is not detected`);
-      }
-      let result = null;
-      if (typeof provider.requestAccounts === 'function') result = await provider.requestAccounts();
-      if (!result && typeof provider.connect === 'function') result = await provider.connect();
-      if (!result && typeof provider.enable === 'function') result = await provider.enable();
-      if (!result && typeof provider.getAccounts === 'function') result = await provider.getAccounts();
-      if (!result) result = await callProviderRequest(provider, 'requestAccounts', []);
-      if (!result) result = await callProviderRequest(provider, 'getAccounts', []);
-      const address = firstAddressFromValue(result);
-      if (!address) throw new Error('Could not read a connected address from the wallet');
-      walletSession = { providerId, provider, address };
+      if (!internalPrivKeyBytes) throw new Error('Import or unlock the built-in testnet3 wallet first');
+      const address = await privKeyToTestnetAddr(internalPrivKeyBytes);
+      walletSession = { providerId: 'internal', provider: null, address };
       dom.walletAddress.value = address;
       return walletSession;
     }
 
     async function signWithWallet(messageHashHex) {
-      if (walletSession.providerId === 'internal') {
-        if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
-        const { r, s } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
-        return bytesToHex(derEncode(r, s));
-      }
-      const provider = walletSession.provider;
-      if (!provider || !walletSession.address) throw new Error('Connect a wallet before signing');
-      if (typeof provider.signMessage === 'function') {
-        try { return await provider.signMessage(messageHashHex, 'ecdsa'); } catch (error) { console.debug('Wallet signMessage ecdsa failed', error); }
-        try { return await provider.signMessage(walletSession.address, messageHashHex); } catch (error) { console.debug('Wallet signMessage(address,message) failed', error); }
-        try { return await provider.signMessage(messageHashHex); } catch (error) { console.debug('Wallet signMessage(message) failed', error); }
-      }
-      const response = await callProviderRequest(provider, 'signMessage', [walletSession.address, messageHashHex])
-        || await callProviderRequest(provider, 'signMessage', { address: walletSession.address, message: messageHashHex })
-        || await callProviderRequest(provider, 'wallet_signMessage', { address: walletSession.address, message: messageHashHex });
-      const signature = normalize(
-        typeof response === 'string'
-          ? response
-          : response?.signature || response?.result || response?.sig || ''
-      );
-      if (!signature) throw new Error('Wallet did not return a signature');
-      return signature;
+      if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
+      const { r, s } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
+      return bytesToHex(derEncode(r, s));
     }
 
     async function sendManyWithWallet(outputs) {
-      if (walletSession.providerId === 'internal') {
-        return buildAndBroadcastInternalTx(outputs);
-      }
-      const provider = walletSession.provider;
-      if (!provider) throw new Error('Connect a wallet before sending');
-      if (typeof provider.sendMany === 'function') {
-        try { return await provider.sendMany(outputs); } catch (error) { console.debug('Wallet sendMany(outputs) failed', error); }
-        try { return await provider.sendMany({ outputs }); } catch (error) { console.debug('Wallet sendMany({outputs}) failed', error); }
-      }
-      const requestResult = await callProviderRequest(provider, 'sendMany', [outputs])
-        || await callProviderRequest(provider, 'sendMany', { outputs })
-        || await callProviderRequest(provider, 'wallet_sendMany', { recipients: outputs })
-        || await callProviderRequest(provider, 'sendmany', outputs);
-      if (requestResult) return requestResult;
-      throw new Error('Selected extension does not expose a sendmany method');
+      return buildAndBroadcastInternalTx(outputs);
     }
 
     function resolveTxidFromSendResult(result) {
@@ -2271,16 +2169,23 @@
       const recipients = await encodeP2fkAddresses(signedObj, P2FK_DEFAULT_VERSION_BYTE);
       const recipientSet = new Set(recipients);
 
+      await decodeLegacyTestnetAddressPayload(fromAddress);
+
       for (const keyword of parseHashtagKeywords(messageText)) {
         try {
           const keywordAddress = await getPublicAddressByKeyword(keyword);
-          if (keywordAddress) recipientSet.add(keywordAddress);
+          if (keywordAddress) {
+            await decodeLegacyTestnetAddressPayload(keywordAddress);
+            recipientSet.add(keywordAddress);
+          }
         } catch (error) {
           console.debug('Unable to encode keyword address', keyword, error);
         }
       }
       for (const address of extraRecipients) {
-        if (address && address !== fromAddress) recipientSet.add(address);
+        if (!address || address === fromAddress) continue;
+        await decodeLegacyTestnetAddressPayload(address);
+        recipientSet.add(address);
       }
       if (fromAddress) recipientSet.add(fromAddress);
       const recipientList = [...recipientSet];
@@ -2780,11 +2685,10 @@
     }
 
     async function onConnectWallet() {
-      setComposeStatus('Connecting wallet…');
+      setComposeStatus('Checking built-in wallet…');
       try {
         const session = await connectSelectedWallet();
-        const walletLabel = WALLET_EXTENSIONS.find((wallet) => wallet.id === session.providerId)?.name || session.providerId;
-        setComposeStatus(`Connected ${walletLabel} as ${shortTitle(session.address, 24)}`);
+        setComposeStatus(`Connected built-in testnet3 wallet as ${shortTitle(session.address, 24)}`);
       } catch (error) {
         setComposeStatus(error?.message || 'Wallet connection failed');
       }
@@ -2814,9 +2718,8 @@
         setComposeStatus('Write a message or add at least one attachment');
         return;
       }
-      const isInternal = walletSession.providerId === 'internal';
-      if (!walletSession.address || (!walletSession.provider && !isInternal)) {
-        setComposeStatus('Connect a wallet before sending');
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setComposeStatus('Import/unlock the built-in testnet3 wallet before sending');
         return;
       }
       const amountPerRecipient = Number(dom.sendAmount?.value || 0);
@@ -3983,7 +3886,6 @@
       });
       dom.composeCloseBtn.addEventListener('click', () => setComposePanelOpen(false));
       dom.connectWalletBtn.addEventListener('click', onConnectWallet);
-      dom.walletProvider.addEventListener('change', renderInternalWalletUi);
       dom.internalImportBtn.addEventListener('click', onInternalImport);
       dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
       dom.internalLockBtn.addEventListener('click', onInternalLock);

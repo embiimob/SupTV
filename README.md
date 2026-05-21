@@ -121,7 +121,7 @@ ${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}
 
 SupTV now includes a **Compose** panel (✎ in the top bar) so users can contribute posts that SupTV indexers can discover:
 
-1. Connect a supported browser extension wallet (UniSat, Xverse, Leather, OKX).
+1. Use the built-in wallet only (testnet3 legacy P2PKH): import/unlock a testnet3 WIF key in the composer.
 2. Write a post message with `#keywords`.
 3. Add one or more IPFS video links using either:
    - `IPFS:<cid>/<filename>.mp4` style URNs, or
@@ -131,4 +131,4 @@ SupTV now includes a **Compose** panel (✎ in the top bar) so users can contrib
    - build a DiscoBall-style p2fk payload,
    - sign the payload hash with the connected wallet,
    - encode it into p2fk chunk addresses,
-   - submit a `sendmany` request through the wallet extension.
+   - build/sign/broadcast a legacy testnet3 transaction directly in-browser.
