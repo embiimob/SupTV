@@ -24,6 +24,8 @@
       --panel: rgba(5, 8, 18, 0.62);
       --accent: #41d1ff;
       --accent-2: #b18fff;
+      --topbar-button-bg: linear-gradient(135deg, var(--accent), var(--accent-2));
+      --topbar-button-border: rgba(181, 223, 255, .55);
       --text: #f4f7ff;
       --muted: #a4b1d8;
       --swipe-tug-transition-ms: 180ms;
@@ -124,6 +126,20 @@
       text-underline-offset: .18rem;
       cursor: pointer;
     }
+    .brand .download-hint {
+      color: var(--muted);
+      font-size: .85rem;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      line-height: inherit;
+      opacity: .8;
+    }
+    .brand .download-hint:hover { opacity: 1; }
     .uncensored-tooltip {
       position: absolute;
       top: calc(100% - .15rem);
@@ -169,37 +185,34 @@
     }
 
     .controls button {
-      border: none;
+      border: 1px solid var(--topbar-button-border);
       border-radius: .7rem;
       padding: .65rem .9rem;
       color: #00131f;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      background: var(--topbar-button-bg);
       font-weight: 700;
-      font-size: 1.05rem;
+      font-size: 1.2rem;
       cursor: pointer;
       min-width: 2.6rem;
     }
 
     .controls .skip-inline {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
     }
 
     .controls .audio-toggle {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
       min-width: 3rem;
     }
 
     .controls .compose-inline {
-      background: rgba(13, 21, 41, .78);
-      color: #dbe7ff;
-      border: 1px solid rgba(132, 157, 217, .36);
-      font-weight: 700;
+      background: var(--topbar-button-bg);
+      color: #00131f;
+      border-color: var(--topbar-button-border);
     }
 
     .side-feed {
@@ -701,11 +714,20 @@
       min-width: 0;
     }
 
+    .compose-grid > * {
+      width: 100%;
+      max-width: 100%;
+    }
+
     .compose-row {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: .5rem;
       align-items: center;
+    }
+
+    .compose-row > * {
+      min-width: 0;
     }
 
     .compose-panel input,
@@ -1036,6 +1058,7 @@
       display: flex;
       align-items: center;
       overflow-wrap: anywhere;
+      min-width: 0;
     }
 
     @media (max-width: 920px) {
@@ -1084,9 +1107,21 @@
         min-width: 2.25rem;
         padding: .56rem .64rem;
         border-radius: .62rem;
-        font-size: .95rem;
+        font-size: 1.05rem;
       }
       .controls .audio-toggle { min-width: 2.55rem; }
+      #internalImportRow,
+      #internalUnlockRow,
+      .compose-attachment-row,
+      .compose-send-row {
+        grid-template-columns: 1fr;
+      }
+      #internalImportRow button,
+      #internalUnlockRow button,
+      .compose-attachment-row button,
+      .compose-send-row button {
+        width: 100%;
+      }
       .side-feed {
         right: .62rem;
         width: calc(100vw - 1.24rem);
@@ -1107,13 +1142,13 @@
       <div class="brand">
         <button type="button" class="brand-home" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b></button>
         <a class="uncensored-hint" id="uncensoredHint" href="https://github.com/embiimob/SUP" aria-describedby="uncensoredTooltip">uncensored</a>
+        <button type="button" class="download-hint" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
       </div>
       <form class="controls" id="searchForm" autocomplete="off">
-        <input id="query" type="text" placeholder="Search p2fk.io videos by keyword" />
+        <input id="query" type="text" placeholder="Search p2fk video by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
         <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
-        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
@@ -1201,7 +1236,7 @@
           </div>
         </div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
-        <div class="compose-row">
+        <div class="compose-row compose-attachment-row">
           <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
           <button type="button" id="addAttachmentBtn">Add</button>
         </div>
@@ -1210,7 +1245,7 @@
           <video id="composePreviewVideo" controls muted playsinline preload="metadata"></video>
         </div>
         <ul class="attachment-list" id="attachmentList"></ul>
-        <div class="compose-row">
+        <div class="compose-row compose-send-row">
           <div class="compose-estimate" id="sendEstimate">* Add an IPFS video attachment to see cost estimates.</div>
           <button type="button" id="sendPostBtn">Sign + Send</button>
         </div>
@@ -1741,10 +1776,99 @@
     const BTC_DECIMAL_PRECISION = 8;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
+    const MAX_URI_DECODE_ITERATIONS = 3; // Limits successive URI decoding iterations to unwrap percent-encoded IPFS links.
+    const MEDIA_QUERY_PARAM_NAMES = [
+      'filename', 'file', 'name', 'path', 'download', 'media', 'animation_url', 'animation',
+      'video', 'img', 'image', 'uri', 'url', 'artifact_uri', 'artifact', 'display_uri', 'display'
+    ];
 
     function setComposeStatus(message) {
       if (!dom.composeStatus) return;
       dom.composeStatus.textContent = cleanDisplayText(message || '', 240);
+    }
+
+    function decodeUriComponentSafely(value) {
+      const text = normalize(value);
+      if (!text) return '';
+      try {
+        return decodeURIComponent(text);
+      } catch {
+        return text;
+      }
+    }
+
+    function collectDecodedStringVariants(value) {
+      const variants = [];
+      let current = normalize(value);
+      let remainingDecodes = MAX_URI_DECODE_ITERATIONS;
+      while (remainingDecodes > 0 && current) {
+        variants.push(current);
+        const next = decodeUriComponentSafely(current);
+        if (!next || next === current) break;
+        current = next;
+        remainingDecodes -= 1;
+      }
+      return [...new Set(variants)];
+    }
+
+    function extractMediaPathFromUrlParts(parsed) {
+      if (!(parsed instanceof URL)) return '';
+      for (const key of MEDIA_QUERY_PARAM_NAMES) {
+        const exactValue = normalize(parsed.searchParams.get(key) || '');
+        if (exactValue) {
+          const decoded = decodeUriComponentSafely(exactValue).replace(/^\/+/, '');
+          const nestedIpfsPath = decoded.match(/ipfs:\/\/(?:ipfs\/)?[^/?#]+\/([^?#]+)/i)?.[1]
+            || decoded.match(/\/ipfs\/[^/?#]+\/([^?#]+)/i)?.[1]
+            || '';
+          if (nestedIpfsPath) return nestedIpfsPath.replace(/^\/+/, '');
+          if (decoded && !COMPOSER_CID_REGEX.test(decoded)) return decoded;
+        }
+      }
+      const hash = normalize(parsed.hash || '').replace(/^#/, '');
+      for (const variant of collectDecodedStringVariants(hash)) {
+        const tokenMatch = variant.match(/(?:^|[/?#=&])(filename|file|name|path)=([^&#]+)/i);
+        if (tokenMatch?.[2]) return decodeUriComponentSafely(tokenMatch[2]).replace(/^\/+/, '');
+      }
+      return '';
+    }
+
+    function buildLooseCidPathResult(cidRaw, pathRaw = '') {
+      const cid = normalize(cidRaw || '');
+      if (!COMPOSER_CID_REGEX.test(cid)) return null;
+      let path = normalize(pathRaw || '');
+      if (/^ipfs[:/]/i.test(path)) {
+        const nested = extractIpfsPartsFromInput(path);
+        if (nested?.cid) return nested;
+      }
+      path = decodeUriComponentSafely(path).replace(/^\/+/, '');
+      if (path && COMPOSER_CID_REGEX.test(path)) path = '';
+      return { cid, path };
+    }
+
+    function extractLooseIpfsPartsFromText(value) {
+      for (const variant of collectDecodedStringVariants(value)) {
+        if (!variant) continue;
+        const ipfsSchemeBody = variant.match(/ipfs:\/\/(?:ipfs\/)?([^?#]+)/i);
+        if (ipfsSchemeBody?.[1]) {
+          const ipfsLike = buildLooseCidPathResult(...(() => {
+            const [cidRaw, ...pathParts] = ipfsSchemeBody[1].split(/[\\/]+/).filter(Boolean);
+            return [cidRaw, pathParts.join('/')];
+          })());
+          if (ipfsLike?.cid) return ipfsLike;
+        }
+        const cidWithPath = variant.match(new RegExp(`${COMPOSER_CID_REGEX.source}(?:[\\\\/]+([^?#<>"'\\s]+))?`, 'i'));
+        if (cidWithPath?.[1]) {
+          let path = normalize(cidWithPath[2] || '');
+          if (!path) {
+            try {
+              path = extractMediaPathFromUrlParts(new URL(variant));
+            } catch {}
+          }
+          const loose = buildLooseCidPathResult(cidWithPath[1], path);
+          if (loose?.cid) return loose;
+        }
+      }
+      return null;
     }
 
     function setSendEstimate(message) {
@@ -2819,21 +2943,27 @@
         if (!COMPOSER_CID_REGEX.test(cid)) return null;
         return { cid, path: pathParts.join('/') };
       }
+      const looseDirect = extractLooseIpfsPartsFromText(input);
+      if (looseDirect?.cid) return looseDirect;
       let parsed;
       try {
         parsed = new URL(input);
       } catch {
-        return null;
+        return extractLooseIpfsPartsFromText(input);
       }
       const hostIpfsSplit = normalize(parsed.hostname).split('.ipfs.');
       if (hostIpfsSplit.length > 1 && COMPOSER_CID_REGEX.test(hostIpfsSplit[0])) {
         return { cid: hostIpfsSplit[0], path: normalize(parsed.pathname).replace(/^\/+/, '') };
       }
       const pathMatch = normalize(parsed.pathname).match(IPFS_PATH_URL_REGEX);
-      if (!pathMatch) return null;
-      const cid = normalize(pathMatch[1] || '');
-      if (!COMPOSER_CID_REGEX.test(cid)) return null;
-      return { cid, path: normalize(pathMatch[2] || '') };
+      if (pathMatch) {
+        const cid = normalize(pathMatch[1] || '');
+        if (!COMPOSER_CID_REGEX.test(cid)) return null;
+        return { cid, path: normalize(pathMatch[2] || '') };
+      }
+      const looseFromUrl = extractLooseIpfsPartsFromText(parsed.href);
+      if (looseFromUrl?.cid) return looseFromUrl;
+      return null;
     }
 
     function sanitizeVideoFilename(path, contentType = '') {
@@ -2876,7 +3006,7 @@
 
     async function verifyAndNormalizeIpfsVideoInput(rawInput) {
       const parsed = extractIpfsPartsFromInput(rawInput);
-      if (!parsed?.cid) throw new Error('Use IPFS:CID/file.mp4 or a gateway /ipfs/CID/file.mp4 URL');
+      if (!parsed?.cid) throw new Error('Use IPFS:CID/file.mp4, ipfs://CID/file.mp4, a gateway /ipfs/CID URL, or a CID-bearing link');
       const candidateUrls = [];
       if (parsed.path) {
         for (let i = 0; i < IPFS_GATEWAY_URLS.length; i += 1) candidateUrls.push(buildIpfsPathUrl(parsed.cid, parsed.path, i));
