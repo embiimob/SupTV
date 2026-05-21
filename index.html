@@ -1779,7 +1779,7 @@
     async function wifToPrivKeyBytes(wif) {
       const p = await decodeBase58Check(normalize(wif));
       // testnet3 uses 0xef for WIF-encoded private keys (distinct from 0x6f address version byte).
-      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF-encoded private keys are supported (expected WIF payload prefix 0xef, received 0x${p[0].toString(16)})`);
+      if (p[0] !== 0xef) throw new Error(`Only testnet3 WIF-encoded private keys are supported (expected WIF version byte 0xef, received 0x${p[0].toString(16)})`);
       if (p.length === 34) return p.slice(1, 33); // compressed WIF payload: version + 32-byte key + 0x01
       if (p.length === 33) return p.slice(1);     // uncompressed WIF payload: version + 32-byte key
       throw new Error('WIF key has unexpected length');
@@ -1795,7 +1795,7 @@
       const seedPrefix = new TextEncoder().encode(`${INTERNAL_CHANGE_DERIVATION_PREFIX}${normalize(derivationLabel)}:`);
       const baseScalar = bytesToBigInt(basePrivBytes);
       const counterBytes = new Uint8Array(4);
-      // A valid secp256k1 scalar is found almost immediately in practice; this loop is deterministic fallback-safe.
+      // A valid secp256k1 scalar is found almost immediately in practice; in the extreme edge case, this deterministic loop throws.
       for (let counter = 0; counter <= 0xffffffff; counter += 1) {
         counterBytes[0] = (counter >>> 24) & 0xff;
         counterBytes[1] = (counter >>> 16) & 0xff;
@@ -1943,7 +1943,7 @@
         const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
         feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
       } catch { /* use default */ }
-      // Estimated virtual size for legacy P2PKH: 10 bytes tx overhead + 148/input + 34/output.
+      // Estimated virtual size for legacy P2PKH (standard policy sizing): 10 bytes tx overhead + 148/input + 34/output.
       const estimateLegacyP2pkhFee = (inputsCount, outputsCount) => Math.ceil((10 + 148 * inputsCount + 34 * outputsCount) * feeRate);
       const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
       const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
@@ -2270,7 +2270,7 @@
 
     function buildP2fkUnsignedObject(messageText, attachments) {
       const delimiter = pickRandomDelimiter();
-      // Mirror DiscoBall message structure:
+      // Mirror legacy DiscoBall-compatible p2fk message structure:
       // "<delimiter><byteLength><delimiter><message><<attachment>>...<<negativeSalt>>"
       // negativeSalt is a random negative integer marker used to keep payload instances unique.
       // Use UTF-8 byte length (not JS character count) to match DiscoBall parsing behavior.
