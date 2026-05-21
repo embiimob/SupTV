@@ -1698,11 +1698,13 @@
     async function ecSign(privBytes, msgHashBytes) {
       const d = bytesToBigInt(privBytes), z = bytesToBigInt(msgHashBytes);
       const k = await rfc6979k(privBytes, msgHashBytes);
-      const [rx] = japToAff(...sMul(k));
+      const [rx, ry] = japToAff(...sMul(k));
       const r = sModN(rx);
       let s = sModN(sInv(k, SECP_N) * (z + r * d));
-      if (s > SECP_N / 2n) s = SECP_N - s; // BIP-62 low-S
-      return { r, s };
+      // recoveryId bit-0 = parity of R.y; bit-1 = whether rx overflowed n (extremely rare on secp256k1)
+      let recoveryId = Number(ry & 1n) | (rx >= SECP_N ? 2 : 0);
+      if (s > SECP_N / 2n) { s = SECP_N - s; recoveryId ^= 1; } // BIP-62 low-S
+      return { r, s, recoveryId };
     }
 
     // ASN.1 DER encoding for ECDSA signatures (Bitcoin legacy scriptSig format)
@@ -2118,8 +2120,14 @@
 
     async function signWithWallet(messageHashHex) {
       if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked');
-      const { r, s } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
-      return bytesToHex(derEncode(r, s));
+      const { r, s, recoveryId } = await ecSign(internalPrivKeyBytes, hexToBytes(messageHashHex));
+      // DiscoBall p2fk expects a compact 65-byte Bitcoin message signature encoded as base64:
+      // [recoveryByte (1), r (32), s (32)] where recoveryByte = 27 + 4 (compressed) + recoveryId
+      const compact = new Uint8Array(65);
+      compact[0] = 27 + 4 + recoveryId;
+      compact.set(bigIntToBytes32(r), 1);
+      compact.set(bigIntToBytes32(s), 33);
+      return btoa(String.fromCharCode.apply(null, compact));
     }
 
     async function sendManyWithWallet(outputs) {
