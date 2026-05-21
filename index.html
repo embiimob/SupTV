@@ -1803,11 +1803,13 @@
     function collectDecodedStringVariants(value) {
       const variants = [];
       let current = normalize(value);
-      for (let i = 0; i < MAX_URI_DECODE_ITERATIONS && current; i += 1) {
+      let remainingDecodes = MAX_URI_DECODE_ITERATIONS;
+      while (remainingDecodes > 0 && current) {
         variants.push(current);
         const next = decodeUriComponentSafely(current);
         if (!next || next === current) break;
         current = next;
+        remainingDecodes -= 1;
       }
       return [...new Set(variants)];
     }
@@ -1998,7 +2000,7 @@
       if (!(parsedUrl instanceof URL) || !/(\.|^)opensea\.io$/i.test(parsedUrl.hostname)) return null;
       const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
       if (pathParts[0] !== 'item' || pathParts.length < 4) return null;
-      const [_, chain, contract, tokenId] = pathParts;
+      const [, chain, contract, tokenId] = pathParts;
       if (!chain || !contract || !tokenId) return null;
       const payload = await fetchJsonCandidate(`https://api.opensea.io/api/v2/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contract)}/nfts/${encodeURIComponent(tokenId)}`);
       if (!payload) return null;
