@@ -126,6 +126,20 @@
       text-underline-offset: .18rem;
       cursor: pointer;
     }
+    .brand .download-hint {
+      color: var(--muted);
+      font-size: .85rem;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      line-height: inherit;
+      opacity: .8;
+    }
+    .brand .download-hint:hover { opacity: 1; }
     .uncensored-tooltip {
       position: absolute;
       top: calc(100% - .15rem);
@@ -177,7 +191,7 @@
       color: #00131f;
       background: var(--topbar-button-bg);
       font-weight: 700;
-      font-size: 1.05rem;
+      font-size: 1.2rem;
       cursor: pointer;
       min-width: 2.6rem;
     }
@@ -1093,7 +1107,7 @@
         min-width: 2.25rem;
         padding: .56rem .64rem;
         border-radius: .62rem;
-        font-size: .95rem;
+        font-size: 1.05rem;
       }
       .controls .audio-toggle { min-width: 2.55rem; }
       #internalImportRow,
@@ -1128,13 +1142,13 @@
       <div class="brand">
         <button type="button" class="brand-home" id="brandBtn" title="Back to trending" aria-label="Back to trending"><b>SupTV.io</b></button>
         <a class="uncensored-hint" id="uncensoredHint" href="https://github.com/embiimob/SUP" aria-describedby="uncensoredTooltip">uncensored</a>
+        <button type="button" class="download-hint" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
       </div>
       <form class="controls" id="searchForm" autocomplete="off">
         <input id="query" type="text" placeholder="Search p2fk video by keyword" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
         <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
-        <button type="button" class="download-inline" id="downloadBtn" title="Download index.html" aria-label="Download index.html">⬇</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
         <button type="button" class="skip-inline" id="skipInlineBtn" title="Skip video" aria-label="Skip video">⏭</button>
       </form>
