@@ -76,7 +76,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 ### p2fk API (read/search/trending)
 
 | Endpoint | Purpose in SupTV |
-|---|---|
+| --- | --- |
 | `GET /GetTrendingRootSearches?qty=<n>` | Fetches trending search terms + stats used for trending UI and queue seed keywords. |
 | `GET /GetPublicAddressByKeyword/<keyword>?mainnet=false` | Resolves keyword-channel address for that keyword. |
 | `GET /GetPublicMessagesByAddress/<address>?skip=<n>&qty=<n>&mainnet=false` | Pulls public channel messages for keyword/address timelines. |
@@ -87,7 +87,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 `MEMPOOL_TESTNET_API` default: `https://mempool.space/testnet/api`
 
 | Endpoint | Purpose in SupTV |
-|---|---|
+| --- | --- |
 | `GET /address/<addr>` | Reads confirmed/unconfirmed balance stats for composer wallet panels. |
 | `GET /address/<addr>/utxo` | Fetches spendable UTXOs for main + derived change addresses. |
 | `GET /v1/fees/recommended` | Gets fee estimates (falls back to default fee rate if unavailable). |
@@ -96,7 +96,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 ### IPFS/gateway checks
 
 | Behavior | Purpose in SupTV |
-|---|---|
+| --- | --- |
 | `HEAD` request to candidate gateway URL | Validates that an attachment URL/URN resolves and is reachable before adding to post. |
 
 ## Key configuration constants
@@ -104,6 +104,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 In `index.html`, adjust:
 
 - `P2FK_BASE_URL` (default: `https://p2fk.io`)
+- `USE_P2FK_MAINNET` (default: `false`, intended for testnet3 flow)
 - `MEMPOOL_TESTNET_API` (default: `https://mempool.space/testnet/api`)
 - `TRENDING_STATS_LIMIT` (default: `100`)
 - `TRENDING_SEARCH_QTY` (default: `200`)
