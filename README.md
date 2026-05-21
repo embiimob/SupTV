@@ -4,7 +4,7 @@ SupTV is a local-first, single-file web app (`index.html`) for discovering, play
 
 - p2fk.io: https://p2fk.io  
 - SupTV repository: https://github.com/embiimob/SupTV  
-- Live demo: https://supgalaxy.org/TV
+- Live demo: https://supTV.io
 
 SupTV is software you run yourself, not a hosted streaming company.
 
