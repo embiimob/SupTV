@@ -1460,6 +1460,7 @@
     let composeEstimateRefreshTimer = null;
     let composeEstimateRequestId = 0;
     let composeProfileAvatarCandidateUrls = [];
+    let composeProfileAvatarCandidateIndex = 0;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1886,6 +1887,7 @@
       dom.composeProfileMeta.textContent = '';
       if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
       composeProfileAvatarCandidateUrls = [];
+      composeProfileAvatarCandidateIndex = 0;
       if (dom.composeProfileAvatar) {
         dom.composeProfileAvatar.classList.remove('visible');
         dom.composeProfileAvatar.removeAttribute('src');
@@ -2052,27 +2054,28 @@
       return [...new Set(urls)];
     }
 
+    function applyComposeProfileAvatarCandidate() {
+      if (!dom.composeProfileAvatar) return;
+      dom.composeProfileAvatar.classList.remove('visible');
+      const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex] || '';
+      if (!nextUrl) {
+        dom.composeProfileAvatar.removeAttribute('src');
+        return;
+      }
+      dom.composeProfileAvatar.src = nextUrl;
+    }
+
     function setComposeProfileAvatarCandidates(urls) {
       composeProfileAvatarCandidateUrls = Array.isArray(urls)
         ? urls.map((url) => normalize(url)).filter(Boolean)
         : [];
-      if (!dom.composeProfileAvatar) return;
-      dom.composeProfileAvatar.classList.remove('visible');
-      if (!composeProfileAvatarCandidateUrls.length) {
-        dom.composeProfileAvatar.removeAttribute('src');
-        return;
-      }
-      dom.composeProfileAvatar.src = composeProfileAvatarCandidateUrls.shift();
+      composeProfileAvatarCandidateIndex = 0;
+      applyComposeProfileAvatarCandidate();
     }
 
     function advanceComposeProfileAvatarCandidate() {
-      if (!dom.composeProfileAvatar) return;
-      dom.composeProfileAvatar.classList.remove('visible');
-      if (!composeProfileAvatarCandidateUrls.length) {
-        dom.composeProfileAvatar.removeAttribute('src');
-        return;
-      }
-      dom.composeProfileAvatar.src = composeProfileAvatarCandidateUrls.shift();
+      composeProfileAvatarCandidateIndex += 1;
+      applyComposeProfileAvatarCandidate();
     }
 
     async function refreshComposerProfileCard() {
