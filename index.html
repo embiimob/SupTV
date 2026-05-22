@@ -812,6 +812,12 @@
       overflow-wrap: anywhere;
     }
 
+    .compose-status a {
+      color: #97ccff;
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
     .compose-preview {
       border: 1px solid rgba(122, 149, 216, .2);
       border-radius: .52rem;
@@ -3462,6 +3468,16 @@
       return index > 0 && index <= PRELOAD_COUNT ? 'downloading' : 'queued';
     }
 
+    function statusLabel(status) {
+      switch (status) {
+        case 'playing': return '▶️';
+        case 'downloading': return '⏳';
+        case 'ready': return '✅';
+        case 'error': return '❌';
+        default: return '🕐';
+      }
+    }
+
     function tickerViewportWidth() {
       return dom.ticker.parentElement?.clientWidth || window.innerWidth || 0;
     }
@@ -3508,7 +3524,7 @@
     function updateTicker(items = playQueue, keyword = currentKeyword) {
       const statusCards = items.slice(0, PRELOAD_COUNT + 1).map((item, idx) => {
         const marker = idx === 0 ? '▶' : `${idx + 1}`;
-        return `${marker} ${shortTitle(item.title, 28)} • ${statusForItem(item, idx).toUpperCase()}`;
+        return `${marker} ${shortTitle(item.title, 28)} • ${statusLabel(statusForItem(item, idx))}`;
       });
       const probeWindow = items.slice(0, PRELOAD_COUNT + 1);
       const probingCount = probeWindow.reduce((count, item, idx) => {
@@ -3552,7 +3568,7 @@
           li.textContent = cleanDisplayText(item?.title || 'Queued video');
           const meta = document.createElement('span');
           meta.className = 'banner-queue-item-meta';
-          meta.textContent = `#${queueIndex + 1} • ${statusForItem(item, queueIndex).toUpperCase()}`;
+          meta.textContent = `#${queueIndex + 1} • ${statusLabel(statusForItem(item, queueIndex))}`;
           li.appendChild(meta);
           const showItemCard = () => showQueueVideoMessageCard(item, queueIndex);
           li.addEventListener('click', showItemCard);
@@ -3703,7 +3719,20 @@
           throw new Error(`Broadcast failed: ${errText}`);
         }
         const txid = (await bcast.text()).trim() || 'pending';
-        setComposeStatus(`Consolidated ${sendSat.toLocaleString()} sat to ${shortTitle(keyring.main.address, 20)} · tx ${shortTitle(txid, 20)}`);
+        const txUrl = txid !== 'pending' ? `https://mempool.space/testnet/tx/${txid}` : null;
+        if (dom.composeStatus) {
+          const prefix = `Consolidated ${sendSat.toLocaleString()} sat to ${shortTitle(keyring.main.address, 20)} · tx `;
+          if (txUrl) {
+            const link = document.createElement('a');
+            link.href = txUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = shortTitle(txid, 20);
+            dom.composeStatus.replaceChildren(document.createTextNode(prefix), link);
+          } else {
+            dom.composeStatus.textContent = prefix + shortTitle(txid, 20);
+          }
+        }
         syncComposerWalletContext();
       } catch (error) {
         setComposeStatus(error?.message || 'Unable to consolidate change');
@@ -3734,13 +3763,25 @@
         setComposeStatus(`${outputs.length} outputs · ${cost.toFixed(BTC_DECIMAL_PRECISION)} BTC (${costSats.toLocaleString()} sat) + fee — signing…`);
         const sendResult = await sendManyWithWallet(outputs);
         const txid = resolveTxidFromSendResult(sendResult) || 'pending';
+        const txUrl = txid !== 'pending' ? `https://mempool.space/testnet/tx/${txid}` : null;
         setStatus(`Post broadcast: ${txid}`);
         addMessage({
           title: 'Post broadcast',
           meta: `writer · ${shortTitle(walletSession.address, 18)}`,
-          body: `Sent p2fk post in ${outputs.length} outputs. txid: ${txid}`
+          body: `Sent p2fk post in ${outputs.length} outputs. txid: ${txid}${txUrl ? ` — ${txUrl}` : ''}`
         });
-        setComposeStatus(`✓ ${txid}`);
+        if (dom.composeStatus) {
+          if (txUrl) {
+            const link = document.createElement('a');
+            link.href = txUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = txid;
+            dom.composeStatus.replaceChildren(document.createTextNode('✓ '), link);
+          } else {
+            dom.composeStatus.textContent = `✓ ${txid}`;
+          }
+        }
         if (dom.postMessage) dom.postMessage.value = '';
         composerAttachments = [];
         renderComposerAttachments();
@@ -3885,7 +3926,7 @@
       const hasMessage = Boolean(body || (Array.isArray(item.links) && item.links.length) || item.imageUrl);
       if (!hasMessage) return;
       const creator = item.from ? shortTitle(item.from, 18) : 'p2fk';
-      const status = statusForItem(item, queueIndex).toUpperCase();
+      const status = statusLabel(statusForItem(item, queueIndex));
       const card = createSocialCard({
         title: `Queued: ${item.title || 'Video'}`,
         meta: `#${queueIndex + 1} • ${status} • ${creator}${item.createdAt ? ` · ${formatUtcDate(item.createdAt)}` : ''}`,
