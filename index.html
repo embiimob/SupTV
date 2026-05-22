@@ -828,6 +828,10 @@
       display: none;
       gap: .36rem;
       overflow: hidden;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .compose-preview.visible {
@@ -841,7 +845,9 @@
     }
 
     .compose-preview video {
-      width: min(100%, 260px);
+      width: 100%;
+      max-width: 260px;
+      min-width: 0;
       max-height: 146px;
       border-radius: .44rem;
       background: #000;
@@ -1141,6 +1147,7 @@
         gap: .28rem;
       }
       .compose-preview video {
+        max-width: 100%;
         max-height: var(--compose-mobile-preview-video-height);
       }
       .side-feed {
