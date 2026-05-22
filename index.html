@@ -1778,6 +1778,7 @@
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
+    const PROFILE_IMAGE_MAX_CANDIDATE_URLS = 24;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
     const MAX_URI_DECODE_ITERATIONS = 3; // Limits successive URI decoding iterations to unwrap percent-encoded IPFS links.
@@ -2051,11 +2052,12 @@
           }
         }
       }
-      return [...new Set(urls)];
+      return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
     }
 
     function applyComposeProfileAvatarCandidate() {
       if (!dom.composeProfileAvatar) return;
+      // Keep avatar hidden until a candidate successfully loads and emits "load".
       dom.composeProfileAvatar.classList.remove('visible');
       const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex] || '';
       if (!nextUrl) {
@@ -2074,6 +2076,11 @@
     }
 
     function advanceComposeProfileAvatarCandidate() {
+      if (composeProfileAvatarCandidateIndex + 1 >= composeProfileAvatarCandidateUrls.length) {
+        composeProfileAvatarCandidateIndex = composeProfileAvatarCandidateUrls.length;
+        applyComposeProfileAvatarCandidate();
+        return;
+      }
       composeProfileAvatarCandidateIndex += 1;
       applyComposeProfileAvatarCandidate();
     }
