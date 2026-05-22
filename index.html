@@ -1779,7 +1779,8 @@
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
     // Cap fallback attempts to keep profile-card image retries bounded across noisy profile payloads.
-    // Allow room for several candidate fields, each expanded across all configured IPFS gateways.
+    // Allow room for several candidate fields (up to ~6 image-like values in mixed profile payloads),
+    // each expanded across all configured IPFS gateways.
     const PROFILE_IMAGE_MAX_CANDIDATE_URLS = Math.max(IPFS_GATEWAY_URLS.length * 6, 12);
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
