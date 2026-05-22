@@ -1780,7 +1780,8 @@
     const BTC_DECIMAL_PRECISION = 8;
     // Cap fallback attempts to keep profile-card image retries bounded across noisy profile payloads.
     // Allow room for several candidate fields (up to ~6 image-like values in mixed profile payloads),
-    // each expanded across all configured IPFS gateways.
+    // each expanded across all configured IPFS gateways, with a floor of 12 so small gateway lists still
+    // get more than one full pass across likely image fields.
     const PROFILE_IMAGE_MAX_CANDIDATE_URLS = Math.max(IPFS_GATEWAY_URLS.length * 6, 12);
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
@@ -2071,11 +2072,14 @@
       if (!dom.composeProfileAvatar) return;
       // Keep avatar hidden until a candidate successfully loads and emits "load".
       dom.composeProfileAvatar.classList.remove('visible');
-      const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex] || '';
-      if (!nextUrl) {
+      if (
+        composeProfileAvatarCandidateIndex < 0
+        || composeProfileAvatarCandidateIndex >= composeProfileAvatarCandidateUrls.length
+      ) {
         dom.composeProfileAvatar.removeAttribute('src');
         return;
       }
+      const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex];
       dom.composeProfileAvatar.src = nextUrl;
     }
 
