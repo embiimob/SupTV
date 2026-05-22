@@ -2058,6 +2058,15 @@
       return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
     }
 
+    function profileImageCandidateUrlsFromProfiles(...profiles) {
+      const urls = [];
+      for (const profile of profiles) {
+        urls.push(...profileImageCandidateUrlsFromProfile(profile));
+        if (urls.length >= PROFILE_IMAGE_MAX_CANDIDATE_URLS) break;
+      }
+      return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
+    }
+
     function applyComposeProfileAvatarCandidate() {
       if (!dom.composeProfileAvatar) return;
       // Keep avatar hidden until a candidate successfully loads and emits "load".
@@ -2112,7 +2121,7 @@
         }
         const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
         const profileUrn = cleanDisplayText(extractProfileUrn(resolvedProfile), 120);
-        const imageUrls = profileImageCandidateUrlsFromProfile(resolvedProfile);
+        const imageUrls = profileImageCandidateUrlsFromProfiles(resolvedProfile, byAddress);
         const bio = cleanAndCollapseWhitespace(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
           260
