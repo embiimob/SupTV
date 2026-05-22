@@ -64,7 +64,8 @@
       border: 1px solid rgba(137, 166, 232, .16);
       box-shadow: inset 0 0 0 2px rgba(130, 167, 255, .06), inset 0 0 120px rgba(41, 95, 205, .15);
       --swipe-tug-x: 0px;
-      transform: translate3d(var(--swipe-tug-x), 0, 0);
+      --swipe-tug-y: 0px;
+      transform: translate3d(var(--swipe-tug-x), var(--swipe-tug-y), 0);
       transition: transform var(--swipe-tug-transition-ms) ease;
     }
 
@@ -1428,19 +1429,19 @@
     ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|avi|m3u8))/i;
-    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+))?/i;
+    const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{59}|[a-zA-Z0-9]{46})(?:[\\/]+([^\s<>]+))?/i;
     const DIRECT_VIDEO_REGEX = /(https?:\/\/[^\s<>"']+\.(mp4|webm|ogv|mov|avi|m3u8)(\?[^\s<>"']*)?)/i;
     const IMAGE_URL_REGEX = /(https?:\/\/[^\s<>"']+\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?)/i;
     const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]{1,}\.)+[a-z]{2,}(?:\/[^\s<>"']*)?\b)/gi;
     const KEYWORD_REGEX = /#([a-zA-Z0-9_-]{2,32})/g;
-    const IPFS_TOKEN_PATTERN_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>"']+))?/;
+    const IPFS_TOKEN_PATTERN_REGEX = /IPFS:([a-zA-Z0-9]{59}|[a-zA-Z0-9]{46})(?:[\\/]+([^\s<>"']+))?/;
     const IPFS_TOKEN_REGEX = new RegExp(IPFS_TOKEN_PATTERN_REGEX.source, 'gi');
     const LINK_OR_IPFS_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})`, 'gi');
     const INLINE_TOKEN_REGEX = new RegExp(`(${IPFS_TOKEN_PATTERN_REGEX.source})|(${URL_REGEX.source})|(${KEYWORD_REGEX.source})`, 'gi');
     const IPFS_TOKEN_PARSER_REGEX = new RegExp(`^${IPFS_TOKEN_PATTERN_REGEX.source}$`, 'i');
     const HASHTAG_TOKEN_PARSER_REGEX = new RegExp(`^${KEYWORD_REGEX.source}$`, 'i');
     const URL_TRAILING_PUNCTUATION_REGEX = /[.,;]+$/;
-    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
+    const IPFS_IMAGE_REGEX = /IPFS:([a-zA-Z0-9]{59}|[a-zA-Z0-9]{46})(?:[\\/]+([^\s<>]+\.(png|jpe?g|gif|webp|avif)))?/i;
     const STATUS_URL_MAX_LENGTH = 34;
     const MESSAGE_URL_MAX_LENGTH = 34;
     const MESSAGE_BODY_MAX_LENGTH = 4000;
@@ -1604,14 +1605,26 @@
     const tryNextIpfsGateway = (item) => {
       if (!item?.hash) return null;
       const currentIndex = Number.isInteger(item.gatewayIndex) ? item.gatewayIndex : 0;
+      const oldUrl = item.url;
+
+      if (item.originalPath && !item.triedPath) {
+        item.triedPath = true;
+        item.path = item.originalPath;
+        const nextUrl = buildIpfsPathUrl(item.hash, item.path, currentIndex);
+        item.url = nextUrl;
+        return { oldUrl, nextUrl, nextIndex: currentIndex, isPathFallback: true };
+      }
+
       if (currentIndex >= IPFS_GATEWAY_RETRY_LIMIT) return null;
       const nextIndex = currentIndex + 1;
       if (nextIndex >= IPFS_GATEWAY_URLS.length) return null;
-      const oldUrl = item.url;
-      const nextUrl = buildIpfsPathUrl(item.hash, item.path || '', nextIndex);
+
+      item.path = '';
+      item.triedPath = false;
+      const nextUrl = buildIpfsPathUrl(item.hash, item.path, nextIndex);
       item.gatewayIndex = nextIndex;
       item.url = nextUrl;
-      return { oldUrl, nextUrl, nextIndex };
+      return { oldUrl, nextUrl, nextIndex, isPathFallback: false };
     };
     const claimStreamRetry = (url) => {
       const cleanUrl = normalize(url);
@@ -1642,7 +1655,7 @@
     const splitInlineIpfsSuffix = (value) => {
       const text = normalize(value);
       if (!text) return { primary: '', suffix: '' };
-      const inlineIpfsIndex = text.search(/IPFS:(?:[a-zA-Z0-9]{46}|[a-zA-Z0-9]{59})/i);
+      const inlineIpfsIndex = text.search(/IPFS:(?:[a-zA-Z0-9]{59}|[a-zA-Z0-9]{46})/i);
       if (inlineIpfsIndex <= 0) return { primary: text, suffix: '' };
       return {
         primary: text.slice(0, inlineIpfsIndex),
@@ -3434,6 +3447,7 @@
           const { ipfsMatch, fileMatch, valid } = isValidIpfsVideoMessage(messageText);
           if (!valid) return null;
           const hash = ipfsMatch[1];
+          const originalPath = normalize(ipfsMatch[2] || '');
           const sourcePath = normalize(fileMatch[1] || '');
           const filename = stripPathParts(sourcePath).trim();
           const url = buildIpfsPathUrl(hash, '', 0);
@@ -3451,6 +3465,8 @@
               createdAt: messageBlockDate(root),
               hash,
               path: '',
+              originalPath,
+              triedPath: false,
               gatewayIndex: 0,
               subject: cleanDisplayText(normalize(root?.Subject || root?.subject || '')),
               imageUrl: extractImageUrl(messageText),
@@ -4866,12 +4882,23 @@
         const gatewayFallback = tryNextIpfsGateway(activeItem);
         if (gatewayFallback) {
           moveStatusToNewUrl(gatewayFallback.oldUrl, gatewayFallback.nextUrl, 'downloading');
-          showWaiting('Switching IPFS gateway…');
-          addMessage({
-            title: 'Gateway fallback',
-            meta: 'player',
-            body: `Switching stream to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
-          });
+
+          if (gatewayFallback.isPathFallback) {
+            showWaiting('Trying alternate path…');
+            addMessage({
+              title: 'Path fallback',
+              meta: 'player',
+              body: `Trying alternate path for current gateway`
+            });
+          } else {
+            showWaiting('Switching IPFS gateway…');
+            addMessage({
+              title: 'Gateway fallback',
+              meta: 'player',
+              body: `Switching stream to ${formatGatewayFallbackLabel(gatewayFallback.nextIndex)}`
+            });
+          }
+
           playCurrent();
           return;
         }
@@ -5058,6 +5085,7 @@
         if (animate) dom.app.classList.add('swipe-tug-release');
         else dom.app.classList.remove('swipe-tug-release');
         dom.app.style.setProperty('--swipe-tug-x', '0px');
+        dom.app.style.setProperty('--swipe-tug-y', '0px');
         if (animate) {
           swipeTugResetTimeoutId = window.setTimeout(() => {
             dom.app.classList.remove('swipe-tug-release');
@@ -5065,19 +5093,35 @@
           }, swipeTugReleaseMs());
         }
       };
-      const applySwipeTug = (deltaX, deltaY, ignoreSwipe) => {
-        if (ignoreSwipe || deltaY > SWIPE_SKIP_MAX_Y_PX || deltaX > 0) {
+      const applySwipeTug = (deltaX, rawDeltaY, ignoreSwipe) => {
+        const absDeltaY = Math.abs(rawDeltaY);
+        const absDeltaX = Math.abs(deltaX);
+        const isLeftSwipe = deltaX < 0 && absDeltaY <= SWIPE_SKIP_MAX_Y_PX;
+        const isUpSwipe = rawDeltaY < 0 && absDeltaX <= SWIPE_SKIP_MAX_Y_PX;
+
+        if (ignoreSwipe || (!isLeftSwipe && !isUpSwipe)) {
           clearSwipeTug(false);
           return;
         }
-        const distance = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, -deltaX * SWIPE_TUG_DAMPING_FACTOR));
-        if (distance < SWIPE_TUG_START_X_PX) {
+
+        let distanceX = 0;
+        let distanceY = 0;
+
+        if (isLeftSwipe) {
+          distanceX = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, -deltaX * SWIPE_TUG_DAMPING_FACTOR));
+        } else if (isUpSwipe) {
+          distanceY = Math.min(SWIPE_TUG_MAX_X_PX, Math.max(0, -rawDeltaY * SWIPE_TUG_DAMPING_FACTOR));
+        }
+
+        if (distanceX < SWIPE_TUG_START_X_PX && distanceY < SWIPE_TUG_START_X_PX) {
           clearSwipeTug(false);
           return;
         }
+
         dom.app.classList.remove('swipe-tug-release');
         dom.app.classList.add('swipe-tugging');
-        dom.app.style.setProperty('--swipe-tug-x', `${-distance}px`);
+        dom.app.style.setProperty('--swipe-tug-x', `${-distanceX}px`);
+        dom.app.style.setProperty('--swipe-tug-y', `${-distanceY}px`);
       };
       dom.app.addEventListener('touchstart', (event) => {
         if (!event.changedTouches?.length) return;
@@ -5093,16 +5137,23 @@
         if (!event.changedTouches?.length || !lastTouchPointer) return;
         const touch = event.changedTouches[0];
         const deltaX = touch.clientX - lastTouchPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
-        applySwipeTug(deltaX, deltaY, lastTouchPointer.ignoreSwipe);
+        const rawDeltaY = touch.clientY - lastTouchPointer.y;
+        applySwipeTug(deltaX, rawDeltaY, lastTouchPointer.ignoreSwipe);
       }, { passive: true });
       dom.app.addEventListener('touchend', (event) => {
         if (!event.changedTouches?.length || !lastTouchPointer) return;
         const touch = event.changedTouches[0];
         const deltaX = touch.clientX - lastTouchPointer.x;
-        const deltaY = Math.abs(touch.clientY - lastTouchPointer.y);
+        const rawDeltaY = touch.clientY - lastTouchPointer.y;
+        const absDeltaY = Math.abs(rawDeltaY);
+        const absDeltaX = Math.abs(deltaX);
+
         clearSwipeTug(true);
-        if (!lastTouchPointer.ignoreSwipe && deltaX < -SWIPE_SKIP_MIN_X_PX && deltaY < SWIPE_SKIP_MAX_Y_PX) {
+
+        const isLeftSwipeSkip = deltaX < -SWIPE_SKIP_MIN_X_PX && absDeltaY < SWIPE_SKIP_MAX_Y_PX;
+        const isUpSwipeSkip = rawDeltaY < -SWIPE_SKIP_MIN_X_PX && absDeltaX < SWIPE_SKIP_MAX_Y_PX;
+
+        if (!lastTouchPointer.ignoreSwipe && (isLeftSwipeSkip || isUpSwipeSkip)) {
           trashCurrentVideo();
         }
         lastTouchPointer = null;
