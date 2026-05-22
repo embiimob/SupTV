@@ -1459,6 +1459,7 @@
     let walletBalanceState = null;
     let composeEstimateRefreshTimer = null;
     let composeEstimateRequestId = 0;
+    let composeProfileAvatarCandidateUrls = [];
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1884,6 +1885,7 @@
       dom.composeProfileTitle.textContent = '';
       dom.composeProfileMeta.textContent = '';
       if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+      composeProfileAvatarCandidateUrls = [];
       if (dom.composeProfileAvatar) {
         dom.composeProfileAvatar.classList.remove('visible');
         dom.composeProfileAvatar.removeAttribute('src');
@@ -2025,24 +2027,52 @@
       return collected;
     }
 
-    function profileImageUrlFromProfile(profile) {
-      if (!profile || typeof profile !== 'object') return '';
+    function profileImageCandidateUrlsFromProfile(profile) {
+      if (!profile || typeof profile !== 'object') return [];
       const directCandidates = [
         profile.img, profile.IMG, profile.image, profile.Image, profile.imageUrl, profile.ImageUrl,
         profile.avatar, profile.Avatar, profile.pfp, profile.PFP, profile.photo, profile.Photo,
         profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
       ];
-      const candidates = [
+      const rawCandidates = [
         ...directCandidates.map((candidate) => normalizeProfileImageCandidate(candidate)).filter(Boolean),
         ...scanNestedProfileImageStrings(profile)
       ];
-      for (const raw of [...new Set(candidates)]) {
+      const urls = [];
+      for (const raw of [...new Set(rawCandidates)]) {
         if (!raw) continue;
-        if (/^https?:\/\//i.test(raw)) return raw;
+        if (/^https?:\/\//i.test(raw)) urls.push(raw);
         const parsed = extractIpfsPartsFromInput(raw);
-        if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
+        if (parsed?.cid) {
+          for (let gatewayIndex = 0; gatewayIndex < IPFS_GATEWAY_URLS.length; gatewayIndex += 1) {
+            urls.push(buildIpfsPathUrl(parsed.cid, parsed.path || '', gatewayIndex));
+          }
+        }
       }
-      return '';
+      return [...new Set(urls)];
+    }
+
+    function setComposeProfileAvatarCandidates(urls) {
+      composeProfileAvatarCandidateUrls = Array.isArray(urls)
+        ? urls.map((url) => normalize(url)).filter(Boolean)
+        : [];
+      if (!dom.composeProfileAvatar) return;
+      dom.composeProfileAvatar.classList.remove('visible');
+      if (!composeProfileAvatarCandidateUrls.length) {
+        dom.composeProfileAvatar.removeAttribute('src');
+        return;
+      }
+      dom.composeProfileAvatar.src = composeProfileAvatarCandidateUrls.shift();
+    }
+
+    function advanceComposeProfileAvatarCandidate() {
+      if (!dom.composeProfileAvatar) return;
+      dom.composeProfileAvatar.classList.remove('visible');
+      if (!composeProfileAvatarCandidateUrls.length) {
+        dom.composeProfileAvatar.removeAttribute('src');
+        return;
+      }
+      dom.composeProfileAvatar.src = composeProfileAvatarCandidateUrls.shift();
     }
 
     async function refreshComposerProfileCard() {
@@ -2068,7 +2098,7 @@
         }
         const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
         const profileUrn = cleanDisplayText(extractProfileUrn(resolvedProfile), 120);
-        const imageUrl = profileImageUrlFromProfile(resolvedProfile);
+        const imageUrls = profileImageCandidateUrlsFromProfile(resolvedProfile);
         const bio = cleanAndCollapseWhitespace(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
           260
@@ -2090,21 +2120,14 @@
           dom.composeProfileExtra.textContent = pieces.join(' · ');
         }
         if (dom.composeProfileAvatar) {
-          if (imageUrl) {
-            dom.composeProfileAvatar.classList.remove('visible');
-            dom.composeProfileAvatar.src = imageUrl;
-          } else {
-            dom.composeProfileAvatar.classList.remove('visible');
-            dom.composeProfileAvatar.removeAttribute('src');
-          }
+          setComposeProfileAvatarCandidates(imageUrls);
         }
       } catch {
         dom.composeProfileTitle.textContent = shortTitle(address, 30);
         dom.composeProfileMeta.textContent = 'No profile found';
         if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
         if (dom.composeProfileAvatar) {
-          dom.composeProfileAvatar.classList.remove('visible');
-          dom.composeProfileAvatar.removeAttribute('src');
+          setComposeProfileAvatarCandidates([]);
         }
       }
     }
@@ -4841,8 +4864,7 @@
           dom.composeProfileAvatar.classList.add('visible');
         });
         dom.composeProfileAvatar.addEventListener('error', () => {
-          dom.composeProfileAvatar.classList.remove('visible');
-          dom.composeProfileAvatar.removeAttribute('src');
+          advanceComposeProfileAvatarCandidate();
         });
       }
       dom.attachmentInput.addEventListener('keydown', (event) => {
