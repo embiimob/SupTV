@@ -1778,7 +1778,8 @@
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
-    // Cap fallback attempts to keep profile-card image retries bounded across noisy profile payloads.
+    // Cap fallback attempts to keep profile-card image retries bounded across payloads with many
+    // invalid or non-image string values that can otherwise trigger excessive failed image loads.
     // Allow room for multiple image-like fields (direct + nested profile values) expanded across all
     // configured IPFS gateways, with a floor of 12 so small gateway lists still get broad fallback coverage.
     const PROFILE_IMAGE_MAX_CANDIDATE_URLS = Math.max(IPFS_GATEWAY_URLS.length * 6, 12);
@@ -2098,7 +2099,8 @@
 
     function advanceComposeProfileAvatarCandidate() {
       if (composeProfileAvatarCandidateIndex >= composeProfileAvatarCandidateUrls.length - 1) {
-        // "length" is a terminal sentinel so applyComposeProfileAvatarCandidate clears src and stops retries.
+        // Setting index to "length" is a sentinel value that makes applyComposeProfileAvatarCandidate
+        // clear src and stop retries.
         composeProfileAvatarCandidateIndex = composeProfileAvatarCandidateUrls.length;
         applyComposeProfileAvatarCandidate();
         return;
