@@ -844,7 +844,6 @@
       border-radius: .44rem;
       background: #000;
       object-fit: contain;
-      aspect-ratio: 16 / 9;
     }
 
     .internal-wallet-section {
@@ -1132,14 +1131,14 @@
         width: 100%;
       }
       .compose-panel {
-        max-height: min(82vh, 760px);
+        max-height: 82vh;
       }
       .compose-preview {
         padding: .32rem;
         gap: .28rem;
       }
       .compose-preview video {
-        max-height: min(24vh, 132px);
+        max-height: clamp(96px, 24vh, 128px);
       }
       .side-feed {
         right: .62rem;
