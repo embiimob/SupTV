@@ -833,9 +833,11 @@
 
     .compose-preview video {
       width: 100%;
+      max-width: 100%;
       max-height: 220px;
       border-radius: .44rem;
       background: #000;
+      object-fit: contain;
     }
 
     .internal-wallet-section {
@@ -1247,7 +1249,7 @@
         <ul class="attachment-list" id="attachmentList"></ul>
         <div class="compose-row compose-send-row">
           <div class="compose-estimate" id="sendEstimate">* Add an IPFS video attachment to see cost estimates.</div>
-          <button type="button" id="sendPostBtn">Sign + Send</button>
+          <button type="button" id="sendPostBtn">Broadcast</button>
         </div>
         <div class="compose-status" id="composeStatus" role="status" aria-live="polite"></div>
       </div>
@@ -3458,7 +3460,7 @@
         return status === 'playing' || status === 'downloading' || status === 'ready' ? count + 1 : count;
       }, 0);
       const summary = `FOUND ${searchResultTotal} • QUEUED ${items.length} • PROBING ${probingCount}/${probeWindow.length} • ${keyword.toUpperCase()}`;
-      const trendingText = normalize(keyword).toLowerCase() === 'trending' && trendingStatsRows.length
+      const trendingText = trendingStatsRows.length
         ? `TOP SEARCHES ${trendingStatsRows.slice(0, TICKER_TRENDING_STATS_SIZE).map((row) => `${cleanDisplayText(row?.term || '') || 'unknown'} (${formatTrendingResultCount(row?.results)} results)`).join(' • ')}`
         : '';
       dom.ticker.textContent = statusCards.length
@@ -4587,6 +4589,9 @@
       if (!isTrendingDefault) {
         trendingResultsCache = null;
         trendingBackgroundFetchId++; // cancel any in-progress trending background fetch
+        // Load trending stats in the background so the banner panel keeps showing
+        // top trending searches even while the user is on a direct keyword search.
+        if (!trendingStatsRows.length) getTrendingKeywords().catch(() => {});
       }
       let displayKeyword = isTrendingDefault ? 'trending' : cleanedInput;
       currentKeyword = displayKeyword;
