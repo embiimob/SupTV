@@ -704,21 +704,26 @@
       overflow-x: hidden;
       z-index: 12;
       display: none;
+      flex-direction: column;
     }
 
     .compose-panel.visible {
-      display: block;
+      display: flex;
     }
 
     .compose-grid {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: .5rem;
       min-width: 0;
+      flex: 1 1 auto;
     }
 
     .compose-grid > * {
       width: 100%;
       max-width: 100%;
+      min-height: 0;
+      flex-shrink: 0;
     }
 
     .compose-row {
@@ -835,7 +840,9 @@
     }
 
     .compose-preview.visible {
-      display: grid;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 1;
     }
 
     .compose-preview b {
@@ -849,6 +856,7 @@
       max-width: 260px;
       min-width: 0;
       max-height: 146px;
+      min-height: 0;
       border-radius: .44rem;
       background: #000;
       object-fit: contain;
