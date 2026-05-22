@@ -1778,6 +1778,7 @@
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
+    // Cap fallback attempts to keep profile-card image retries bounded across noisy profile payloads.
     const PROFILE_IMAGE_MAX_CANDIDATE_URLS = 24;
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
@@ -2077,6 +2078,7 @@
 
     function advanceComposeProfileAvatarCandidate() {
       if (composeProfileAvatarCandidateIndex + 1 >= composeProfileAvatarCandidateUrls.length) {
+        // "length" is a terminal sentinel so applyComposeProfileAvatarCandidate clears src and stops retries.
         composeProfileAvatarCandidateIndex = composeProfileAvatarCandidateUrls.length;
         applyComposeProfileAvatarCandidate();
         return;
