@@ -2048,13 +2048,19 @@
       const urls = [];
       for (const raw of [...new Set(rawCandidates)]) {
         if (!raw) continue;
-        if (/^https?:\/\//i.test(raw)) urls.push(raw);
         const parsed = extractIpfsPartsFromInput(raw);
         if (parsed?.cid) {
           for (let gatewayIndex = 0; gatewayIndex < IPFS_GATEWAY_URLS.length; gatewayIndex += 1) {
-            urls.push(buildIpfsPathUrl(parsed.cid, parsed.path || '', gatewayIndex));
+            urls.push(buildIpfsPathUrl(parsed.cid, '', gatewayIndex));
           }
+          if (parsed.path) {
+            for (let gatewayIndex = 0; gatewayIndex < IPFS_GATEWAY_URLS.length; gatewayIndex += 1) {
+              urls.push(buildIpfsPathUrl(parsed.cid, parsed.path, gatewayIndex));
+            }
+          }
+          continue;
         }
+        if (/^https?:\/\//i.test(raw)) urls.push(raw);
       }
       return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
     }
