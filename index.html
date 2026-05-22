@@ -29,6 +29,8 @@
       --text: #f4f7ff;
       --muted: #a4b1d8;
       --swipe-tug-transition-ms: 180ms;
+      --compose-mobile-panel-max-height: 82vh;
+      --compose-mobile-preview-video-height: clamp(96px, 24vh, 128px);
     }
 
     * { box-sizing: border-box; }
@@ -840,7 +842,7 @@
     .compose-preview video {
       width: 100%;
       max-width: 100%;
-      max-height: 220px;
+      max-height: 180px;
       border-radius: .44rem;
       background: #000;
       object-fit: contain;
@@ -1129,6 +1131,16 @@
       .compose-attachment-row button,
       .compose-send-row button {
         width: 100%;
+      }
+      .compose-panel {
+        max-height: var(--compose-mobile-panel-max-height);
+      }
+      .compose-preview {
+        padding: .32rem;
+        gap: .28rem;
+      }
+      .compose-preview video {
+        max-height: var(--compose-mobile-preview-video-height);
       }
       .side-feed {
         right: .62rem;
