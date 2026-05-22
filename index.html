@@ -29,6 +29,8 @@
       --text: #f4f7ff;
       --muted: #a4b1d8;
       --swipe-tug-transition-ms: 180ms;
+      --compose-mobile-panel-max-height: 82vh;
+      --compose-mobile-preview-video-height: clamp(96px, 24vh, 128px);
     }
 
     * { box-sizing: border-box; }
@@ -1131,14 +1133,14 @@
         width: 100%;
       }
       .compose-panel {
-        max-height: 82vh;
+        max-height: var(--compose-mobile-panel-max-height);
       }
       .compose-preview {
         padding: .32rem;
         gap: .28rem;
       }
       .compose-preview video {
-        max-height: clamp(96px, 24vh, 128px);
+        max-height: var(--compose-mobile-preview-video-height);
       }
       .side-feed {
         right: .62rem;
