@@ -1459,6 +1459,8 @@
     let walletBalanceState = null;
     let composeEstimateRefreshTimer = null;
     let composeEstimateRequestId = 0;
+    let composeProfileAvatarCandidateUrls = [];
+    let composeProfileAvatarCandidateIndex = 0;
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1776,6 +1778,12 @@
     const IPFS_PATH_URL_REGEX = /\/ipfs\/([^/?#]+)(?:\/([^?#]+))?/i;
     const IPFS_VIDEO_PROBE_TIMEOUT_MS = 11000;
     const BTC_DECIMAL_PRECISION = 8;
+    const PROFILE_IMAGE_GATEWAY_VARIANT_MULTIPLIER = 6;
+    // Cap fallback attempts to keep profile-card image retries bounded across payloads with many
+    // invalid or non-image string values that can otherwise trigger excessive failed image loads.
+    // Allow room for multiple image-like fields (direct + nested profile values) expanded across all
+    // configured IPFS gateways, with a floor of 12 so small gateway lists still get broad fallback coverage.
+    const PROFILE_IMAGE_MAX_CANDIDATE_URLS = Math.max(IPFS_GATEWAY_URLS.length * PROFILE_IMAGE_GATEWAY_VARIANT_MULTIPLIER, 12);
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const SIGNING_DELIMITERS = ['\\', '/', ':', '*', '?', '"', '|'];
     const MAX_URI_DECODE_ITERATIONS = 3; // Limits successive URI decoding iterations to unwrap percent-encoded IPFS links.
@@ -1884,6 +1892,8 @@
       dom.composeProfileTitle.textContent = '';
       dom.composeProfileMeta.textContent = '';
       if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
+      composeProfileAvatarCandidateUrls = [];
+      composeProfileAvatarCandidateIndex = 0;
       if (dom.composeProfileAvatar) {
         dom.composeProfileAvatar.classList.remove('visible');
         dom.composeProfileAvatar.removeAttribute('src');
@@ -2025,24 +2035,77 @@
       return collected;
     }
 
-    function profileImageUrlFromProfile(profile) {
-      if (!profile || typeof profile !== 'object') return '';
+    function profileImageCandidateUrlsFromProfile(profile) {
+      if (!profile || typeof profile !== 'object') return [];
       const directCandidates = [
         profile.img, profile.IMG, profile.image, profile.Image, profile.imageUrl, profile.ImageUrl,
         profile.avatar, profile.Avatar, profile.pfp, profile.PFP, profile.photo, profile.Photo,
         profile.ProfileImage, profile.profileImage, profile.profileImageUrl, profile.ProfileImageUrl
       ];
-      const candidates = [
+      const rawCandidates = [
         ...directCandidates.map((candidate) => normalizeProfileImageCandidate(candidate)).filter(Boolean),
         ...scanNestedProfileImageStrings(profile)
       ];
-      for (const raw of [...new Set(candidates)]) {
+      const urls = [];
+      for (const raw of [...new Set(rawCandidates)]) {
         if (!raw) continue;
-        if (/^https?:\/\//i.test(raw)) return raw;
         const parsed = extractIpfsPartsFromInput(raw);
-        if (parsed?.cid) return buildIpfsPathUrl(parsed.cid, parsed.path || '', 0);
+        if (parsed?.cid) {
+          for (let gatewayIndex = 0; gatewayIndex < IPFS_GATEWAY_URLS.length; gatewayIndex += 1) {
+            urls.push(buildIpfsPathUrl(parsed.cid, '', gatewayIndex));
+          }
+          if (parsed.path) {
+            for (let gatewayIndex = 0; gatewayIndex < IPFS_GATEWAY_URLS.length; gatewayIndex += 1) {
+              urls.push(buildIpfsPathUrl(parsed.cid, parsed.path, gatewayIndex));
+            }
+          }
+          continue;
+        }
+        if (/^https?:\/\//i.test(raw)) urls.push(raw);
       }
-      return '';
+      return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
+    }
+
+    function profileImageCandidateUrlsFromProfiles(...profiles) {
+      const urls = [];
+      for (const profile of profiles) {
+        urls.push(...profileImageCandidateUrlsFromProfile(profile));
+        if (urls.length >= PROFILE_IMAGE_MAX_CANDIDATE_URLS) break;
+      }
+      return [...new Set(urls)].slice(0, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
+    }
+
+    function applyComposeProfileAvatarCandidate() {
+      if (!dom.composeProfileAvatar) return;
+      // Keep avatar hidden until a candidate successfully loads and emits "load".
+      dom.composeProfileAvatar.classList.remove('visible');
+      if (
+        composeProfileAvatarCandidateIndex < 0
+        || composeProfileAvatarCandidateIndex >= composeProfileAvatarCandidateUrls.length
+      ) {
+        dom.composeProfileAvatar.removeAttribute('src');
+        return;
+      }
+      const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex];
+      dom.composeProfileAvatar.src = nextUrl;
+    }
+
+    function setComposeProfileAvatarCandidates(urls) {
+      composeProfileAvatarCandidateUrls = Array.isArray(urls)
+        ? urls.map((url) => normalize(url)).filter(Boolean)
+        : [];
+      composeProfileAvatarCandidateIndex = 0;
+      applyComposeProfileAvatarCandidate();
+    }
+
+    function advanceComposeProfileAvatarCandidate() {
+      if (composeProfileAvatarCandidateIndex >= composeProfileAvatarCandidateUrls.length - 1) {
+        composeProfileAvatarCandidateIndex = -1;
+        applyComposeProfileAvatarCandidate();
+        return;
+      }
+      composeProfileAvatarCandidateIndex += 1;
+      applyComposeProfileAvatarCandidate();
     }
 
     async function refreshComposerProfileCard() {
@@ -2068,7 +2131,7 @@
         }
         const title = profileDisplayName(resolvedProfile) || shortTitle(address, 48);
         const profileUrn = cleanDisplayText(extractProfileUrn(resolvedProfile), 120);
-        const imageUrl = profileImageUrlFromProfile(resolvedProfile);
+        const imageUrls = profileImageCandidateUrlsFromProfiles(resolvedProfile, byAddress);
         const bio = cleanAndCollapseWhitespace(
           resolvedProfile?.bio || resolvedProfile?.Bio || resolvedProfile?.description || resolvedProfile?.Description || '',
           260
@@ -2090,21 +2153,14 @@
           dom.composeProfileExtra.textContent = pieces.join(' · ');
         }
         if (dom.composeProfileAvatar) {
-          if (imageUrl) {
-            dom.composeProfileAvatar.classList.remove('visible');
-            dom.composeProfileAvatar.src = imageUrl;
-          } else {
-            dom.composeProfileAvatar.classList.remove('visible');
-            dom.composeProfileAvatar.removeAttribute('src');
-          }
+          setComposeProfileAvatarCandidates(imageUrls);
         }
       } catch {
         dom.composeProfileTitle.textContent = shortTitle(address, 30);
         dom.composeProfileMeta.textContent = 'No profile found';
         if (dom.composeProfileExtra) dom.composeProfileExtra.textContent = '';
         if (dom.composeProfileAvatar) {
-          dom.composeProfileAvatar.classList.remove('visible');
-          dom.composeProfileAvatar.removeAttribute('src');
+          setComposeProfileAvatarCandidates([]);
         }
       }
     }
@@ -4841,8 +4897,7 @@
           dom.composeProfileAvatar.classList.add('visible');
         });
         dom.composeProfileAvatar.addEventListener('error', () => {
-          dom.composeProfileAvatar.classList.remove('visible');
-          dom.composeProfileAvatar.removeAttribute('src');
+          advanceComposeProfileAvatarCandidate();
         });
       }
       dom.attachmentInput.addEventListener('keydown', (event) => {
