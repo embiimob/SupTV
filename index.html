@@ -3022,8 +3022,7 @@
 
     function addComposerAttachment(value) {
       const token = cleanDisplayText(normalize(value), 260);
-      if (!token) return false;
-      if (composerAttachments.length === 1 && composerAttachments[0] === token) return false;
+      if (!token || (composerAttachments.length === 1 && composerAttachments[0] === token)) return false;
       // Only one video attachment is allowed; replace any existing one.
       composerAttachments = [token];
       renderComposerAttachments();
