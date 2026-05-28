@@ -738,6 +738,9 @@
       min-width: 0;
     }
 
+    .compose-attachment-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
     .compose-panel input,
     .compose-panel textarea,
     .compose-panel select,
@@ -1274,9 +1277,11 @@
         </div>
         <textarea id="postMessage" placeholder="Write your post message with #keywords..."></textarea>
         <div class="compose-row compose-attachment-row">
-          <input id="attachmentInput" type="text" placeholder="Attachment URL or IPFS:CID/path" />
+          <input id="attachmentInput" type="text" placeholder="IPFS:CID/video.mp4 or paste a gateway URL" />
           <button type="button" id="addAttachmentBtn">Add</button>
+          <button type="button" id="uploadAttachmentBtn">Upload</button>
         </div>
+        <input type="file" id="attachmentFileInput" accept="video/*" style="display:none" />
         <div class="compose-preview" id="composePreview" aria-live="polite">
           <b>Video preview</b>
           <video id="composePreviewVideo" controls muted playsinline preload="metadata"></video>
@@ -1336,6 +1341,8 @@
       postMessage: document.getElementById('postMessage'),
       attachmentInput: document.getElementById('attachmentInput'),
       addAttachmentBtn: document.getElementById('addAttachmentBtn'),
+      uploadAttachmentBtn: document.getElementById('uploadAttachmentBtn'),
+      attachmentFileInput: document.getElementById('attachmentFileInput'),
       composePreview: document.getElementById('composePreview'),
       composePreviewVideo: document.getElementById('composePreviewVideo'),
       attachmentList: document.getElementById('attachmentList'),
@@ -3015,8 +3022,9 @@
 
     function addComposerAttachment(value) {
       const token = cleanDisplayText(normalize(value), 260);
-      if (!token || composerAttachments.includes(token)) return false;
-      composerAttachments.push(token);
+      if (!token || (composerAttachments.length === 1 && composerAttachments[0] === token)) return false;
+      // Only one video attachment is allowed; replace any existing one.
+      composerAttachments = [token];
       renderComposerAttachments();
       queueComposerSendEstimateRefresh();
       return true;
@@ -3107,6 +3115,99 @@
         probe.src = url;
         try { probe.load(); } catch { finish(false); }
       });
+    }
+
+    function sanitizeUploadFileName(name = '') {
+      const base = normalize(String(name || '')).replace(/[\\/]+/g, '_').replace(/\s+/g, '_');
+      const safe = base.split('.').map((part) => part.replace(UNSAFE_FILENAME_CHARS_REGEX, '')).filter(Boolean).join('.');
+      if (!safe) throw new Error('Upload needs a valid file name');
+      return safe.slice(0, 120);
+    }
+
+    function extractUploadCid(payload) {
+      const read = (v) => {
+        const t = normalize(v);
+        if (!t) return '';
+        if (COMPOSER_CID_REGEX.test(t)) return t.match(COMPOSER_CID_REGEX)[0];
+        const m = t.match(/(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[0-9a-z]{40,})/i);
+        return m?.[1] || '';
+      };
+      if (typeof payload === 'string') return read(payload);
+      if (payload && typeof payload === 'object') {
+        const direct = [
+          payload.cid, payload.CID, payload.hash, payload.Hash, payload.ipfs,
+          payload.ipfsCid, payload.IpfsHash,
+          payload?.data?.cid, payload?.result?.cid, payload?.payload?.cid
+        ];
+        for (const v of direct) { const c = read(v); if (c) return c; }
+        return read(JSON.stringify(payload));
+      }
+      return '';
+    }
+
+    async function waitForIpfsPreview(cid, path = '', tries = 8, gapMs = 2500) {
+      const checkUrl = buildIpfsPathUrl(cid, path, 0);
+      for (let i = 0; i < tries; i += 1) {
+        try {
+          const r = await fetch(checkUrl, { method: 'HEAD', cache: 'no-store' });
+          if (r.ok) return true;
+        } catch { /* continue polling */ }
+        if (i < tries - 1) await new Promise((res) => { setTimeout(res, gapMs); });
+      }
+      return false;
+    }
+
+    function triggerComposeFileUpload() {
+      if (dom.attachmentFileInput) dom.attachmentFileInput.click();
+    }
+
+    async function uploadComposeAttachmentFile() {
+      const fileInp = dom.attachmentFileInput;
+      const btn = dom.uploadAttachmentBtn;
+      if (!fileInp?.files?.length) {
+        setComposeStatus('Choose a video file to upload first');
+        return;
+      }
+      const file = fileInp.files[0];
+      let fileName = '';
+      try {
+        fileName = sanitizeUploadFileName(file?.name || '');
+      } catch (e) {
+        setComposeStatus(e.message || 'Invalid filename');
+        fileInp.value = '';
+        return;
+      }
+      try {
+        if (btn) btn.disabled = true;
+        setComposeStatus(`Uploading ${fileName} to p2fk.io…`);
+        const fd = new FormData();
+        fd.append('file', file, fileName);
+        const r = await fetch(`${P2FK_BASE_URL}/ipfs`, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error(`Upload failed (${r.status})`);
+        const raw = await r.text();
+        let payload = raw;
+        try { payload = JSON.parse(raw); } catch { /* use raw text */ }
+        const cid = extractUploadCid(payload);
+        if (!COMPOSER_CID_REGEX.test(cid)) throw new Error('Upload succeeded but no valid CID was returned');
+        const urn = `IPFS:${cid}/${fileName}`;
+        composerAttachments = [urn];
+        if (dom.attachmentInput) dom.attachmentInput.value = urn;
+        renderComposerAttachments();
+        queueComposerSendEstimateRefresh();
+        setComposeStatus('Uploaded and pinned for 1 hour. Preview may take time to appear—please wait before posting.');
+        const previewReady = await waitForIpfsPreview(cid, fileName);
+        if (previewReady) {
+          const previewUrl = buildIpfsPathUrl(cid, fileName, 0);
+          setComposerPreview(previewUrl);
+          renderComposerAttachments();
+          setComposeStatus(`Preview ready · Attached: ${urn.slice(0, 80)}`);
+        }
+      } catch (e) {
+        setComposeStatus(e.message || 'Upload failed');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (fileInp) fileInp.value = '';
+      }
     }
 
     async function verifyAndNormalizeIpfsVideoInput(rawInput) {
@@ -4986,6 +5087,8 @@
       if (dom.internalGenerateBtn) dom.internalGenerateBtn.addEventListener('click', onGenerateNewKey);
       if (dom.internalGearBtn) dom.internalGearBtn.addEventListener('click', onToggleWalletSettings);
       dom.addAttachmentBtn.addEventListener('click', onAddAttachment);
+      if (dom.uploadAttachmentBtn) dom.uploadAttachmentBtn.addEventListener('click', triggerComposeFileUpload);
+      if (dom.attachmentFileInput) dom.attachmentFileInput.addEventListener('change', uploadComposeAttachmentFile);
       dom.sendPostBtn.addEventListener('click', onSendPost);
       dom.postMessage.addEventListener('input', queueComposerSendEstimateRefresh);
       if (dom.composeProfileAvatar) {
