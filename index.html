@@ -4392,12 +4392,19 @@
       const keywordMessages = keywordChannelResult.status === 'fulfilled' ? keywordChannelResult.value : [];
       const mainSearchMessages = mainSearchResult.status === 'fulfilled' ? mainSearchResult.value : [];
       const messages = mergeUniqueMessagesByTxid(keywordMessages, mainSearchMessages);
-      const addressLabels = await resolveAddressLabels(messages);
-      const items = dedupeItemsByTxid(parseItems(messages, addressLabels));
+      // Parse items immediately with empty labels so playback starts without waiting for
+      // rate-limited profile lookups. Labels are cosmetic only (the "from" display field).
+      const items = dedupeItemsByTxid(parseItems(messages, new Map()));
       if (!items.length) {
         throw new Error('no playable videos in keyword or search results');
       }
-      return { items, messages, addressLabels };
+      // Resolve address labels in background; update the social feed once ready.
+      resolveAddressLabels(messages).then((addressLabels) => {
+        if (!addressLabels.size) return;
+        streamCardPool = parseSocialCards(messages, addressLabels);
+        socialTimeline = streamCardPool;
+      }).catch((err) => { console.warn('Background address label resolution failed:', err); });
+      return { items, messages, addressLabels: new Map() };
     }
 
     function extractSearchString(entry) {
@@ -4608,10 +4615,10 @@
       keywordWorkers.forEach((workerPromise) => workerPromise.catch(() => {}));
 
       const firstRaw = await keywordFetches[0];
-      const firstLabels = await resolveAddressLabels(firstRaw);
-      // Only queue the first TRENDING_KEYWORD_BATCH_SIZE items from kw1 so the progressive
-      // phase below can interleave other keywords' content before those finish playing.
-      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, firstLabels)).slice(0, TRENDING_KEYWORD_BATCH_SIZE);
+      // Skip address label resolution here — labels are cosmetic (the "from" display field)
+      // and resolving them can stall for ~10 s when the rate-limiter window is full.
+      // The final phase resolves all labels properly once every keyword fetch completes.
+      const firstItems = dedupeItemsByTxid(parseItems(firstRaw, new Map())).slice(0, TRENDING_KEYWORD_BATCH_SIZE);
 
       const displayKeyword = keywords.length === 1 && keywords[0].toLowerCase() === DEFAULT_KEYWORD.toLowerCase()
         ? DEFAULT_KEYWORD
@@ -4619,7 +4626,7 @@
 
       // Publish the partial result immediately so the cache is warm for logo-clicks
       // that arrive before the full background phase finishes.
-      const partialResult = { items: firstItems, messages: firstRaw, addressLabels: firstLabels, keywords, displayKeyword };
+      const partialResult = { items: firstItems, messages: firstRaw, addressLabels: new Map(), keywords, displayKeyword };
       trendingResultsCache = partialResult;
 
       const bgFetchId = ++trendingBackgroundFetchId;
