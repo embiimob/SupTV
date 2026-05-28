@@ -1384,7 +1384,7 @@
     const TRENDING_SEARCH_METRIC_KEYS = ['successfulSearchCount', 'searchTotal', 'searchCount', 'count', 'total', 'SuccessfulSearchCount', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
     const STANDARD_SEARCH_QTY = 200;
     const TRENDING_SEARCH_QTY = 200;
-    const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
+    const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 45000;
     const TRENDING_KEYWORD_FETCH_CONCURRENCY = 4;
     const PRELOAD_COUNT = 5;
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
@@ -1411,6 +1411,57 @@
     const INTERACTIVE_TOUCH_SELECTORS = `${FORM_INTERACTIVE_TOUCH_SELECTORS}, ${NON_SWIPE_REGION_SELECTORS}`;
     const MOBILE_CARD_IMAGE_MEDIA_QUERY = `(max-width: ${MOBILE_LAYOUT_BREAKPOINT_PX}px)`;
     const P2FK_BASE_URL = 'https://p2fk.io';
+
+    class TokenBucketRateLimiter {
+      constructor(capacity, fillRatePerSecond) {
+        this.capacity = capacity;
+        this.tokens = capacity;
+        this.fillRate = fillRatePerSecond;
+        this.lastFill = performance.now();
+        this.queue = [];
+      }
+
+      refill() {
+        const now = performance.now();
+        const elapsedSeconds = (now - this.lastFill) / 1000;
+        const addTokens = elapsedSeconds * this.fillRate;
+        if (addTokens > 0) {
+          this.tokens = Math.min(this.capacity, this.tokens + addTokens);
+          this.lastFill = now;
+        }
+      }
+
+      async acquire() {
+        return new Promise((resolve) => {
+          this.queue.push(resolve);
+          this.processQueue();
+        });
+      }
+
+      processQueue() {
+        this.refill();
+        if (this.queue.length === 0) return;
+
+        if (this.tokens >= 1) {
+          this.tokens -= 1;
+          const resolve = this.queue.shift();
+          resolve();
+          this.processQueue();
+        } else {
+          // Calculate time until next token
+          const timeToNextToken = (1 - this.tokens) / this.fillRate * 1000;
+          setTimeout(() => this.processQueue(), timeToNextToken);
+        }
+      }
+    }
+
+    const p2fkRateLimiter = new TokenBucketRateLimiter(40, 4); // 40 tokens max, 4 per second (40 per 10s)
+
+    async function fetchP2fk(url, options = {}) {
+      await p2fkRateLimiter.acquire();
+      return fetch(url, options);
+    }
+
     const TRENDING_SEARCHES_ENDPOINT = `${P2FK_BASE_URL}/GetTrendingRootSearches?qty=${TRENDING_STATS_LIMIT}`;
     const P2FK_CHUNK_SIZE_BYTES = 20;
     const P2FK_DEFAULT_VERSION_BYTE = 0x6f;
@@ -3182,7 +3233,7 @@
         setComposeStatus(`Uploading ${fileName} to p2fk.io…`);
         const fd = new FormData();
         fd.append('file', file, fileName);
-        const r = await fetch(`${P2FK_BASE_URL}/ipfs`, { method: 'POST', body: fd });
+        const r = await fetchP2fk(`${P2FK_BASE_URL}/ipfs`, { method: 'POST', body: fd });
         if (!r.ok) throw new Error(`Upload failed (${r.status})`);
         const raw = await r.text();
         let payload = raw;
@@ -3413,7 +3464,7 @@
       const lookup = (async () => {
         try {
           const endpoint = `${P2FK_BASE_URL}/GetProfileByAddress/${encodeURIComponent(cleanAddress)}?mainnet=${USE_P2FK_MAINNET}`;
-          const response = await fetch(endpoint);
+          const response = await fetchP2fk(endpoint);
           if (!response.ok) return null;
           return await response.json();
         } catch {
@@ -3431,7 +3482,7 @@
       const lookup = (async () => {
         try {
           const endpoint = `${P2FK_BASE_URL}/GetProfileByURN/${encodeURIComponent(cleanUrn)}?mainnet=${USE_P2FK_MAINNET}`;
-          const response = await fetch(endpoint);
+          const response = await fetchP2fk(endpoint);
           if (!response.ok) return null;
           return await response.json();
         } catch {
@@ -4296,7 +4347,7 @@
 
     async function getPublicAddressByKeyword(keyword) {
       const endpoint = `${P2FK_BASE_URL}/GetPublicAddressByKeyword/${encodeURIComponent(keyword)}?mainnet=${USE_P2FK_MAINNET}`;
-      const response = await fetch(endpoint);
+      const response = await fetchP2fk(endpoint);
       if (!response.ok) throw new Error(`address lookup failed (${response.status})`);
       const payload = normalize(await response.text()).replace(/^"|"$/g, '');
       if (!payload) throw new Error('keyword address not found');
@@ -4305,7 +4356,7 @@
 
     async function getPublicMessagesByAddress(address, skip = 0, qty = 200) {
       const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}`;
-      const response = await fetch(endpoint);
+      const response = await fetchP2fk(endpoint);
       if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
       const payload = await response.json();
       return asArray(payload);
@@ -4313,7 +4364,7 @@
 
     async function getKnownRootsBySearchString(searchString, skip = 0, qty = 200) {
       const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(searchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
-      const response = await fetch(endpoint);
+      const response = await fetchP2fk(endpoint);
       if (!response.ok) throw new Error(`search lookup failed (${response.status})`);
       const payload = await response.json();
       return asArray(payload);
@@ -4377,7 +4428,7 @@
 
     async function getTrendingKeywords(limit = TRENDING_KEYWORD_LIMIT) {
       try {
-        const response = await fetch(TRENDING_SEARCHES_ENDPOINT, { cache: 'no-store' });
+        const response = await fetchP2fk(TRENDING_SEARCHES_ENDPOINT, { cache: 'no-store' });
         if (!response.ok) {
           trendingStatsRows = [];
           renderBannerTrendingSearches();
