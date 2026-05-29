@@ -4347,7 +4347,8 @@
     }
 
     async function getKnownRootsBySearchString(searchString, skip = 0, qty = 200) {
-      const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(searchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
+      const normalizedSearchString = normalize(searchString) || '*';
+      const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(normalizedSearchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`search lookup failed (${response.status})`);
       const payload = await response.json();
