@@ -1590,7 +1590,8 @@
       if (!text) return '';
       if (text === '*') return '*';
       if (/^\*+$/.test(text)) return '*';
-      if (/^\*+.+\*+$/.test(text)) return normalize(text.replace(/^\*+|\*+$/g, ''));
+      const wrappedMatch = text.match(/^\*+(.+?)\*+$/);
+      if (wrappedMatch) return wrappedMatch[1];
       return text;
     };
     const parseMetricNumber = (value) => {
