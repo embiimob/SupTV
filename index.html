@@ -1585,6 +1585,14 @@
     };
     const cleanAndCollapseWhitespace = (value, maxLength = 220) => cleanDisplayText(value, maxLength).replace(/\s+/g, ' ').trim();
     const normalizeKeywordKey = (value) => cleanDisplayText(normalize(value)).toLowerCase();
+    const normalizeSearchKeyword = (value) => {
+      const text = normalize(value);
+      if (!text) return '';
+      if (text === '*') return '*';
+      if (/^\*+$/.test(text)) return '*';
+      if (/^\*+.+\*+$/.test(text)) return normalize(text.replace(/^\*+|\*+$/g, ''));
+      return text;
+    };
     const parseMetricNumber = (value) => {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
       if (typeof value === 'string') {
@@ -4347,7 +4355,7 @@
     }
 
     async function getKnownRootsBySearchString(searchString, skip = 0, qty = 200) {
-      const normalizedSearchString = normalize(searchString) || '*';
+      const normalizedSearchString = normalizeSearchKeyword(searchString) || '*';
       const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(normalizedSearchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`search lookup failed (${response.status})`);
@@ -4409,7 +4417,7 @@
     }
 
     function extractSearchString(entry) {
-      return normalize(
+      return normalizeSearchKeyword(
         entry?.searchString
         || entry?.SearchString
         || entry?.keyword
