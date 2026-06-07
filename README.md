@@ -21,7 +21,7 @@ SupTV currently has two main roles:
 
 1. Clone this repo.
 2. Open `index.html` in a browser from your cloned repository directory.
-3. Optional: use `?q=keyword` to preload a query, e.g. `index.html?q=mp4`.
+3. Optional: use `?q=keyword` to preload a query, e.g. `index.html?q=mp4` (or `?q=@profileUrn` for profile-thread search).
 4. Open **✎ Compose** in the top bar to post.
 
 ## Runtime behavior (viewer/search side)
@@ -77,6 +77,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 
 | Endpoint | Purpose in SupTV |
 | --- | --- |
+| `GET /GetProfileByURN/<urn>?mainnet=false` | Resolves `@profile` searches to profile metadata and creator addresses. |
 | `GET /GetTrendingRootSearches?qty=<n>` | Fetches trending search terms + stats used for trending UI and queue seed keywords. |
 | `GET /GetPublicAddressByKeyword/<keyword>?mainnet=false` | Resolves keyword-channel address for that keyword. |
 | `GET /GetPublicMessagesByAddress/<address>?skip=<n>&qty=<n>&mainnet=false` | Pulls public channel messages for keyword/address timelines. |
