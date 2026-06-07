@@ -4377,9 +4377,9 @@
     async function getProfileAddressByUrnSearch(searchString) {
       const rawSearch = normalize(searchString);
       if (!rawSearch.startsWith('@')) throw new Error('profile search must start with @');
-      const profileUrn = cleanDisplayText(rawSearch.replace(/^@+/, ''));
+      const profileUrn = cleanDisplayText(rawSearch.replace(/^@/, ''));
       if (!profileUrn) throw new Error('profile urn is required after @');
-      const urnCandidates = [...new Set([`@${profileUrn}`, profileUrn])];
+      const urnCandidates = [`@${profileUrn}`, profileUrn];
       for (const urn of urnCandidates) {
         const profile = await getProfileByURN(urn);
         const creatorAddresses = extractCreatorAddresses(profile);
@@ -4411,7 +4411,7 @@
         const messages = mergeUniqueMessagesByTxid(profileMessages);
         const items = dedupeItemsByTxid(parseItems(messages, new Map()));
         if (!items.length) {
-          throw new Error('no playable videos in profile thread');
+          throw new Error(`no playable videos found for @${normalizedKeyword.replace(/^@/, '')}`);
         }
         resolveAddressLabels(messages).then((addressLabels) => {
           if (!addressLabels.size) return;
