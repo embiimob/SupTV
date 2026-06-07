@@ -1186,7 +1186,7 @@
         <span class="uncensored-tooltip" id="uncensoredTooltip" role="tooltip" aria-hidden="true">This content is being censored by public IPFS gateways. For truly uncensored SupTV, sync an old Bitcoin wallet yourself.</span>
       </div>
       <form class="controls" id="searchForm" autocomplete="off">
-        <input id="query" type="text" placeholder="Search p2fk video by keyword" />
+        <input id="query" type="text" placeholder="Search p2fk video by keyword or @profile" />
         <button type="button" class="audio-toggle" id="audioBtn" title="Unmute" aria-label="Unmute">🔇</button>
         <button type="button" class="compose-inline" id="composeBtn" title="Compose post" aria-label="Compose post">✎</button>
         <button type="button" id="fullscreenBtn" aria-keyshortcuts="f" title="Full Screen" aria-label="Full Screen">⛶</button>
@@ -4374,6 +4374,25 @@
       return getPublicMessagesByAddress(address, 0, 200);
     }
 
+    async function getProfileAddressByUrnSearch(searchString) {
+      const rawSearch = normalize(searchString);
+      if (!rawSearch.startsWith('@')) throw new Error('profile search must start with @');
+      const profileUrn = cleanDisplayText(rawSearch.replace(/^@/, ''));
+      if (!profileUrn) throw new Error('profile urn is required after @');
+      const urnCandidates = [`@${profileUrn}`, profileUrn];
+      for (const urn of urnCandidates) {
+        const profile = await getProfileByURN(urn);
+        const creatorAddresses = extractCreatorAddresses(profile);
+        if (creatorAddresses.length) return creatorAddresses[0];
+      }
+      throw new Error(`profile address not found for @${profileUrn}`);
+    }
+
+    async function getProfileChannelMessages(searchString) {
+      const address = await getProfileAddressByUrnSearch(searchString);
+      return getPublicMessagesByAddress(address, 0, 200);
+    }
+
     async function fetchTrendingKeywordMessages(keyword) {
       const [searchRaw, channelRaw] = await Promise.all([
         getKnownRootsBySearchStringWithTimeout(keyword, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
@@ -4386,6 +4405,22 @@
     }
 
     async function queryP2FK(keyword) {
+      const normalizedKeyword = normalize(keyword);
+      if (normalizedKeyword.startsWith('@')) {
+        const profileMessages = await getProfileChannelMessages(normalizedKeyword);
+        const messages = mergeUniqueMessagesByTxid(profileMessages);
+        const items = dedupeItemsByTxid(parseItems(messages, new Map()));
+        if (!items.length) {
+          throw new Error(`no playable videos found for @${normalizedKeyword.replace(/^@/, '')}`);
+        }
+        resolveAddressLabels(messages).then((addressLabels) => {
+          if (!addressLabels.size) return;
+          streamCardPool = parseSocialCards(messages, addressLabels);
+          socialTimeline = streamCardPool;
+        }).catch((err) => { console.warn('Background address label resolution failed:', err); });
+        return { items, messages, addressLabels: new Map() };
+      }
+
       const [keywordChannelResult, mainSearchResult] = await Promise.allSettled([
         getKeywordChannelMessages(keyword),
         getKnownRootsSearchWindow(keyword, STANDARD_SEARCH_QTY)
