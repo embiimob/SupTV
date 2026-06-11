@@ -1271,6 +1271,7 @@
           <div class="compose-row" id="internalActionsRow">
             <button type="button" id="internalLockBtn">Lock</button>
             <button type="button" id="internalConsolidateBtn">Consolidate change</button>
+            <button type="button" id="internalConsolidateMessagingBtn">Consolidate for messaging</button>
             <button type="button" id="internalExportKeyBtn">Export key</button>
             <button type="button" id="internalForgetBtn">Forget key</button>
           </div>
@@ -1362,6 +1363,7 @@
       internalUnlockBtn: document.getElementById('internalUnlockBtn'),
       internalLockBtn: document.getElementById('internalLockBtn'),
       internalConsolidateBtn: document.getElementById('internalConsolidateBtn'),
+      internalConsolidateMessagingBtn: document.getElementById('internalConsolidateMessagingBtn'),
       internalExportKeyBtn: document.getElementById('internalExportKeyBtn'),
       internalForgetBtn: document.getElementById('internalForgetBtn'),
       internalGenerateBtn: document.getElementById('internalGenerateBtn'),
@@ -1498,6 +1500,7 @@
     let composerPreviewUrl = '';
     let walletSession = { providerId: '', provider: null, address: '' };
     let internalPrivKeyBytes = null;
+    let internalLastChangeOutputAddr = null;
     let walletSettingsOpen = false;
     let walletBalanceExpanded = false;
     let walletBalanceState = null;
@@ -2060,7 +2063,7 @@
 
     async function getAddressBalanceStats(address) {
       const cleanAddress = cleanDisplayText(address || '');
-      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0 };
+      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 };
       const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(cleanAddress)}`);
       if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
       const payload = await response.json();
@@ -2068,7 +2071,9 @@
       const mempoolStats = payload?.mempool_stats || {};
       const confirmedSat = (Number(chainStats.funded_txo_sum || 0) - Number(chainStats.spent_txo_sum || 0));
       const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
-      return { confirmedSat, unconfirmedSat };
+      const txCount = Number(chainStats.tx_count || 0) + Number(mempoolStats.tx_count || 0);
+      const utxoCount = (Number(chainStats.funded_txo_count || 0) - Number(chainStats.spent_txo_count || 0)) + (Number(mempoolStats.funded_txo_count || 0) - Number(mempoolStats.spent_txo_count || 0));
+      return { confirmedSat, unconfirmedSat, txCount, utxoCount };
     }
 
     async function refreshWalletBalance() {
@@ -2618,6 +2623,105 @@
       return encodeBase58Check(wifBytes);
     }
 
+
+    async function onConsolidateForMessaging() {
+      if (!walletSession.address || !internalPrivKeyBytes) {
+        setComposeStatus('Import/unlock the built-in testnet3 wallet first');
+        return;
+      }
+      try {
+        setComposeStatus('Collecting balances for messaging consolidation…');
+        const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
+
+        const allUtxos = [];
+        const validChanges = [];
+
+        await Promise.all(keyring.allSigners.map(async sg => {
+          const stats = await getAddressBalanceStats(sg.address).catch(() => ({confirmedSat: 0, unconfirmedSat: 0, utxoCount: 0}));
+          if (keyring.changeSigners.includes(sg)) {
+            sg.utxoCount = stats.utxoCount;
+            if (sg.utxoCount < 420) {
+              validChanges.push(sg);
+            }
+          }
+          if (stats.confirmedSat <= 0) return;
+          try {
+            const r = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(sg.address)}/utxo`);
+            if (!r.ok) throw new Error(`UTXO fetch failed for ${sg.label}`);
+            const j = await r.json();
+            const utxos = j.filter(u => u.status?.confirmed).map(u => ({...u, sourceAddress: sg.address, signer: sg}));
+            allUtxos.push(...utxos);
+          } catch(e) {}
+        }));
+
+        if (!allUtxos.length) {
+          setComposeStatus('No confirmed funds to consolidate');
+          return;
+        }
+
+        if (validChanges.length === 0) {
+           const nextIdx = keyring.changeSigners.length;
+           if (nextIdx < 200) {
+              const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx+1}`);
+              const newChange = await buildWalletSignerEntry(d, `change-${nextIdx+1}`);
+              newChange.utxoCount = 0;
+              keyring.changeSigners.push(newChange);
+              keyring.allSigners.push(newChange);
+              validChanges.push(newChange);
+           } else {
+              throw new Error('No valid change addresses to consolidate to');
+           }
+        }
+
+        validChanges.sort((a,b) => a.utxoCount - b.utxoCount);
+        const targetChange = validChanges[0];
+
+        let feeRate = BTC_DEFAULT_FEE_RATE;
+        try {
+          const fr = await fetch(`${MEMPOOL_TESTNET_API}/v1/fees/recommended`);
+          feeRate = Math.max(((await fr.json()).halfHourFee) || BTC_DEFAULT_FEE_RATE, BTC_MIN_FEE_RATE);
+        } catch { /* use default */ }
+
+        const estimateFee = Math.ceil((10 + 148 * allUtxos.length + 34) * feeRate);
+        const totalSat = allUtxos.reduce((sum, utxo) => sum + Number(utxo.value || 0), 0);
+        const sendSat = totalSat - estimateFee;
+        if (sendSat < BTC_DUST_LIMIT_SAT) {
+          throw new Error(`Consolidation output would be dust after fee (${sendSat} sat)`);
+        }
+
+        const rawHex = await buildSignedBtcTx(allUtxos, [{ address: targetChange.address, valueSats: sendSat }]);
+        setComposeStatus('Broadcasting consolidation transaction…');
+        const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: rawHex
+        });
+        if (!bcast.ok) {
+          const errText = await bcast.text().catch(() => String(bcast.status));
+          throw new Error(`Broadcast failed: ${errText}`);
+        }
+        const txid = (await bcast.text()).trim() || 'pending';
+        const txUrl = txid !== 'pending' ? `https://mempool.space/testnet/tx/${txid}` : null;
+        if (dom.composeStatus) {
+          const prefix = `Consolidated ${sendSat.toLocaleString()} sat to ${shortTitle(targetChange.address, 20)} · tx `;
+          if (txUrl) {
+            const link = document.createElement('a');
+            link.href = txUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = shortTitle(txid, 20);
+            dom.composeStatus.replaceChildren(document.createTextNode(prefix), link);
+          } else {
+            dom.composeStatus.textContent = prefix + txid;
+          }
+        }
+        if (composeEstimateRequestId) clearTimeout(composeEstimateRequestId);
+        composeEstimateRequestId = setTimeout(refreshWalletBalance, 2000);
+      } catch (err) {
+        setComposeStatus(err.message || 'Consolidation failed');
+      }
+    }
+
     async function onGenerateNewKey() {
       setComposeStatus('Generating a testnet3 address…');
       try {
@@ -2712,10 +2816,13 @@
     async function buildInternalWalletKeyring(basePrivBytes) {
       const main = await buildWalletSignerEntry(basePrivBytes, 'main');
       const changeSigners = [];
-      for (let i = 0; i < INTERNAL_CHANGE_ADDRESS_COUNT; i += 1) {
+      for (let i = 0; i < 200; i += 1) {
         const derivedPrivBytes = await deriveDeterministicInternalPrivKey(basePrivBytes, `slot-${i + 1}`);
         const signer = await buildWalletSignerEntry(derivedPrivBytes, `change-${i + 1}`);
+        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 }));
+        signer.utxoCount = stats.utxoCount;
         changeSigners.push(signer);
+        if (i >= 1 && stats.txCount === 0) break;
       }
       return { main, changeSigners, allSigners: [main, ...changeSigners] };
     }
@@ -2796,21 +2903,21 @@
       if (!internalPrivKeyBytes) throw new Error('Internal wallet is locked — import or unlock first');
       const keyring = await buildInternalWalletKeyring(internalPrivKeyBytes);
       const byAddress = new Map(keyring.allSigners.map((signer) => [signer.address, signer]));
-      const changeA = keyring.changeSigners[0];
-      const changeB = keyring.changeSigners[1];
-      if (!changeA || !changeB) throw new Error('Internal change-address keyring is unavailable');
 
       setComposeStatus('Fetching balances from main + derived change addresses…');
       const totalByAddress = new Map();
+      const utxoCountByAddr = new Map();
       let availableSat = 0;
 
       await Promise.all(keyring.allSigners.map(async (signer) => {
-        const stats = await getAddressBalanceStats(signer.address);
+        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 }));
         totalByAddress.set(signer.address, stats.confirmedSat);
+        utxoCountByAddr.set(signer.address, stats.utxoCount);
+        signer.utxoCount = stats.utxoCount;
         availableSat += stats.confirmedSat;
       }));
 
-      if (availableSat === 0) throw new Error(`No confirmed balances across ${keyring.main.address}, ${changeA.address}, ${changeB.address}`);
+      if (availableSat === 0) throw new Error('No confirmed balances across main or change addresses');
 
       let feeRate = BTC_DEFAULT_FEE_RATE;
       try {
@@ -2822,15 +2929,10 @@
       const outSats = sendManyOutputs.map(o => ({ address: o.address, valueSats: Math.round(o.amount * 1e8) }));
       const totalOut = outSats.reduce((s, o) => s + o.valueSats, 0);
 
-      const changeATotal = totalByAddress.get(changeA.address) || 0;
-      const changeBTotal = totalByAddress.get(changeB.address) || 0;
-      const mainTotal = totalByAddress.get(keyring.main.address) || 0;
-      const preferredSource = changeATotal >= changeBTotal ? changeA : changeB;
-      const secondarySource = preferredSource.address === changeA.address ? changeB : changeA;
-      const sourceCandidates = [];
-      if ((totalByAddress.get(preferredSource.address) || 0) > 0) sourceCandidates.push(preferredSource);
-      if ((totalByAddress.get(secondarySource.address) || 0) > 0) sourceCandidates.push(secondarySource);
-      if (mainTotal > 0) sourceCandidates.push(keyring.main);
+      const sourceCandidates = [...keyring.allSigners]
+        .filter(s => (totalByAddress.get(s.address) || 0) > 0)
+        .sort((a, b) => (totalByAddress.get(b.address) || 0) - (totalByAddress.get(a.address) || 0));
+
       if (!sourceCandidates.length) throw new Error('No spendable source address has confirmed balances');
 
       let selectedSource = null;
@@ -2839,12 +2941,17 @@
 
       for (const source of sourceCandidates) {
         setComposeStatus(`Fetching UTXOs for ${source.label}…`);
-        const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${source.address}/utxo`);
-        if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${source.label}`);
-        const pool = (await utxoResp.json())
-          .filter((utxo) => utxo.status?.confirmed)
-          .map((utxo) => ({ ...utxo, sourceAddress: source.address, signer: source }))
-          .sort((a, b) => b.value - a.value);
+        let pool = [];
+        try {
+          const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${source.address}/utxo`);
+          if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${source.label}`);
+          pool = (await utxoResp.json())
+            .filter((utxo) => utxo.status?.confirmed)
+            .map((utxo) => ({ ...utxo, sourceAddress: source.address, signer: source }))
+            .sort((a, b) => b.value - a.value);
+        } catch (e) {
+          continue; // Skip if utxo fetch fails
+        }
 
         const candidateSel = [];
         let candidateTotal = 0;
@@ -2869,12 +2976,37 @@
       const fee = estimateLegacyP2pkhFee(sel.length, outSats.length + 1);
       const change = selTotal - totalOut - fee;
       if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
-      let changeAddress = preferredSource.address;
-      if (selectedSource.address === changeA.address) {
-        changeAddress = changeB.address;
-      } else if (selectedSource.address === changeB.address) {
-        changeAddress = changeA.address;
+
+      let validChanges = keyring.changeSigners.filter(c => utxoCountByAddr.get(c.address) < 420);
+      if (validChanges.length === 0) {
+        const nextIdx = keyring.changeSigners.length;
+        if (nextIdx < 200) {
+          const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx+1}`);
+          const newChange = await buildWalletSignerEntry(d, `change-${nextIdx+1}`);
+          newChange.utxoCount = 0;
+          keyring.changeSigners.push(newChange);
+          keyring.allSigners.push(newChange);
+          validChanges.push(newChange);
+          byAddress.set(newChange.address, newChange);
+        } else {
+          throw new Error('All 200 change addresses have >= 420 UTXOs. Cannot create more change outputs.');
+        }
       }
+
+      let changeAddress = validChanges[0].address;
+      if (validChanges.length > 1) {
+        const lastIdx = validChanges.findIndex(c => c.address === internalLastChangeOutputAddr);
+        if (lastIdx >= 0) {
+          changeAddress = validChanges[(lastIdx + 1) % validChanges.length].address;
+        } else if (selectedSource) {
+          const selIdx = validChanges.findIndex(c => c.address === selectedSource.address);
+          if (selIdx >= 0) {
+            changeAddress = validChanges[(selIdx + 1) % validChanges.length].address;
+          }
+        }
+      }
+      internalLastChangeOutputAddr = changeAddress;
+
       const changeSigner = byAddress.get(changeAddress);
       if (!changeSigner) throw new Error('Could not resolve deterministic change destination');
       const finalOuts = [...outSats];
@@ -3879,11 +4011,15 @@
 
         setComposeStatus('Collecting change-address UTXOs…');
         const utxoGroups = await Promise.all(signersWithBalance.map(async (signer) => {
-          const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${signer.address}/utxo`);
-          if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${signer.label}`);
-          return (await utxoResp.json())
-            .filter((utxo) => utxo.status?.confirmed)
-            .map((utxo) => ({ ...utxo, signer }));
+          try {
+            const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${signer.address}/utxo`);
+            if (!utxoResp.ok) throw new Error(`UTXO fetch failed (${utxoResp.status}) for ${signer.label}`);
+            return (await utxoResp.json())
+              .filter((utxo) => utxo.status?.confirmed)
+              .map((utxo) => ({ ...utxo, signer }));
+          } catch (e) {
+            return [];
+          }
         }));
         const utxos = utxoGroups.flat();
         if (!utxos.length) {
@@ -5174,6 +5310,7 @@
       dom.internalUnlockBtn.addEventListener('click', onInternalUnlock);
       dom.internalLockBtn.addEventListener('click', onInternalLock);
       dom.internalConsolidateBtn.addEventListener('click', onConsolidateChange);
+      if (dom.internalConsolidateMessagingBtn) dom.internalConsolidateMessagingBtn.addEventListener('click', onConsolidateForMessaging);
       dom.internalExportKeyBtn.addEventListener('click', onExportPrivKey);
       dom.internalForgetBtn.addEventListener('click', onInternalForget);
       if (dom.internalGenerateBtn) dom.internalGenerateBtn.addEventListener('click', onGenerateNewKey);
