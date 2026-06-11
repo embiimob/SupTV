@@ -1792,10 +1792,10 @@
     };
     const profileDisplayName = (profile) => {
       if (!profile || typeof profile !== 'object') return '';
-      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || '');
-      if (urn) return urn;
       const displayName = cleanDisplayText(profile.dnm || profile.DNM || profile.displayName || profile.DisplayName || '');
       if (displayName) return displayName;
+      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || '');
+      if (urn) return urn;
       const fullName = [
         profile.fnm, profile.FNM, profile.firstName, profile.FirstName,
         profile.mnm, profile.MNM, profile.middleName, profile.MiddleName,
@@ -2235,9 +2235,10 @@
           90
         );
         dom.composeProfileTitle.textContent = title;
-        dom.composeProfileMeta.textContent = profileUrn === title
-          ? (bio || profileUrn || 'No profile URN')
-          : `${profileUrn || 'No profile URN'}${bio ? ` · ${bio}` : ''}`;
+        const displayUrn = profileUrn ? `@${profileUrn}` : 'No profile URN';
+        dom.composeProfileMeta.textContent = displayUrn === title
+          ? (bio || displayUrn)
+          : `${displayUrn}${bio ? ` · ${bio}` : ''}`;
         if (dom.composeProfileExtra) {
           const pieces = [];
           if (hometown) pieces.push(`Location: ${hometown}`);
