@@ -1758,7 +1758,7 @@
       if (left.startsWith('0x') && right.startsWith('0x')) return left.toLowerCase() === right.toLowerCase();
       return false;
     };
-    const extractProfileUrn = (profile) => cleanDisplayText(profile?.urn || profile?.URN || profile?.Urn || profile?.profileURN || profile?.ProfileURN || '');
+    const extractProfileUrn = (profile) => cleanDisplayText(profile?.urn || profile?.URN || profile?.Urn || profile?.profileURN || profile?.ProfileURN || profile?.['@handle'] || '');
     const normalizeCreatorValue = (value) => {
       if (!value) return '';
       if (typeof value === 'string') return normalizeAddressForCompare(value);
@@ -1792,10 +1792,10 @@
     };
     const profileDisplayName = (profile) => {
       if (!profile || typeof profile !== 'object') return '';
+      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || profile['@handle'] || '');
+      if (urn) return urn;
       const displayName = cleanDisplayText(profile.dnm || profile.DNM || profile.displayName || profile.DisplayName || '');
       if (displayName) return displayName;
-      const urn = cleanDisplayText(profile.urn || profile.URN || profile.Urn || '');
-      if (urn) return urn;
       const fullName = [
         profile.fnm, profile.FNM, profile.firstName, profile.FirstName,
         profile.mnm, profile.MNM, profile.middleName, profile.MiddleName,
@@ -3588,6 +3588,11 @@
         }
       })();
       profileByAddressCache.set(cleanAddress, lookup);
+      lookup.then((result) => {
+        if (!result) profileByAddressCache.delete(cleanAddress);
+      }).catch(() => {
+        profileByAddressCache.delete(cleanAddress);
+      });
       return lookup;
     }
 
@@ -3606,6 +3611,11 @@
         }
       })();
       profileByUrnCache.set(cleanUrn, lookup);
+      lookup.then((result) => {
+        if (!result) profileByUrnCache.delete(cleanUrn);
+      }).catch(() => {
+        profileByUrnCache.delete(cleanUrn);
+      });
       return lookup;
     }
 
