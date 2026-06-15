@@ -4593,6 +4593,17 @@
       // rate-limited profile lookups. Labels are cosmetic only (the "from" display field).
       const items = dedupeItemsByTxid(parseItems(messages, new Map()));
       if (!items.length) {
+        if (!normalizedKeyword.startsWith('@')) {
+          try {
+            const fallbackResult = await queryP2FK(`@${normalizedKeyword}`);
+            return {
+              ...fallbackResult,
+              displayKeyword: `@${normalizedKeyword}`
+            };
+          } catch (fallbackError) {
+            throw new Error('no playable videos in keyword or search results');
+          }
+        }
         throw new Error('no playable videos in keyword or search results');
       }
       // Resolve address labels in background; update the social feed once ready.
@@ -5092,7 +5103,7 @@
           ? await queryTrendingP2FK()
           : await queryP2FK(cleanedInput);
         if (requestId !== loadSearchRequestId) return;
-        if (isTrendingDefault && result?.displayKeyword) {
+        if (result?.displayKeyword) {
           displayKeyword = result.displayKeyword;
           currentKeyword = displayKeyword;
         }
