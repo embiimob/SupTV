@@ -1384,8 +1384,8 @@
     const TRENDING_EMPTY_MESSAGE = 'Nothing is currently trending.';
     const TRENDING_RESULT_METRIC_KEYS = ['lastResultCount', 'averageResultCount', 'maxResultCount', 'resultTotal', 'results', 'totalResults', 'resultCount', 'LastResultCount', 'AverageResultCount', 'MaxResultCount', 'ResultTotal', 'Results', 'TotalResults', 'ResultCount'];
     const TRENDING_SEARCH_METRIC_KEYS = ['successfulSearchCount', 'searchTotal', 'searchCount', 'count', 'total', 'SuccessfulSearchCount', 'SearchTotal', 'SearchCount', 'Count', 'Total'];
-    const STANDARD_SEARCH_QTY = 1000;
-    const TRENDING_SEARCH_QTY = 200;
+    const STANDARD_SEARCH_QTY = 5000;
+    const TRENDING_SEARCH_QTY = 1000;
     const TRENDING_KEYWORD_FETCH_TIMEOUT_MS = 12000;
     const TRENDING_KEYWORD_FETCH_CONCURRENCY = 4;
     const P2FK_API_MAX_CALLS_PER_WINDOW = 40;
@@ -4499,7 +4499,7 @@
       return payload;
     }
 
-    async function getPublicMessagesByAddress(address, skip = 0, qty = 1000) {
+    async function getPublicMessagesByAddress(address, skip = 0, qty = 5000) {
       const endpoint = `${P2FK_BASE_URL}/GetPublicMessagesByAddress/${encodeURIComponent(address)}?skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`message lookup failed (${response.status})`);
@@ -4507,7 +4507,7 @@
       return asArray(payload);
     }
 
-    async function getKnownRootsBySearchString(searchString, skip = 0, qty = 1000) {
+    async function getKnownRootsBySearchString(searchString, skip = 0, qty = 5000) {
       const normalizedSearchString = normalize(searchString) || '*';
       const endpoint = `${P2FK_BASE_URL}/GetKnownRootsBySearchString?searchString=${encodeURIComponent(normalizedSearchString)}&skip=${skip}&qty=${qty}&mainnet=${USE_P2FK_MAINNET}&showSystemFiles=false`;
       const response = await fetch(endpoint);
@@ -4516,7 +4516,7 @@
       return asArray(payload);
     }
 
-    async function getKnownRootsBySearchStringWithTimeout(searchString, skip = 0, qty = 1000, timeoutMs = TRENDING_KEYWORD_FETCH_TIMEOUT_MS) {
+    async function getKnownRootsBySearchStringWithTimeout(searchString, skip = 0, qty = 5000, timeoutMs = TRENDING_KEYWORD_FETCH_TIMEOUT_MS) {
       let timeoutId = null;
       try {
         return await Promise.race([
@@ -4532,7 +4532,7 @@
 
     async function getKeywordChannelMessages(keyword) {
       const address = await getPublicAddressByKeyword(keyword);
-      return getPublicMessagesByAddress(address, 0, 1000);
+      return getPublicMessagesByAddress(address, 0, 5000);
     }
 
     async function getProfileAddressByUrnSearch(searchString) {
@@ -4551,7 +4551,7 @@
 
     async function getProfileChannelMessages(searchString) {
       const address = await getProfileAddressByUrnSearch(searchString);
-      return getPublicMessagesByAddress(address, 0, 1000);
+      return getPublicMessagesByAddress(address, 0, 5000);
     }
 
     async function fetchTrendingKeywordMessages(keyword) {
