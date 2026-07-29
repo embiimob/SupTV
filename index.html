@@ -2064,7 +2064,7 @@
 
     async function getAddressBalanceStats(address) {
       const cleanAddress = cleanDisplayText(address || '');
-      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 };
+      if (!cleanAddress) return { confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0, fundedTxoCount: 0 };
       const response = await fetch(`${MEMPOOL_TESTNET_API}/address/${encodeURIComponent(cleanAddress)}`);
       if (!response.ok) throw new Error(`Balance lookup failed (${response.status})`);
       const payload = await response.json();
@@ -2074,7 +2074,8 @@
       const unconfirmedSat = (Number(mempoolStats.funded_txo_sum || 0) - Number(mempoolStats.spent_txo_sum || 0));
       const txCount = Number(chainStats.tx_count || 0) + Number(mempoolStats.tx_count || 0);
       const utxoCount = (Number(chainStats.funded_txo_count || 0) - Number(chainStats.spent_txo_count || 0)) + (Number(mempoolStats.funded_txo_count || 0) - Number(mempoolStats.spent_txo_count || 0));
-      return { confirmedSat, unconfirmedSat, txCount, utxoCount };
+      const fundedTxoCount = Number(chainStats.funded_txo_count || 0);
+      return { confirmedSat, unconfirmedSat, txCount, utxoCount, fundedTxoCount };
     }
 
     async function refreshWalletBalance() {
@@ -2639,10 +2640,11 @@
         const validChanges = [];
 
         await Promise.all(keyring.allSigners.map(async sg => {
-          const stats = await getAddressBalanceStats(sg.address).catch(() => ({confirmedSat: 0, unconfirmedSat: 0, utxoCount: 0}));
+          const stats = await getAddressBalanceStats(sg.address).catch(() => ({confirmedSat: 0, unconfirmedSat: 0, utxoCount: 0, fundedTxoCount: 0}));
           if (keyring.changeSigners.includes(sg)) {
             sg.utxoCount = stats.utxoCount;
-            if (sg.utxoCount < 420) {
+            sg.fundedTxoCount = stats.fundedTxoCount || 0;
+            if ((sg.fundedTxoCount || 0) <= 450) {
               validChanges.push(sg);
             }
           }
@@ -2662,20 +2664,27 @@
         }
 
         if (validChanges.length === 0) {
-           const nextIdx = keyring.changeSigners.length;
-           if (nextIdx < 200) {
-              const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx+1}`);
-              const newChange = await buildWalletSignerEntry(d, `change-${nextIdx+1}`);
-              newChange.utxoCount = 0;
-              keyring.changeSigners.push(newChange);
-              keyring.allSigners.push(newChange);
+          let found = false;
+          for (let nextIdx = keyring.changeSigners.length; nextIdx < 200; nextIdx++) {
+            const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx + 1}`);
+            const newChange = await buildWalletSignerEntry(d, `change-${nextIdx + 1}`);
+            const newBal = await getAddressBalanceStats(newChange.address).catch(() => ({ fundedTxoCount: 0, utxoCount: 0 }));
+            newChange.fundedTxoCount = newBal.fundedTxoCount || 0;
+            newChange.utxoCount = newBal.utxoCount || 0;
+            keyring.changeSigners.push(newChange);
+            keyring.allSigners.push(newChange);
+            if (newChange.fundedTxoCount <= 450) {
               validChanges.push(newChange);
-           } else {
-              throw new Error('No valid change addresses to consolidate to');
-           }
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            throw new Error('No valid change addresses to consolidate to');
+          }
         }
 
-        validChanges.sort((a,b) => a.utxoCount - b.utxoCount);
+        validChanges.sort((a, b) => (a.fundedTxoCount || 0) - (b.fundedTxoCount || 0));
         const targetChange = validChanges[0];
 
         let feeRate = BTC_DEFAULT_FEE_RATE;
@@ -2821,10 +2830,14 @@
       for (let i = 0; i < 200; i += 1) {
         const derivedPrivBytes = await deriveDeterministicInternalPrivKey(basePrivBytes, `slot-${i + 1}`);
         const signer = await buildWalletSignerEntry(derivedPrivBytes, `change-${i + 1}`);
-        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 }));
+        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0, fundedTxoCount: 0 }));
         signer.utxoCount = stats.utxoCount;
-        changeSigners.push(signer);
+        signer.fundedTxoCount = stats.fundedTxoCount || 0;
         if (i >= 1 && stats.txCount === 0) break;
+        // Skip addresses with 0 balance that have exceeded the spam-filter threshold
+        const totalBalance = (stats.confirmedSat || 0) + (stats.unconfirmedSat || 0);
+        if (totalBalance === 0 && signer.fundedTxoCount > 450) continue;
+        changeSigners.push(signer);
       }
       return { main, changeSigners, allSigners: [main, ...changeSigners] };
     }
@@ -2912,10 +2925,11 @@
       let availableSat = 0;
 
       await Promise.all(keyring.allSigners.map(async (signer) => {
-        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0 }));
+        const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0, fundedTxoCount: 0 }));
         totalByAddress.set(signer.address, stats.confirmedSat);
         utxoCountByAddr.set(signer.address, stats.utxoCount);
         signer.utxoCount = stats.utxoCount;
+        signer.fundedTxoCount = stats.fundedTxoCount || 0;
         availableSat += stats.confirmedSat;
       }));
 
@@ -2937,9 +2951,9 @@
 
       if (!sourceCandidates.length) throw new Error('No spendable source address has confirmed balances');
 
-      let selectedSource = null;
       let sel = [];
       let selTotal = 0;
+      let multiSource = false;
 
       for (const source of sourceCandidates) {
         setComposeStatus(`Fetching UTXOs for ${source.label}…`);
@@ -2965,55 +2979,87 @@
         }
         const candidateFee = estimateLegacyP2pkhFee(candidateSel.length, outSats.length + 1);
         if (candidateSel.length && candidateTotal >= totalOut + candidateFee) {
-          selectedSource = source;
           sel = candidateSel;
           selTotal = candidateTotal;
           break;
         }
       }
 
-      if (!selectedSource) {
-        throw new Error(`Insufficient funds in a single source address for valid sendmany/change routing: need >= ${totalOut} sat + fee, available ${availableSat} sat`);
+      // If no single source has enough, combine confirmed UTXOs from all sources
+      if (!sel.length) {
+        setComposeStatus('No single address has enough — collecting UTXOs from all confirmed sources…');
+        const combinedUtxos = [];
+        await Promise.all(sourceCandidates.map(async (source) => {
+          try {
+            const utxoResp = await fetch(`${MEMPOOL_TESTNET_API}/address/${source.address}/utxo`);
+            if (!utxoResp.ok) return;
+            const utxos = (await utxoResp.json())
+              .filter((utxo) => utxo.status?.confirmed)
+              .map((utxo) => ({ ...utxo, sourceAddress: source.address, signer: source }));
+            combinedUtxos.push(...utxos);
+          } catch { /* skip */ }
+        }));
+        combinedUtxos.sort((a, b) => b.value - a.value);
+        let combinedTotal = 0;
+        const combinedSel = [];
+        for (const utxo of combinedUtxos) {
+          combinedSel.push(utxo);
+          combinedTotal += utxo.value;
+          const estFee = estimateLegacyP2pkhFee(combinedSel.length, outSats.length + 1);
+          if (combinedTotal >= totalOut + estFee) break;
+        }
+        const combinedFee = estimateLegacyP2pkhFee(combinedSel.length, outSats.length + 1);
+        if (combinedSel.length && combinedTotal >= totalOut + combinedFee) {
+          sel = combinedSel;
+          selTotal = combinedTotal;
+          multiSource = true;
+        }
+      }
+
+      if (!sel.length) {
+        throw new Error(`Insufficient confirmed funds: need >= ${totalOut} sat + fee, available ${availableSat} sat`);
       }
       const fee = estimateLegacyP2pkhFee(sel.length, outSats.length + 1);
       const change = selTotal - totalOut - fee;
       if (change < 0) throw new Error(`Insufficient funds: need ${totalOut + fee} sat, have ${selTotal} sat`);
 
-      let validChanges = keyring.changeSigners.filter(c => utxoCountByAddr.get(c.address) < 420);
+      // Select change address: must have fundedTxoCount <= 450 (spam filter safe); prefer lowest count
+      let validChanges = keyring.changeSigners.filter(c => (c.fundedTxoCount || 0) <= 450);
+
       if (validChanges.length === 0) {
-        const nextIdx = keyring.changeSigners.length;
-        if (nextIdx < 200) {
-          const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx+1}`);
-          const newChange = await buildWalletSignerEntry(d, `change-${nextIdx+1}`);
-          newChange.utxoCount = 0;
+        // Try to find a fresh slot beyond the current keyring
+        let found = false;
+        for (let nextIdx = keyring.changeSigners.length; nextIdx < 200; nextIdx++) {
+          const d = await deriveDeterministicInternalPrivKey(keyring.main.privBytes, `slot-${nextIdx + 1}`);
+          const newChange = await buildWalletSignerEntry(d, `change-${nextIdx + 1}`);
+          const newBal = await getAddressBalanceStats(newChange.address).catch(() => ({ fundedTxoCount: 0, utxoCount: 0 }));
+          newChange.fundedTxoCount = newBal.fundedTxoCount || 0;
+          newChange.utxoCount = newBal.utxoCount || 0;
           keyring.changeSigners.push(newChange);
           keyring.allSigners.push(newChange);
-          validChanges.push(newChange);
           byAddress.set(newChange.address, newChange);
-        } else {
-          throw new Error('All 200 change addresses have >= 420 UTXOs. Cannot create more change outputs.');
+          if (newChange.fundedTxoCount <= 450) {
+            validChanges.push(newChange);
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new Error('All change addresses have exceeded the spam filter limit (450 funded outputs). Cannot create change output.');
         }
       }
 
-      let changeAddress = validChanges[0].address;
-      if (validChanges.length > 1) {
-        const lastIdx = validChanges.findIndex(c => c.address === internalLastChangeOutputAddr);
-        if (lastIdx >= 0) {
-          changeAddress = validChanges[(lastIdx + 1) % validChanges.length].address;
-        } else if (selectedSource) {
-          const selIdx = validChanges.findIndex(c => c.address === selectedSource.address);
-          if (selIdx >= 0) {
-            changeAddress = validChanges[(selIdx + 1) % validChanges.length].address;
-          }
-        }
-      }
+      // Always use the address with the lowest funded_txo_count
+      validChanges.sort((a, b) => (a.fundedTxoCount || 0) - (b.fundedTxoCount || 0));
+      const changeAddress = validChanges[0].address;
       internalLastChangeOutputAddr = changeAddress;
 
       const changeSigner = byAddress.get(changeAddress);
       if (!changeSigner) throw new Error('Could not resolve deterministic change destination');
       const finalOuts = [...outSats];
       if (change >= BTC_DUST_LIMIT_SAT) finalOuts.push({ address: changeAddress, valueSats: change });
-      setComposeStatus(`Signing tx (${sel.length} inputs from ${selectedSource.label}, ${finalOuts.length} outputs, ~${fee} sat fee, change → ${changeSigner.label})…`);
+      const sourceDesc = multiSource ? `${sel.length} inputs (multi-source)` : `${sel.length} inputs from ${sel[0]?.signer?.label || 'unknown'}`;
+      setComposeStatus(`Signing tx (${sourceDesc}, ${finalOuts.length} outputs, ~${fee} sat fee, change → ${changeSigner.label})…`);
       const rawHex = await buildSignedBtcTx(sel, finalOuts);
       setComposeStatus('Broadcasting transaction…');
       const bcast = await fetch(`${MEMPOOL_TESTNET_API}/tx`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: rawHex });
