@@ -2833,8 +2833,12 @@
         const stats = await getAddressBalanceStats(signer.address).catch(() => ({ confirmedSat: 0, unconfirmedSat: 0, txCount: 0, utxoCount: 0, fundedTxoCount: 0 }));
         signer.utxoCount = stats.utxoCount;
         signer.fundedTxoCount = stats.fundedTxoCount || 0;
+        // Break at the first fresh unused address — txCount === 0 implies fundedTxoCount === 0,
+        // so the spam-filter below can never trigger on this address; breaking first avoids
+        // including bare unused slots in the keyring.
         if (i >= 1 && stats.txCount === 0) break;
-        // Skip addresses with 0 balance that have exceeded the spam-filter threshold
+        // Skip 0-balance addresses whose funded_txo_count exceeds the spam-filter threshold (450).
+        // These addresses are exhausted (mempool would reject outputs to them) and hold no funds.
         const totalBalance = (stats.confirmedSat || 0) + (stats.unconfirmedSat || 0);
         if (totalBalance === 0 && signer.fundedTxoCount > 450) continue;
         changeSigners.push(signer);
