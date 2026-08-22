@@ -1394,7 +1394,7 @@
     const TICKER_SCROLL_SPEED_PX_PER_SECOND = 44;
     const MS_PER_SECOND = 1000;
     const STREAM_RETRY_LIMIT = 1;
-    const IPFS_GATEWAY_RETRY_LIMIT = 1;
+    const IPFS_GATEWAY_RETRY_LIMIT = 3;
     const ACTIVE_STREAM_TIMEOUT_MS = 12000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
@@ -1433,10 +1433,10 @@
     const BTC_DEFAULT_FEE_RATE = 10; // sat/vbyte fallback when fee API is unreachable
     const BTC_MIN_FEE_RATE = 2; // sat/vbyte absolute minimum
     const IPFS_GATEWAY_URLS = [
-      'https://ipfs.io/ipfs/',
-      'https://cloudflare-ipfs.com/ipfs/',
-      'https://dweb.link/ipfs/',
-      'https://gateway.pinata.cloud/ipfs/'
+      'https://gateway.pinata.cloud/ipfs/',
+      'https://4everland.io/ipfs/',
+      'https://ipfs.filebase.io/ipfs/',
+      'https://hardbin.com/ipfs/'
     ];
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|qt|quicktime|avi|m3u8))/i;
