@@ -1382,6 +1382,68 @@
     <button type="button" class="ticker-wrap" id="tickerWrap" aria-controls="bannerMenu" aria-expanded="false" aria-label="Show queued videos and trending searches"><span id="ticker"></span></button>
   </main>
 
+  <script type="module">
+    // Establish a direct connection to the IPFS network via Helia (verified-fetch).
+    // Blob URLs created here are consumed by the main script through window.__heliaFetch.
+    import { createVerifiedFetch } from 'https://esm.sh/@helia/verified-fetch@4';
+
+    let verifiedFetch = null;
+    const heliaReadyPromise = createVerifiedFetch().then((fn) => {
+      verifiedFetch = fn;
+      console.info('Helia: IPFS node ready');
+    }).catch((err) => {
+      console.warn('Helia: initialization failed, gateway fallback will be used', err);
+    });
+
+    // heliaBlobUrlCache maps a gateway URL key → blob URL.
+    // heliaFetchPromises maps a gateway URL key → in-flight Promise<string|null>.
+    const heliaBlobUrlCache = new Map();
+    const heliaFetchPromises = new Map();
+
+    // Start a direct IPFS fetch for the given CID/path.  Returns a blob: URL on
+    // success or null when Helia is unavailable or the fetch fails.
+    window.__heliaFetch = async function heliaFetch(cid, path, entryUrl) {
+      const key = entryUrl || `${cid}/${path || ''}`;
+
+      if (heliaBlobUrlCache.has(key)) return heliaBlobUrlCache.get(key);
+      if (heliaFetchPromises.has(key)) return heliaFetchPromises.get(key);
+
+      const p = (async () => {
+        await heliaReadyPromise;
+        if (!verifiedFetch) return null;
+        const ipfsUrl = path ? `ipfs://${cid}/${path}` : `ipfs://${cid}`;
+        const resp = await verifiedFetch(ipfsUrl);
+        if (!resp.ok) throw new Error(`Helia fetch ${resp.status}`);
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        heliaBlobUrlCache.set(key, blobUrl);
+        return blobUrl;
+      })().catch((err) => {
+        console.debug('Helia: fetch failed for', cid, err?.message || err);
+        return null;
+      }).finally(() => {
+        heliaFetchPromises.delete(key);
+      });
+
+      heliaFetchPromises.set(key, p);
+      return p;
+    };
+
+    // Return any already-cached blob URL without starting a new fetch.
+    window.__heliaGetCachedBlob = function heliaGetCachedBlob(entryUrl) {
+      return heliaBlobUrlCache.get(entryUrl) || null;
+    };
+
+    // Revoke and discard a cached blob URL.
+    window.__heliaRevokeBlob = function heliaRevokeBlob(entryUrl) {
+      const blobUrl = heliaBlobUrlCache.get(entryUrl);
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        heliaBlobUrlCache.delete(entryUrl);
+      }
+    };
+  </script>
+
   <script>
     const dom = {
       video: document.getElementById('player'),
@@ -1520,6 +1582,9 @@
       'https://gateway.pinata.cloud/ipfs/',
       'https://hardbin.com/ipfs/'
     ];
+    // Maximum time (ms) to wait for a direct Helia IPFS fetch before falling
+    // back to a public gateway when the current item is about to play.
+    const HELIA_PLAY_TIMEOUT_MS = 30000;
     const USE_P2FK_MAINNET = false;
     const VIDEO_FILE_REGEX = /([a-zA-Z0-9\s._-]+\.(mp4|webm|ogv|mov|qt|quicktime|avi|m3u8))/i;
     const IPFS_REGEX = /IPFS:([a-zA-Z0-9]{59}|[a-zA-Z0-9]{46})(?:[\\/]+([^\s<>]+))?/i;
@@ -4624,6 +4689,10 @@
       return isBufferedFromStartThroughEnd(videoEl);
     }
 
+    function clearHeliaBlobUrl(url) {
+      if (typeof window.__heliaRevokeBlob === 'function') window.__heliaRevokeBlob(url);
+    }
+
     function clearPreloadProbe(url, media) {
       const probe = media || preloadElements.get(url);
       if (probe) {
@@ -4688,6 +4757,21 @@
         probe.src = candidate.url;
         probe.load();
         preloadElements.set(candidate.url, probe);
+        // Start a direct IPFS download for this candidate in the background so
+        // the blob URL is cached and ready before the item reaches the front of
+        // the queue.  The probe (gateway) download runs in parallel as a fallback.
+        if (typeof window.__heliaFetch === 'function') {
+          window.__heliaFetch(candidate.hash, candidate.path || '', candidate.url)
+            .then((blobUrl) => {
+              if (!blobUrl) return;
+              // Mark as ready once the blob is fully downloaded.
+              if (videoStatusByUrl.get(candidate.url) !== 'error') {
+                videoStatusByUrl.set(candidate.url, 'ready');
+                updateTicker();
+              }
+            })
+            .catch(() => {});
+        }
         const pollId = window.setInterval(() => {
           if (!preloadElements.has(candidate.url)) {
             clearPreloadProbe(candidate.url, probe);
@@ -5168,7 +5252,7 @@
       return partialResult;
     }
 
-    function playCurrent() {
+    async function playCurrent() {
       while (playQueue.length) {
         const candidate = playQueue[0];
         if (videoStatusByUrl.get(candidate.url) !== 'error') break;
@@ -5218,8 +5302,35 @@
       updateTicker(playQueue, currentKeyword);
       scheduleTimelineForCurrent(entry, playQueue[1] || null);
       showWaiting(`Loading "${entry.title}"…`);
+
+      // Attempt to resolve the video via a direct IPFS connection (Helia).
+      // A pre-fetched blob URL (from primePreloadCandidates) is used immediately;
+      // otherwise we wait up to HELIA_PLAY_TIMEOUT_MS before falling back to the
+      // gateway URL so playback degrades gracefully when Helia is unavailable.
+      let resolvedUrl = entry.url;
+      if (typeof window.__heliaFetch === 'function') {
+        const cachedBlob = window.__heliaGetCachedBlob?.(entry.url);
+        if (cachedBlob) {
+          resolvedUrl = cachedBlob;
+        } else {
+          showWaiting('Connecting to IPFS network…');
+          const heliaResult = await Promise.race([
+            window.__heliaFetch(entry.hash, entry.path || '', entry.url),
+            new Promise((res) => { setTimeout(() => res(null), HELIA_PLAY_TIMEOUT_MS); })
+          ]);
+          // Bail if the queue changed while we were waiting (user skipped, etc.)
+          if (currentEntry !== entry) return;
+          if (heliaResult) {
+            resolvedUrl = heliaResult;
+          } else {
+            addMessage({ title: 'IPFS network timeout', meta: 'player', body: 'Direct IPFS fetch timed out – using gateway fallback' });
+          }
+        }
+      }
+
       const probe = preloadElements.get(entry.url);
-      if (probe) {
+      if (probe && !window.__heliaGetCachedBlob?.(entry.url)) {
+        // Use the preloaded gateway probe when no Helia blob is available.
         probe.muted = dom.video.muted;
         probe.volume = dom.video.volume;
         probe.id = dom.video.id;
@@ -5232,7 +5343,12 @@
         preloadElements.delete(entry.url);
         attachVideoListeners(dom.video);
       } else {
-        dom.video.src = entry.url;
+        if (probe) {
+          // A Helia blob is available; discard the gateway probe to avoid
+          // double-downloading the same content.
+          clearPreloadProbe(entry.url, probe);
+        }
+        dom.video.src = resolvedUrl;
         dom.video.load();
       }
       primePreloadCandidates();
@@ -5259,6 +5375,7 @@
       const last = playQueue.shift();
       if (last?.url) {
         clearPreloadProbe(last.url, preloadElements.get(last.url));
+        clearHeliaBlobUrl(last.url);
         clearStreamRetry(last.url);
         videoStatusByUrl.delete(last.url);
       }
@@ -5270,6 +5387,7 @@
       if (!current) return;
       trashedVideoUrls.add(current.url);
       clearStreamRetry(current.url);
+      clearHeliaBlobUrl(current.url);
       videoStatusByUrl.delete(current.url);
       playQueue = playQueue.filter((item) => !trashedVideoUrls.has(item.url));
       addMessage({
