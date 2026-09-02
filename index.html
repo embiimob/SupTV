@@ -4809,11 +4809,30 @@
       return getPublicMessagesByAddress(address, 0, 5000);
     }
 
+    function parseSearchIntent(searchString) {
+      const normalizedSearch = normalize(searchString);
+      if (normalizedSearch.startsWith('@')) {
+        return { type: 'profile', term: normalizedSearch };
+      }
+      if (normalizedSearch.startsWith('#')) {
+        return { type: 'keyword', term: normalize(normalizedSearch.replace(/^#+/, '')) };
+      }
+      return { type: 'keyword', term: normalizedSearch };
+    }
+
     async function fetchTrendingKeywordMessages(keyword) {
+      const searchIntent = parseSearchIntent(keyword);
+      if (searchIntent.type === 'profile') {
+        return Promise.race([
+          getProfileChannelMessages(searchIntent.term),
+          new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
+        ]).catch(() => []);
+      }
+      const keywordTerm = searchIntent.term;
       const [searchRaw, channelRaw] = await Promise.all([
-        getKnownRootsBySearchStringWithTimeout(keyword, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
+        getKnownRootsBySearchStringWithTimeout(keywordTerm, 0, TRENDING_SEARCH_QTY).then(asArray).catch(() => []),
         Promise.race([
-          getKeywordChannelMessages(keyword),
+          getKeywordChannelMessages(keywordTerm),
           new Promise((resolve) => setTimeout(() => resolve([]), TRENDING_KEYWORD_FETCH_TIMEOUT_MS))
         ]).catch(() => [])
       ]);
@@ -4821,9 +4840,10 @@
     }
 
     async function queryP2FK(keyword) {
-      const normalizedKeyword = normalize(keyword);
-      if (normalizedKeyword.startsWith('@')) {
-        const profileMessages = await getProfileChannelMessages(normalizedKeyword);
+      const searchIntent = parseSearchIntent(keyword);
+      const normalizedKeyword = searchIntent.term;
+      if (searchIntent.type === 'profile') {
+        const profileMessages = await getProfileChannelMessages(searchIntent.term);
         const messages = mergeUniqueMessagesByTxid(profileMessages);
         const items = dedupeItemsByTxid(parseItems(messages, new Map()));
         if (!items.length) {
