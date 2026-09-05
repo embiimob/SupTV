@@ -1596,6 +1596,7 @@
     let composeProfileAvatarCandidateIndex = 0;
     const mediaObjectUrlBySourceUrl = new Map();
     const mediaCacheFillPromises = new Map();
+    const mediaCacheResolvePromises = new Map();
     const mediaElementCacheToken = new WeakMap();
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -1777,24 +1778,31 @@
         mediaObjectUrlBySourceUrl.set(cleanUrl, existingObjectUrl);
         return existingObjectUrl;
       }
-      const cached = await cache.match(cleanUrl);
-      if (!cached) {
-        if (populateOnMiss) populateMediaDiskCache(cleanUrl).catch(() => {});
-        return cleanUrl;
-      }
-      if (cached.type === 'opaque') return cleanUrl;
-      const blob = await cached.clone().blob();
-      if (!(blob?.size > 0)) return cleanUrl;
-      while (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) {
-        const oldestEntry = mediaObjectUrlBySourceUrl.entries().next().value;
-        if (!oldestEntry) break;
-        const [oldSourceUrl, oldObjectUrl] = oldestEntry;
-        mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
-        try { URL.revokeObjectURL(oldObjectUrl); } catch {}
-      }
-      const objectUrl = URL.createObjectURL(blob);
-      mediaObjectUrlBySourceUrl.set(cleanUrl, objectUrl);
-      return objectUrl;
+      if (mediaCacheResolvePromises.has(cleanUrl)) return mediaCacheResolvePromises.get(cleanUrl);
+      const resolvePromise = (async () => {
+        const cached = await cache.match(cleanUrl);
+        if (!cached) {
+          if (populateOnMiss) populateMediaDiskCache(cleanUrl).catch(() => {});
+          return cleanUrl;
+        }
+        if (cached.type === 'opaque') return cleanUrl;
+        const blob = await cached.clone().blob();
+        if (!(blob?.size > 0)) return cleanUrl;
+        while (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) {
+          const oldestEntry = mediaObjectUrlBySourceUrl.entries().next().value;
+          if (!oldestEntry) break;
+          const [oldSourceUrl, oldObjectUrl] = oldestEntry;
+          mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
+          try { URL.revokeObjectURL(oldObjectUrl); } catch {}
+        }
+        const objectUrl = URL.createObjectURL(blob);
+        mediaObjectUrlBySourceUrl.set(cleanUrl, objectUrl);
+        return objectUrl;
+      })().finally(() => {
+        mediaCacheResolvePromises.delete(cleanUrl);
+      });
+      mediaCacheResolvePromises.set(cleanUrl, resolvePromise);
+      return resolvePromise;
     };
     const setMediaElementSourceWithCache = (mediaElement, sourceUrl, { invokeLoad = true } = {}) => {
       if (!mediaElement) return;
@@ -1803,6 +1811,7 @@
       mediaElementCacheToken.set(mediaElement, token);
       if (!cleanUrl) {
         mediaElement.removeAttribute('src');
+        if (mediaElement.dataset?.cacheSource) delete mediaElement.dataset.cacheSource;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
         return;
       }
