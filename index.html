@@ -1727,14 +1727,28 @@
     };
     const canUseCacheStorage = () => typeof caches !== 'undefined' && typeof caches.open === 'function';
     const isObjectUrl = (url) => /^blob:/i.test(normalize(url));
+    const releaseUnusedMappedObjectUrl = (objectUrl = '') => {
+      const cleanObjectUrl = normalize(objectUrl);
+      if (!isObjectUrl(cleanObjectUrl)) return;
+      if ((mediaObjectUrlRefCount.get(cleanObjectUrl) || 0) > 0) return;
+      for (const [sourceUrl, mappedObjectUrl] of mediaObjectUrlBySourceUrl.entries()) {
+        if (mappedObjectUrl !== cleanObjectUrl) continue;
+        mediaObjectUrlBySourceUrl.delete(sourceUrl);
+      }
+      try { URL.revokeObjectURL(cleanObjectUrl); } catch {}
+    };
     const updateMediaObjectUrlRef = (mediaElement, nextUrl = '') => {
+      const cleanNext = normalize(nextUrl);
       const previousObjectUrl = mediaElementAssignedObjectUrl.get(mediaElement);
+      if (previousObjectUrl && cleanNext === previousObjectUrl) return;
       if (previousObjectUrl && mediaObjectUrlRefCount.has(previousObjectUrl)) {
         const nextCount = Math.max(0, (mediaObjectUrlRefCount.get(previousObjectUrl) || 0) - 1);
         if (nextCount > 0) mediaObjectUrlRefCount.set(previousObjectUrl, nextCount);
-        else mediaObjectUrlRefCount.delete(previousObjectUrl);
+        else {
+          mediaObjectUrlRefCount.delete(previousObjectUrl);
+          releaseUnusedMappedObjectUrl(previousObjectUrl);
+        }
       }
-      const cleanNext = normalize(nextUrl);
       if (isObjectUrl(cleanNext)) {
         mediaElementAssignedObjectUrl.set(mediaElement, cleanNext);
         mediaObjectUrlRefCount.set(cleanNext, (mediaObjectUrlRefCount.get(cleanNext) || 0) + 1);
