@@ -1837,39 +1837,13 @@
         if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
         if (normalize(mediaElement.src) === normalize(cachedUrl)) return;
         const isMediaElement = typeof HTMLMediaElement !== 'undefined' && mediaElement instanceof HTMLMediaElement;
-        const restorePlayback = {
-          shouldRestoreTime: false,
-          currentTime: 0,
-          shouldPlay: false
-        };
         if (isMediaElement) {
-          restorePlayback.shouldPlay = !mediaElement.paused;
           const currentTime = Number(mediaElement.currentTime);
-          if (Number.isFinite(currentTime) && currentTime > 0) {
-            restorePlayback.shouldRestoreTime = true;
-            restorePlayback.currentTime = currentTime;
-          }
+          const hasStartedPlayback = !mediaElement.paused || (Number.isFinite(currentTime) && currentTime > 0);
+          if (hasStartedPlayback) return;
         }
         mediaElement.src = cachedUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
-        if (isMediaElement && (restorePlayback.shouldRestoreTime || restorePlayback.shouldPlay)) {
-          const restore = () => {
-            if (mediaElementCacheToken.get(mediaElement) !== token) return;
-            if (restorePlayback.shouldRestoreTime) {
-              try {
-                mediaElement.currentTime = restorePlayback.currentTime;
-              } catch {}
-            }
-            if (restorePlayback.shouldPlay) {
-              mediaElement.play().catch(() => {});
-            }
-          };
-          if (mediaElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
-            restore();
-          } else {
-            mediaElement.addEventListener('loadedmetadata', restore, { once: true });
-          }
-        }
       }).catch(() => {});
     };
     const warmMediaDiskCacheUrls = (urls = [], maxUrls = PRELOAD_COUNT * 3) => {
