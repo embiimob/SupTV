@@ -1854,6 +1854,7 @@
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
         if (isMediaElement && (restorePlayback.shouldRestoreTime || restorePlayback.shouldPlay)) {
           const restore = () => {
+            if (mediaElementCacheToken.get(mediaElement) !== token) return;
             if (restorePlayback.shouldRestoreTime) {
               try {
                 mediaElement.currentTime = restorePlayback.currentTime;
