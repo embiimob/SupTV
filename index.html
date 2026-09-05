@@ -1478,6 +1478,7 @@
     const MS_PER_SECOND = 1000;
     const STREAM_RETRY_LIMIT = 1;
     const IPFS_GATEWAY_RETRY_LIMIT = 3;
+    const MEDIA_OBJECT_URL_CACHE_LIMIT = 24;
     const ACTIVE_STREAM_TIMEOUT_MS = 45000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
@@ -1771,15 +1772,26 @@
       const cache = await getMediaDiskCache();
       if (!cache) return cleanUrl;
       const existingObjectUrl = mediaObjectUrlBySourceUrl.get(cleanUrl);
-      if (existingObjectUrl) return existingObjectUrl;
+      if (existingObjectUrl) {
+        mediaObjectUrlBySourceUrl.delete(cleanUrl);
+        mediaObjectUrlBySourceUrl.set(cleanUrl, existingObjectUrl);
+        return existingObjectUrl;
+      }
       const cached = await cache.match(cleanUrl);
       if (!cached) {
         if (populateOnMiss) populateMediaDiskCache(cleanUrl).catch(() => {});
         return cleanUrl;
       }
-      if (normalize(cached.type).toLowerCase() === 'opaque') return cleanUrl;
+      if (cached.type === 'opaque') return cleanUrl;
       const blob = await cached.clone().blob();
       if (!(blob?.size > 0)) return cleanUrl;
+      while (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) {
+        const oldestEntry = mediaObjectUrlBySourceUrl.entries().next().value;
+        if (!oldestEntry) break;
+        const [oldSourceUrl, oldObjectUrl] = oldestEntry;
+        mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
+        try { URL.revokeObjectURL(oldObjectUrl); } catch {}
+      }
       const objectUrl = URL.createObjectURL(blob);
       mediaObjectUrlBySourceUrl.set(cleanUrl, objectUrl);
       return objectUrl;
