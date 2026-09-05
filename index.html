@@ -1838,25 +1838,27 @@
         if (normalize(mediaElement.src) === normalize(cachedUrl)) return;
         const isMediaElement = typeof HTMLMediaElement !== 'undefined' && mediaElement instanceof HTMLMediaElement;
         const restorePlayback = {
-          shouldRestore: false,
+          shouldRestoreTime: false,
           currentTime: 0,
           shouldPlay: false
         };
         if (isMediaElement) {
+          restorePlayback.shouldPlay = !mediaElement.paused;
           const currentTime = Number(mediaElement.currentTime);
           if (Number.isFinite(currentTime) && currentTime > 0) {
-            restorePlayback.shouldRestore = true;
+            restorePlayback.shouldRestoreTime = true;
             restorePlayback.currentTime = currentTime;
-            restorePlayback.shouldPlay = !mediaElement.paused;
           }
         }
         mediaElement.src = cachedUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
-        if (isMediaElement && restorePlayback.shouldRestore) {
+        if (isMediaElement && (restorePlayback.shouldRestoreTime || restorePlayback.shouldPlay)) {
           const restore = () => {
-            try {
-              mediaElement.currentTime = restorePlayback.currentTime;
-            } catch {}
+            if (restorePlayback.shouldRestoreTime) {
+              try {
+                mediaElement.currentTime = restorePlayback.currentTime;
+              } catch {}
+            }
             if (restorePlayback.shouldPlay) {
               mediaElement.play().catch(() => {});
             }
