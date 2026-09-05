@@ -1836,8 +1836,37 @@
         if (mediaElementCacheToken.get(mediaElement) !== token) return;
         if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
         if (normalize(mediaElement.src) === normalize(cachedUrl)) return;
+        const isMediaElement = typeof HTMLMediaElement !== 'undefined' && mediaElement instanceof HTMLMediaElement;
+        const restorePlayback = {
+          shouldRestore: false,
+          currentTime: 0,
+          shouldPlay: false
+        };
+        if (isMediaElement) {
+          const currentTime = Number(mediaElement.currentTime);
+          if (Number.isFinite(currentTime) && currentTime > 0) {
+            restorePlayback.shouldRestore = true;
+            restorePlayback.currentTime = currentTime;
+            restorePlayback.shouldPlay = !mediaElement.paused;
+          }
+        }
         mediaElement.src = cachedUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+        if (isMediaElement && restorePlayback.shouldRestore) {
+          const restore = () => {
+            try {
+              mediaElement.currentTime = restorePlayback.currentTime;
+            } catch {}
+            if (restorePlayback.shouldPlay) {
+              mediaElement.play().catch(() => {});
+            }
+          };
+          if (mediaElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
+            restore();
+          } else {
+            mediaElement.addEventListener('loadedmetadata', restore, { once: true });
+          }
+        }
       }).catch(() => {});
     };
     const warmMediaDiskCacheUrls = (urls = [], maxUrls = PRELOAD_COUNT * 3) => {
