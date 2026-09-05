@@ -1729,7 +1729,7 @@
     const isObjectUrl = (url) => /^blob:/i.test(normalize(url));
     const updateMediaObjectUrlRef = (mediaElement, nextUrl = '') => {
       const previousObjectUrl = mediaElementAssignedObjectUrl.get(mediaElement);
-      if (previousObjectUrl) {
+      if (previousObjectUrl && mediaObjectUrlRefCount.has(previousObjectUrl)) {
         const nextCount = Math.max(0, (mediaObjectUrlRefCount.get(previousObjectUrl) || 0) - 1);
         if (nextCount > 0) mediaObjectUrlRefCount.set(previousObjectUrl, nextCount);
         else mediaObjectUrlRefCount.delete(previousObjectUrl);
@@ -1747,9 +1747,12 @@
         try {
           const parsed = new URL(gatewayUrl);
           const gatewayPath = normalize(parsed.pathname).replace(/\/+$/, '');
-          return `${parsed.origin}${gatewayPath ? `${gatewayPath}/` : '/'}`.toLowerCase();
+          return {
+            originLower: parsed.origin.toLowerCase(),
+            pathPrefix: `${gatewayPath ? `${gatewayPath}/` : '/'}`
+          };
         } catch {
-          return '';
+          return null;
         }
       })
       .filter(Boolean);
@@ -1759,10 +1762,13 @@
       try {
         const parsed = new URL(url);
         if (!/^https?:$/i.test(parsed.protocol)) return false;
-        const normalizedCandidate = `${parsed.origin}${parsed.pathname}`.toLowerCase();
-        const matchesTrustedGateway = normalizedIpfsGatewayCacheBases.some((baseUrl) => normalizedCandidate.startsWith(baseUrl));
+        const candidateOriginLower = parsed.origin.toLowerCase();
+        const candidatePath = parsed.pathname;
+        const matchesTrustedGateway = normalizedIpfsGatewayCacheBases.some((base) => (
+          candidateOriginLower === base.originLower && candidatePath.startsWith(base.pathPrefix)
+        ));
         if (!matchesTrustedGateway) return false;
-        return parsed.pathname.toLowerCase().includes('/ipfs/');
+        return candidatePath.includes('/ipfs/');
       } catch {
         return false;
       }
