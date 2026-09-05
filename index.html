@@ -1754,12 +1754,8 @@
       return caches.open(MEDIA_CACHE_NAME);
     };
     const fetchCacheableMediaResponse = async (url) => {
-      try {
-        const corsResponse = await fetch(url, { cache: 'no-store', credentials: 'omit', mode: 'cors' });
-        if (corsResponse?.ok || corsResponse?.type === 'opaque') return corsResponse;
-      } catch {}
-      const opaqueResponse = await fetch(url, { cache: 'no-store', credentials: 'omit', mode: 'no-cors' });
-      if (opaqueResponse?.ok || opaqueResponse?.type === 'opaque') return opaqueResponse;
+      const corsResponse = await fetch(url, { cache: 'no-store', credentials: 'omit', mode: 'cors' });
+      if (corsResponse?.ok && corsResponse.type !== 'opaque') return corsResponse;
       throw new Error('media fetch failed');
     };
     const populateMediaDiskCache = async (url) => {
@@ -1829,22 +1825,22 @@
         return;
       }
       mediaElement.dataset.cacheSource = cleanUrl;
-      mediaElement.src = cleanUrl;
-      if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
-      resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: true }).then((cachedUrl) => {
-        if (!cachedUrl) return;
+      if (!shouldDiskCacheMediaUrl(cleanUrl)) {
+        mediaElement.src = cleanUrl;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+        return;
+      }
+      resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: false }).then((cachedUrl) => {
         if (mediaElementCacheToken.get(mediaElement) !== token) return;
         if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
-        if (normalize(mediaElement.src) === normalize(cachedUrl)) return;
-        const isMediaElement = typeof HTMLMediaElement !== 'undefined' && mediaElement instanceof HTMLMediaElement;
-        if (isMediaElement) {
-          const currentTime = Number(mediaElement.currentTime);
-          const hasStartedPlayback = !mediaElement.paused || (Number.isFinite(currentTime) && currentTime > 0);
-          if (hasStartedPlayback) return;
-        }
-        mediaElement.src = cachedUrl;
+        mediaElement.src = normalize(cachedUrl) || cleanUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
-      }).catch(() => {});
+      }).catch(() => {
+        if (mediaElementCacheToken.get(mediaElement) !== token) return;
+        if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
+        mediaElement.src = cleanUrl;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+      });
     };
     const warmMediaDiskCacheUrls = (urls = [], maxUrls = PRELOAD_COUNT * 3) => {
       const unique = [...new Set(asArray(urls).map((url) => normalize(url)).filter(Boolean))];
@@ -2425,6 +2421,7 @@
       composeProfileAvatarCandidateUrls = Array.isArray(urls)
         ? urls.map((url) => normalize(url)).filter(Boolean)
         : [];
+      warmMediaDiskCacheUrls(composeProfileAvatarCandidateUrls, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
       composeProfileAvatarCandidateIndex = 0;
       applyComposeProfileAvatarCandidate();
     }
@@ -3495,6 +3492,7 @@
     function setComposerPreview(url) {
       composerPreviewUrl = normalize(url);
       if (!dom.composePreview || !dom.composePreviewVideo || !composerPreviewUrl) return;
+      warmMediaDiskCacheUrls([composerPreviewUrl], 1);
       dom.composePreview.classList.add('visible');
       setMediaElementSourceWithCache(dom.composePreviewVideo, composerPreviewUrl);
     }
