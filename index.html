@@ -1724,14 +1724,27 @@
       return `${gateway}${hash}/${encoded}`;
     };
     const canUseCacheStorage = () => typeof caches !== 'undefined' && typeof caches.open === 'function';
+    const normalizedIpfsGatewayCacheBases = IPFS_GATEWAY_URLS
+      .map((gatewayUrl) => {
+        try {
+          const parsed = new URL(gatewayUrl);
+          const gatewayPath = normalize(parsed.pathname).replace(/\/+$/, '');
+          return `${parsed.origin}${gatewayPath ? `${gatewayPath}/` : '/'}`.toLowerCase();
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean);
     const shouldDiskCacheMediaUrl = (raw = '') => {
       const url = normalize(raw);
       if (!url) return false;
       try {
         const parsed = new URL(url);
         if (!/^https?:$/i.test(parsed.protocol)) return false;
-        if (parsed.pathname.includes('/ipfs/')) return true;
-        return /\.ipfs\./i.test(parsed.hostname);
+        const normalizedCandidate = `${parsed.origin}${parsed.pathname}`.toLowerCase();
+        const matchesTrustedGateway = normalizedIpfsGatewayCacheBases.some((baseUrl) => normalizedCandidate.startsWith(baseUrl));
+        if (!matchesTrustedGateway) return false;
+        return parsed.pathname.toLowerCase().includes('/ipfs/');
       } catch {
         return false;
       }
