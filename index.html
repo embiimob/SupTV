@@ -1819,13 +1819,13 @@
       if (!shouldDiskCacheMediaUrl(cleanUrl)) return cleanUrl;
       const cache = await getMediaDiskCache();
       if (!cache) return cleanUrl;
+      if (mediaCacheResolvePromises.has(cleanUrl)) return mediaCacheResolvePromises.get(cleanUrl);
       const existingObjectUrl = mediaObjectUrlBySourceUrl.get(cleanUrl);
       if (existingObjectUrl) {
         mediaObjectUrlBySourceUrl.delete(cleanUrl);
         mediaObjectUrlBySourceUrl.set(cleanUrl, existingObjectUrl);
         return existingObjectUrl;
       }
-      if (mediaCacheResolvePromises.has(cleanUrl)) return mediaCacheResolvePromises.get(cleanUrl);
       const resolvePromise = (async () => {
         const cached = await cache.match(cleanUrl);
         if (!cached) {
@@ -1845,6 +1845,7 @@
           }
           if (!evictableEntry) break;
           const [oldSourceUrl, oldObjectUrl] = evictableEntry;
+          if ((mediaObjectUrlRefCount.get(oldObjectUrl) || 0) > 0) continue;
           mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
           try { URL.revokeObjectURL(oldObjectUrl); } catch {}
         }
