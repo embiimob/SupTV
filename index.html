@@ -1478,6 +1478,7 @@
     const MS_PER_SECOND = 1000;
     const STREAM_RETRY_LIMIT = 1;
     const IPFS_GATEWAY_RETRY_LIMIT = 3;
+    const MEDIA_OBJECT_URL_CACHE_LIMIT = 24;
     const ACTIVE_STREAM_TIMEOUT_MS = 45000;
     const READY_RANGE_START_ALLOWANCE_SECONDS = 0.75;
     const FULLY_BUFFERED_EPSILON_SECONDS = 0.35;
@@ -1515,6 +1516,7 @@
     const COMPOSER_AMOUNT_PER_RECIPIENT = BTC_DUST_LIMIT_SAT / 1e8;
     const BTC_DEFAULT_FEE_RATE = 10; // sat/vbyte fallback when fee API is unreachable
     const BTC_MIN_FEE_RATE = 2; // sat/vbyte absolute minimum
+    const MEDIA_CACHE_NAME = 'supspace_media_cache_v1';
     const IPFS_GATEWAY_URLS = [
       'https://p2fk.io/ipfs/',
       'https://ipfs.filebase.io/ipfs/',
@@ -1592,6 +1594,12 @@
     let composeEstimateRequestId = 0;
     let composeProfileAvatarCandidateUrls = [];
     let composeProfileAvatarCandidateIndex = 0;
+    const mediaObjectUrlBySourceUrl = new Map();
+    const mediaCacheFillPromises = new Map();
+    const mediaCacheResolvePromises = new Map();
+    const mediaObjectUrlRefCount = new Map();
+    const mediaElementAssignedObjectUrl = new WeakMap();
+    const mediaElementCacheToken = new WeakMap();
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
     const decodeHtmlEntities = (text) => {
@@ -1716,6 +1724,212 @@
         .map((part) => encodeURIComponent(part))
         .join('/');
       return `${gateway}${hash}/${encoded}`;
+    };
+    const canUseCacheStorage = () => typeof caches !== 'undefined' && typeof caches.open === 'function';
+    const isObjectUrl = (url) => /^blob:/i.test(normalize(url));
+    const releaseUnusedMappedObjectUrl = (objectUrl = '') => {
+      const cleanObjectUrl = normalize(objectUrl);
+      if (!isObjectUrl(cleanObjectUrl)) return;
+      if ((mediaObjectUrlRefCount.get(cleanObjectUrl) || 0) > 0) return;
+      for (const [sourceUrl, mappedObjectUrl] of mediaObjectUrlBySourceUrl.entries()) {
+        if (mappedObjectUrl !== cleanObjectUrl) continue;
+        mediaObjectUrlBySourceUrl.delete(sourceUrl);
+      }
+      try { URL.revokeObjectURL(cleanObjectUrl); } catch {}
+    };
+    const updateMediaObjectUrlRef = (mediaElement, nextUrl = '') => {
+      const cleanNext = normalize(nextUrl);
+      const previousObjectUrl = mediaElementAssignedObjectUrl.get(mediaElement);
+      if (previousObjectUrl && cleanNext === previousObjectUrl) return;
+      if (previousObjectUrl && mediaObjectUrlRefCount.has(previousObjectUrl)) {
+        const nextCount = Math.max(0, (mediaObjectUrlRefCount.get(previousObjectUrl) || 0) - 1);
+        if (nextCount > 0) mediaObjectUrlRefCount.set(previousObjectUrl, nextCount);
+        else {
+          mediaObjectUrlRefCount.delete(previousObjectUrl);
+          releaseUnusedMappedObjectUrl(previousObjectUrl);
+        }
+      }
+      if (isObjectUrl(cleanNext)) {
+        mediaElementAssignedObjectUrl.set(mediaElement, cleanNext);
+        mediaObjectUrlRefCount.set(cleanNext, (mediaObjectUrlRefCount.get(cleanNext) || 0) + 1);
+      } else {
+        mediaElementAssignedObjectUrl.delete(mediaElement);
+      }
+    };
+    const normalizedIpfsGatewayCacheBases = IPFS_GATEWAY_URLS
+      .map((gatewayUrl) => {
+        try {
+          const parsed = new URL(gatewayUrl);
+          const gatewayPath = normalize(parsed.pathname).replace(/\/+$/, '');
+          return {
+            originLower: parsed.origin.toLowerCase(),
+            pathPrefix: `${gatewayPath ? `${gatewayPath}/` : '/'}`
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    const shouldDiskCacheMediaUrl = (raw = '') => {
+      const url = normalize(raw);
+      if (!url) return false;
+      try {
+        const parsed = new URL(url);
+        if (!/^https?:$/i.test(parsed.protocol)) return false;
+        const candidateOriginLower = parsed.origin.toLowerCase();
+        const candidatePath = parsed.pathname;
+        const matchesTrustedGateway = normalizedIpfsGatewayCacheBases.some((base) => (
+          candidateOriginLower === base.originLower && candidatePath.startsWith(base.pathPrefix)
+        ));
+        if (!matchesTrustedGateway) return false;
+        return candidatePath.includes('/ipfs/');
+      } catch {
+        return false;
+      }
+    };
+    const getMediaDiskCache = async () => {
+      if (!canUseCacheStorage()) return null;
+      return caches.open(MEDIA_CACHE_NAME);
+    };
+    const fetchCacheableMediaResponse = async (url) => {
+      const corsResponse = await fetch(url, { cache: 'no-store', credentials: 'omit', mode: 'cors' });
+      if (corsResponse?.ok && corsResponse.type !== 'opaque') return corsResponse;
+      throw new Error('media fetch failed');
+    };
+    const populateMediaDiskCache = async (url) => {
+      const cleanUrl = normalize(url);
+      if (!shouldDiskCacheMediaUrl(cleanUrl)) return null;
+      if (mediaCacheFillPromises.has(cleanUrl)) return mediaCacheFillPromises.get(cleanUrl);
+      const fillPromise = (async () => {
+        const cache = await getMediaDiskCache();
+        if (!cache) return null;
+        const existing = await cache.match(cleanUrl);
+        if (existing) return existing;
+        const fetched = await fetchCacheableMediaResponse(cleanUrl);
+        await cache.put(cleanUrl, fetched.clone());
+        return fetched;
+      })().finally(() => {
+        mediaCacheFillPromises.delete(cleanUrl);
+      });
+      mediaCacheFillPromises.set(cleanUrl, fillPromise);
+      return fillPromise;
+    };
+    const resolveMediaUrlFromDiskCache = async (url, { populateOnMiss = true } = {}) => {
+      const cleanUrl = normalize(url);
+      if (!shouldDiskCacheMediaUrl(cleanUrl)) return cleanUrl;
+      const cache = await getMediaDiskCache();
+      if (!cache) return cleanUrl;
+      if (mediaCacheResolvePromises.has(cleanUrl)) return mediaCacheResolvePromises.get(cleanUrl);
+      const existingObjectUrl = mediaObjectUrlBySourceUrl.get(cleanUrl);
+      if (existingObjectUrl) {
+        mediaObjectUrlBySourceUrl.delete(cleanUrl);
+        mediaObjectUrlBySourceUrl.set(cleanUrl, existingObjectUrl);
+        return existingObjectUrl;
+      }
+      const resolvePromise = (async () => {
+        const cached = await cache.match(cleanUrl);
+        if (!cached) {
+          if (populateOnMiss) populateMediaDiskCache(cleanUrl).catch(() => {});
+          return cleanUrl;
+        }
+        if (cached.type === 'opaque') return cleanUrl;
+        const blob = await cached.clone().blob();
+        if (!(blob?.size > 0)) return cleanUrl;
+        while (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) {
+          let evictableEntry = null;
+          for (const entry of mediaObjectUrlBySourceUrl.entries()) {
+            const [, objectUrl] = entry;
+            if ((mediaObjectUrlRefCount.get(objectUrl) || 0) > 0) continue;
+            evictableEntry = entry;
+            break;
+          }
+          if (!evictableEntry) break;
+          const [oldSourceUrl, oldObjectUrl] = evictableEntry;
+          if ((mediaObjectUrlRefCount.get(oldObjectUrl) || 0) > 0) continue;
+          mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
+          try { URL.revokeObjectURL(oldObjectUrl); } catch {}
+        }
+        if (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) return cleanUrl;
+        const objectUrl = URL.createObjectURL(blob);
+        mediaObjectUrlBySourceUrl.set(cleanUrl, objectUrl);
+        return objectUrl;
+      })().finally(() => {
+        mediaCacheResolvePromises.delete(cleanUrl);
+      });
+      mediaCacheResolvePromises.set(cleanUrl, resolvePromise);
+      return resolvePromise;
+    };
+    const releaseStaleObjectUrlForSource = (sourceUrl, objectUrl) => {
+      const cleanSourceUrl = normalize(sourceUrl);
+      const cleanObjectUrl = normalize(objectUrl);
+      if (!isObjectUrl(cleanObjectUrl)) return;
+      if (mediaObjectUrlBySourceUrl.get(cleanSourceUrl) !== cleanObjectUrl) return;
+      if ((mediaObjectUrlRefCount.get(cleanObjectUrl) || 0) > 0) return;
+      mediaObjectUrlBySourceUrl.delete(cleanSourceUrl);
+      try { URL.revokeObjectURL(cleanObjectUrl); } catch {}
+    };
+    const setMediaElementSourceWithCache = (mediaElement, sourceUrl, { invokeLoad = true } = {}) => {
+      if (!mediaElement) return;
+      const cleanUrl = normalize(sourceUrl);
+      const token = (mediaElementCacheToken.get(mediaElement) || 0) + 1;
+      mediaElementCacheToken.set(mediaElement, token);
+      if (!cleanUrl) {
+        updateMediaObjectUrlRef(mediaElement, '');
+        mediaElement.removeAttribute('src');
+        if (mediaElement.dataset?.cacheSource) delete mediaElement.dataset.cacheSource;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+        return;
+      }
+      mediaElement.dataset.cacheSource = cleanUrl;
+      if (!shouldDiskCacheMediaUrl(cleanUrl)) {
+        updateMediaObjectUrlRef(mediaElement, '');
+        mediaElement.src = cleanUrl;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+        return;
+      }
+      resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: true }).then((cachedUrl) => {
+        const resolvedUrl = normalize(cachedUrl) || cleanUrl;
+        if (mediaElementCacheToken.get(mediaElement) !== token) {
+          releaseStaleObjectUrlForSource(cleanUrl, resolvedUrl);
+          return;
+        }
+        if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) {
+          releaseStaleObjectUrlForSource(cleanUrl, resolvedUrl);
+          return;
+        }
+        updateMediaObjectUrlRef(mediaElement, resolvedUrl);
+        mediaElement.src = resolvedUrl;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+      }).catch(() => {
+        if (mediaElementCacheToken.get(mediaElement) !== token) return;
+        if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
+        updateMediaObjectUrlRef(mediaElement, '');
+        mediaElement.src = cleanUrl;
+        if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
+      });
+    };
+    const warmMediaDiskCacheUrls = (urls = [], maxUrls = PRELOAD_COUNT * 3) => {
+      const unique = [...new Set(asArray(urls).map((url) => normalize(url)).filter(Boolean))];
+      unique.slice(0, maxUrls).forEach((url) => {
+        populateMediaDiskCache(url).catch(() => {});
+      });
+    };
+    const warmMediaDiskCacheForItems = (items = [], maxItems = PRELOAD_COUNT * 3) => {
+      const urls = [];
+      asArray(items).slice(0, maxItems).forEach((item) => {
+        const mediaUrl = normalize(item?.url);
+        if (mediaUrl) urls.push(mediaUrl);
+        const imageUrl = normalize(item?.imageUrl);
+        if (imageUrl) urls.push(imageUrl);
+      });
+      warmMediaDiskCacheUrls(urls, maxItems * 2);
+    };
+    const releaseMediaObjectUrls = () => {
+      for (const objectUrl of mediaObjectUrlBySourceUrl.values()) {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+      }
+      mediaObjectUrlBySourceUrl.clear();
+      mediaObjectUrlRefCount.clear();
     };
     const waitingSymbolText = (message = '') => {
       const text = normalize(message).toLowerCase();
@@ -2267,13 +2481,14 @@
         return;
       }
       const nextUrl = composeProfileAvatarCandidateUrls[composeProfileAvatarCandidateIndex];
-      dom.composeProfileAvatar.src = nextUrl;
+      setMediaElementSourceWithCache(dom.composeProfileAvatar, nextUrl, { invokeLoad: false });
     }
 
     function setComposeProfileAvatarCandidates(urls) {
       composeProfileAvatarCandidateUrls = Array.isArray(urls)
         ? urls.map((url) => normalize(url)).filter(Boolean)
         : [];
+      warmMediaDiskCacheUrls(composeProfileAvatarCandidateUrls, PROFILE_IMAGE_MAX_CANDIDATE_URLS);
       composeProfileAvatarCandidateIndex = 0;
       applyComposeProfileAvatarCandidate();
     }
@@ -3336,16 +3551,15 @@
       composerPreviewUrl = '';
       if (!dom.composePreview || !dom.composePreviewVideo) return;
       dom.composePreview.classList.remove('visible');
-      dom.composePreviewVideo.removeAttribute('src');
-      dom.composePreviewVideo.load();
+      setMediaElementSourceWithCache(dom.composePreviewVideo, '');
     }
 
     function setComposerPreview(url) {
       composerPreviewUrl = normalize(url);
       if (!dom.composePreview || !dom.composePreviewVideo || !composerPreviewUrl) return;
+      warmMediaDiskCacheUrls([composerPreviewUrl], 1);
       dom.composePreview.classList.add('visible');
-      dom.composePreviewVideo.src = composerPreviewUrl;
-      dom.composePreviewVideo.load();
+      setMediaElementSourceWithCache(dom.composePreviewVideo, composerPreviewUrl);
     }
 
     function extractIpfsPartsFromInput(value) {
@@ -4332,7 +4546,7 @@
         image.className = 'message-card-image';
         image.loading = 'lazy';
         image.alt = cleanDisplayText(card.title || 'Post image');
-        image.src = card.imageUrl;
+        setMediaElementSourceWithCache(image, card.imageUrl, { invokeLoad: false });
         image.addEventListener('error', () => image.remove());
         if (Array.isArray(card.links) && card.links[0]) {
           const imageLink = document.createElement('a');
@@ -4592,8 +4806,7 @@
       }
       dom.offAirScreen.classList.add('visible');
       hideWaiting();
-      dom.video.removeAttribute('src');
-      dom.video.load();
+      setMediaElementSourceWithCache(dom.video, '');
       updateTicker([], currentKeyword);
       setStatus(message || 'OFF AIR • No more queued search results');
       addMessage({ title: 'Station Notice', meta: currentKeyword, body: message || 'No more search results. SupTV is now off air.', imageUrl: '' });
@@ -4628,8 +4841,7 @@
     function clearPreloadProbe(url, media) {
       const probe = media || preloadElements.get(url);
       if (probe) {
-        probe.removeAttribute('src');
-        probe.load();
+        setMediaElementSourceWithCache(probe, '');
       }
       preloadElements.delete(url);
       const poller = preloadStatusPollers.get(url);
@@ -4686,8 +4898,7 @@
           updateTicker();
           queueMicrotask(primePreloadCandidates);
         });
-        probe.src = candidate.url;
-        probe.load();
+        setMediaElementSourceWithCache(probe, candidate.url);
         preloadElements.set(candidate.url, probe);
         const pollId = window.setInterval(() => {
           if (!preloadElements.has(candidate.url)) {
@@ -4985,6 +5196,7 @@
         .filter((item) => item?.url && !existingQueueUrls.has(item.url) && !trashedVideoUrls.has(item.url))
         .slice(0, headroom);
       if (nextItems.length) playQueue.push(...nextItems);
+      if (nextItems.length) warmMediaDiskCacheForItems(nextItems, nextItems.length);
       return nextItems;
     }
 
@@ -5133,6 +5345,7 @@
 
           const existingQueueUrls = new Set(playQueue.map((i) => i.url));
           const toAdd = batch.filter((i) => !existingQueueUrls.has(i.url));
+          warmMediaDiskCacheForItems(toAdd, toAdd.length);
           const headroom = TRENDING_MAX_PLAYLIST_ITEMS - playQueue.length;
           const wasEmpty = !playQueue.length;
           if (toAdd.length && headroom > 0) {
@@ -5160,6 +5373,7 @@
         const perKeywordItems = allGroups.map((group) => dedupeItemsByTxid(parseItems(group, allLabels)));
         let allItems = batchItemsRoundRobin(perKeywordItems, TRENDING_KEYWORD_BATCH_SIZE);
         if (!allItems.length) allItems = firstItems;
+        warmMediaDiskCacheForItems(allItems, PRELOAD_COUNT * 4);
 
         // Reorder the active playQueue to use the full round-robin sequence.
         // Keep playQueue[0] (currently playing) in place; replace the pending tail so
@@ -5253,8 +5467,7 @@
         preloadElements.delete(entry.url);
         attachVideoListeners(dom.video);
       } else {
-        dom.video.src = entry.url;
-        dom.video.load();
+        setMediaElementSourceWithCache(dom.video, entry.url);
       }
       primePreloadCandidates();
       if (isTrendingStationMode) {
@@ -5387,6 +5600,7 @@
         }
         const maxItems = isTrendingDefault ? TRENDING_MAX_PLAYLIST_ITEMS : MAX_PLAYLIST_ITEMS;
         playQueue = items.filter((item) => !trashedVideoUrls.has(item.url)).slice(0, maxItems);
+        warmMediaDiskCacheForItems(playQueue, PRELOAD_COUNT * 4);
         updateTicker(playQueue, displayKeyword);
         prepareSocialFeed(messages, displayKeyword, addressLabels);
         if (!playQueue.length) throw new Error('all videos were trashed in this session');
@@ -5658,6 +5872,7 @@
         bannerQueueVisibleCount = Math.min(playQueue.length, bannerQueueVisibleCount + BANNER_QUEUE_PAGE_SIZE);
         renderBannerQueue();
       });
+      window.addEventListener('beforeunload', releaseMediaObjectUrls, { once: true });
       document.addEventListener('fullscreenchange', updateFullscreenUiState);
       document.addEventListener('webkitfullscreenchange', updateFullscreenUiState);
       dom.app.addEventListener('mousemove', (event) => {
