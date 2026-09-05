@@ -1597,6 +1597,8 @@
     const mediaObjectUrlBySourceUrl = new Map();
     const mediaCacheFillPromises = new Map();
     const mediaCacheResolvePromises = new Map();
+    const mediaObjectUrlRefCount = new Map();
+    const mediaElementAssignedObjectUrl = new WeakMap();
     const mediaElementCacheToken = new WeakMap();
 
     const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -1724,6 +1726,22 @@
       return `${gateway}${hash}/${encoded}`;
     };
     const canUseCacheStorage = () => typeof caches !== 'undefined' && typeof caches.open === 'function';
+    const isObjectUrl = (url) => /^blob:/i.test(normalize(url));
+    const updateMediaObjectUrlRef = (mediaElement, nextUrl = '') => {
+      const previousObjectUrl = mediaElementAssignedObjectUrl.get(mediaElement);
+      if (previousObjectUrl) {
+        const nextCount = Math.max(0, (mediaObjectUrlRefCount.get(previousObjectUrl) || 0) - 1);
+        if (nextCount > 0) mediaObjectUrlRefCount.set(previousObjectUrl, nextCount);
+        else mediaObjectUrlRefCount.delete(previousObjectUrl);
+      }
+      const cleanNext = normalize(nextUrl);
+      if (isObjectUrl(cleanNext)) {
+        mediaElementAssignedObjectUrl.set(mediaElement, cleanNext);
+        mediaObjectUrlRefCount.set(cleanNext, (mediaObjectUrlRefCount.get(cleanNext) || 0) + 1);
+      } else {
+        mediaElementAssignedObjectUrl.delete(mediaElement);
+      }
+    };
     const normalizedIpfsGatewayCacheBases = IPFS_GATEWAY_URLS
       .map((gatewayUrl) => {
         try {
@@ -1798,9 +1816,15 @@
         const blob = await cached.clone().blob();
         if (!(blob?.size > 0)) return cleanUrl;
         while (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) {
-          const oldestEntry = mediaObjectUrlBySourceUrl.entries().next().value;
-          if (!oldestEntry) break;
-          const [oldSourceUrl, oldObjectUrl] = oldestEntry;
+          let evictableEntry = null;
+          for (const entry of mediaObjectUrlBySourceUrl.entries()) {
+            const [, objectUrl] = entry;
+            if ((mediaObjectUrlRefCount.get(objectUrl) || 0) > 0) continue;
+            evictableEntry = entry;
+            break;
+          }
+          if (!evictableEntry) break;
+          const [oldSourceUrl, oldObjectUrl] = evictableEntry;
           mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
           try { URL.revokeObjectURL(oldObjectUrl); } catch {}
         }
@@ -1819,6 +1843,7 @@
       const token = (mediaElementCacheToken.get(mediaElement) || 0) + 1;
       mediaElementCacheToken.set(mediaElement, token);
       if (!cleanUrl) {
+        updateMediaObjectUrlRef(mediaElement, '');
         mediaElement.removeAttribute('src');
         if (mediaElement.dataset?.cacheSource) delete mediaElement.dataset.cacheSource;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
@@ -1826,18 +1851,22 @@
       }
       mediaElement.dataset.cacheSource = cleanUrl;
       if (!shouldDiskCacheMediaUrl(cleanUrl)) {
+        updateMediaObjectUrlRef(mediaElement, '');
         mediaElement.src = cleanUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
         return;
       }
-      resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: false }).then((cachedUrl) => {
+      resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: true }).then((cachedUrl) => {
         if (mediaElementCacheToken.get(mediaElement) !== token) return;
         if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
-        mediaElement.src = normalize(cachedUrl) || cleanUrl;
+        const resolvedUrl = normalize(cachedUrl) || cleanUrl;
+        updateMediaObjectUrlRef(mediaElement, resolvedUrl);
+        mediaElement.src = resolvedUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
       }).catch(() => {
         if (mediaElementCacheToken.get(mediaElement) !== token) return;
         if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
+        updateMediaObjectUrlRef(mediaElement, '');
         mediaElement.src = cleanUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
       });
@@ -1863,6 +1892,7 @@
         try { URL.revokeObjectURL(objectUrl); } catch {}
       }
       mediaObjectUrlBySourceUrl.clear();
+      mediaObjectUrlRefCount.clear();
     };
     const waitingSymbolText = (message = '') => {
       const text = normalize(message).toLowerCase();
@@ -3484,9 +3514,7 @@
       composerPreviewUrl = '';
       if (!dom.composePreview || !dom.composePreviewVideo) return;
       dom.composePreview.classList.remove('visible');
-      dom.composePreviewVideo.removeAttribute('src');
-      if (dom.composePreviewVideo.dataset) delete dom.composePreviewVideo.dataset.cacheSource;
-      dom.composePreviewVideo.load();
+      setMediaElementSourceWithCache(dom.composePreviewVideo, '');
     }
 
     function setComposerPreview(url) {
@@ -4741,8 +4769,7 @@
       }
       dom.offAirScreen.classList.add('visible');
       hideWaiting();
-      dom.video.removeAttribute('src');
-      dom.video.load();
+      setMediaElementSourceWithCache(dom.video, '');
       updateTicker([], currentKeyword);
       setStatus(message || 'OFF AIR • No more queued search results');
       addMessage({ title: 'Station Notice', meta: currentKeyword, body: message || 'No more search results. SupTV is now off air.', imageUrl: '' });
@@ -4777,8 +4804,7 @@
     function clearPreloadProbe(url, media) {
       const probe = media || preloadElements.get(url);
       if (probe) {
-        probe.removeAttribute('src');
-        probe.load();
+        setMediaElementSourceWithCache(probe, '');
       }
       preloadElements.delete(url);
       const poller = preloadStatusPollers.get(url);
