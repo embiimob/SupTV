@@ -1828,6 +1828,7 @@
           mediaObjectUrlBySourceUrl.delete(oldSourceUrl);
           try { URL.revokeObjectURL(oldObjectUrl); } catch {}
         }
+        if (mediaObjectUrlBySourceUrl.size >= MEDIA_OBJECT_URL_CACHE_LIMIT) return cleanUrl;
         const objectUrl = URL.createObjectURL(blob);
         mediaObjectUrlBySourceUrl.set(cleanUrl, objectUrl);
         return objectUrl;
@@ -1836,6 +1837,15 @@
       });
       mediaCacheResolvePromises.set(cleanUrl, resolvePromise);
       return resolvePromise;
+    };
+    const releaseStaleObjectUrlForSource = (sourceUrl, objectUrl) => {
+      const cleanSourceUrl = normalize(sourceUrl);
+      const cleanObjectUrl = normalize(objectUrl);
+      if (!isObjectUrl(cleanObjectUrl)) return;
+      if (mediaObjectUrlBySourceUrl.get(cleanSourceUrl) !== cleanObjectUrl) return;
+      if ((mediaObjectUrlRefCount.get(cleanObjectUrl) || 0) > 0) return;
+      mediaObjectUrlBySourceUrl.delete(cleanSourceUrl);
+      try { URL.revokeObjectURL(cleanObjectUrl); } catch {}
     };
     const setMediaElementSourceWithCache = (mediaElement, sourceUrl, { invokeLoad = true } = {}) => {
       if (!mediaElement) return;
@@ -1857,9 +1867,15 @@
         return;
       }
       resolveMediaUrlFromDiskCache(cleanUrl, { populateOnMiss: true }).then((cachedUrl) => {
-        if (mediaElementCacheToken.get(mediaElement) !== token) return;
-        if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) return;
         const resolvedUrl = normalize(cachedUrl) || cleanUrl;
+        if (mediaElementCacheToken.get(mediaElement) !== token) {
+          releaseStaleObjectUrlForSource(cleanUrl, resolvedUrl);
+          return;
+        }
+        if (normalize(mediaElement.dataset?.cacheSource) !== cleanUrl) {
+          releaseStaleObjectUrlForSource(cleanUrl, resolvedUrl);
+          return;
+        }
         updateMediaObjectUrlRef(mediaElement, resolvedUrl);
         mediaElement.src = resolvedUrl;
         if (invokeLoad && typeof mediaElement.load === 'function') mediaElement.load();
