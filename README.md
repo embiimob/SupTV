@@ -85,7 +85,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 
 ### testnet3 chain API (wallet/tx side via mempool.space)
 
-`MEMPOOL_TESTNET_API` default: `https://mempool.space/testnet/api`
+Wallet requests start at `https://mempool.space/testnet/api`, with 47 regional Mempool nodes as Testnet3 fallbacks. Each page limits all wallet requests (including retries and broadcasts) to 10 attempts per 10 seconds. A timeout after 10 seconds, network error, HTTP 408, or server error triggers failover; HTTP 429 pauses the queue for at least 10 seconds and respects `Retry-After` when available. New requests use the current preferred node.
 
 | Endpoint | Purpose in SupTV |
 | --- | --- |
@@ -99,6 +99,7 @@ This keeps the posting flow recoverable from a single root WIF while separating 
 | Behavior | Purpose in SupTV |
 | --- | --- |
 | `HEAD` request to candidate gateway URL | Validates that an attachment URL/URN resolves and is reachable before adding to post. |
+| `POST /ipfs` on p2fk.io | Uploads a video; SupTV does not use the deprecated `/add` endpoint. |
 
 ## Key configuration constants
 
